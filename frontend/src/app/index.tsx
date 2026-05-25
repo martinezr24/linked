@@ -3,94 +3,130 @@ import {
   StyleSheet,
   Text,
   View,
-  TextInput,
-  Button,
+  TouchableOpacity,
   SafeAreaView,
-  FlatList,
 } from "react-native";
 
 export default function App() {
-  const [socket, setSocket] = useState<WebSocket | null>(null);
-  const [message, setMessage] = useState("");
-  const [chatHistory, setChatHistory] = useState<string[]>([]);
+  const [socket, setSocket] = useState(null);
+
+  // This is the shared state. It starts as white.
+  const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
 
   useEffect(() => {
-    // 1. Open the connection to the Go server
-    // Note: If testing on an Android emulator, change localhost to 10.0.2.2
+    // 1. Connect to Go (Remember to use your Mac's IP if on a physical phone)
     const ws = new WebSocket("ws://localhost:8080/ws");
 
-    ws.onopen = () => {
-      console.log("Connected to Linked Go Server!");
-    };
+    ws.onopen = () => console.log("Connected to Linked Go Server!");
 
-    // 2. The Event Listener (receives the routed payload from Go)
+    // 2. The JSON Listener
     ws.onmessage = (event) => {
-      setChatHistory((prev) => [...prev, `Partner: ${event.data}`]);
+      try {
+        // Parse the incoming string back into a JSON object
+        const data = JSON.parse(event.data);
+
+        // Route the event based on its "type"
+        if (data.type === "color_change") {
+          console.log("Partner changed the color to:", data.color);
+          setBackgroundColor(data.color); // Instantly update UI
+        }
+      } catch (e) {
+        console.log("Received non-JSON message:", event.data);
+      }
     };
 
     setSocket(ws);
-
-    // 3. Cleanup: Close socket when app closes
-    return () => {
-      ws.close();
-    };
+    return () => ws.close();
   }, []);
 
-  const sendMessage = () => {
-    if (socket && message) {
-      socket.send(message);
-      // Optimistically update our own screen
-      setChatHistory((prev) => [...prev, `Me: ${message}`]);
-      setMessage("");
+  // 3. The JSON Sender
+  const handleColorTap = (hexColor) => {
+    // Optimistically update our own screen instantly
+    setBackgroundColor(hexColor);
+
+    // Build the JSON contract and send it to Go
+    if (socket) {
+      const payload = {
+        type: "color_change",
+        color: hexColor,
+      };
+      // WebSockets only send text/bytes, so we stringify the object
+      socket.send(JSON.stringify(payload));
     }
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.header}>Linked</Text>
+    <SafeAreaView style={[styles.container, { backgroundColor }]}>
+      <Text style={styles.header}>Linked: Shared State</Text>
 
-      <FlatList
-        data={chatHistory}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item }) => <Text style={styles.chatBubble}>{item}</Text>}
-        style={styles.chatBox}
-      />
-
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={message}
-          onChangeText={setMessage}
-          placeholder="Type a message..."
+      <View style={styles.buttonContainer}>
+        {/* The Action Buttons */}
+        <ColorButton
+          color="#FF5733"
+          title="Red"
+          onPress={() => handleColorTap("#FF5733")}
         />
-        <Button title="Send" onPress={sendMessage} />
+        <ColorButton
+          color="#33FF57"
+          title="Green"
+          onPress={() => handleColorTap("#33FF57")}
+        />
+        <ColorButton
+          color="#3357FF"
+          title="Blue"
+          onPress={() => handleColorTap("#3357FF")}
+        />
+        <ColorButton
+          color="#FFFFFF"
+          title="Reset"
+          onPress={() => handleColorTap("#FFFFFF")}
+        />
       </View>
     </SafeAreaView>
   );
 }
 
+// A simple reusable button component
+const ColorButton = ({ color, title, onPress }) => (
+  <TouchableOpacity
+    style={[styles.button, { backgroundColor: color }]}
+    onPress={onPress}
+  >
+    <Text style={styles.buttonText}>{title}</Text>
+  </TouchableOpacity>
+);
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f5f5f5", padding: 20 },
+  container: {
+    flex: 1,
+    justifyContent: "center",
+    transition: "background-color 0.2s",
+  },
   header: {
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    marginVertical: 10,
+    marginBottom: 50,
   },
-  chatBox: { flex: 1, marginVertical: 20 },
-  chatBubble: {
-    padding: 10,
-    backgroundColor: "#e0e0e0",
-    marginVertical: 5,
-    borderRadius: 8,
+  buttonContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "center",
+    gap: 20,
   },
-  inputContainer: { flexDirection: "row", alignItems: "center" },
-  input: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    padding: 10,
-    borderRadius: 8,
-    marginRight: 10,
+  button: {
+    padding: 20,
+    borderRadius: 50,
+    width: 100,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+  },
+  buttonText: {
+    fontWeight: "bold",
+    color: "#000",
+    textShadowColor: "#FFF",
+    textShadowRadius: 2,
   },
 });
