@@ -3,32 +3,47 @@ import {
   StyleSheet,
   Text,
   View,
+  TextInput,
   TouchableOpacity,
   SafeAreaView,
+  FlatList,
 } from "react-native";
+
+// Helper to generate a unique ID without needing external libraries right now
+const generateId = () =>
+  Date.now().toString(36) + Math.random().toString(36).substring(2);
 
 export default function App() {
   const [socket, setSocket] = useState(null);
+  const [inputText, setInputText] = useState("");
 
-  // This is the shared state. It starts as white.
-  const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
+  // The shared array state. Initialized with one item to test with.
+  const [itinerary, setItinerary] = useState([
+    { id: "item_init", text: "Flight arrives in CDMX" },
+  ]);
 
   useEffect(() => {
-    // 1. Connect to Go (Remember to use your Mac's IP if on a physical phone)
-    const ws = new WebSocket("ws://localhost:8080/ws");
+    // 1. Connect to Go (Change localhost to your Mac's IP if using a physical phone)
+    const ws = new WebSocket("ws://192.168.1.206:8080/ws");
 
-    ws.onopen = () => console.log("Connected to Linked Go Server!");
+    ws.onopen = () => console.log("Connected to Go Server!");
 
-    // 2. The JSON Listener
+    // 2. Listen for incoming JSON payloads from the Go router
     ws.onmessage = (event) => {
       try {
-        // Parse the incoming string back into a JSON object
-        const data = JSON.parse(event.data);
+        const { action, payload } = JSON.parse(event.data);
 
-        // Route the event based on its "type"
-        if (data.type === "color_change") {
-          console.log("Partner changed the color to:", data.color);
-          setBackgroundColor(data.color); // Instantly update UI
+        switch (action) {
+          case "ADD_ITEM":
+            setItinerary((prev) => [...prev, payload]);
+            break;
+          case "DELETE_ITEM":
+            setItinerary((prev) =>
+              prev.filter((item) => item.id !== payload.id),
+            );
+            break;
+          default:
+            console.log("Unknown action:", action);
         }
       } catch (e) {
         console.log("Received non-JSON message:", event.data);
@@ -39,94 +54,111 @@ export default function App() {
     return () => ws.close();
   }, []);
 
-  // 3. The JSON Sender
-  const handleColorTap = (hexColor) => {
-    // Optimistically update our own screen instantly
-    setBackgroundColor(hexColor);
+  // --- MUTATION FUNCTIONS ---
 
-    // Build the JSON contract and send it to Go
-    if (socket) {
-      const payload = {
-        type: "color_change",
-        color: hexColor,
-      };
-      // WebSockets only send text/bytes, so we stringify the object
-      socket.send(JSON.stringify(payload));
-    }
+  const handleAddItem = () => {
+    if (!inputText.trim() || !socket) return;
+
+    const newItem = { id: generateId(), text: inputText };
+
+    // 1. Optimistically update our local screen instantly
+    setItinerary((prev) => [...prev, newItem]);
+    setInputText(""); // Clear the input box
+
+    // 2. Build the JSON contract and send it to the Go server
+    const message = {
+      action: "ADD_ITEM",
+      payload: newItem,
+    };
+    socket.send(JSON.stringify(message));
   };
 
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor }]}>
-      <Text style={styles.header}>Linked: Shared State</Text>
+  const handleDeleteItem = (id) => {
+    if (!socket) return;
 
-      <View style={styles.buttonContainer}>
-        {/* The Action Buttons */}
-        <ColorButton
-          color="#FF5733"
-          title="Red"
-          onPress={() => handleColorTap("#FF5733")}
+    // 1. Instantly remove it from our local screen
+    setItinerary((prev) => prev.filter((item) => item.id !== id));
+
+    // 2. Tell the Go server to tell the partner to delete it
+    const message = {
+      action: "DELETE_ITEM",
+      payload: { id: id },
+    };
+    socket.send(JSON.stringify(message));
+  };
+
+  // --- UI RENDERING ---
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <Text style={styles.header}>Trip Itinerary</Text>
+
+      <View style={styles.inputContainer}>
+        <TextInput
+          style={styles.input}
+          value={inputText}
+          onChangeText={setInputText}
+          placeholder="Add a new plan..."
+          onSubmitEditing={handleAddItem} // Triggers when you hit enter on the keyboard
         />
-        <ColorButton
-          color="#33FF57"
-          title="Green"
-          onPress={() => handleColorTap("#33FF57")}
-        />
-        <ColorButton
-          color="#3357FF"
-          title="Blue"
-          onPress={() => handleColorTap("#3357FF")}
-        />
-        <ColorButton
-          color="#FFFFFF"
-          title="Reset"
-          onPress={() => handleColorTap("#FFFFFF")}
-        />
+        <TouchableOpacity style={styles.addButton} onPress={handleAddItem}>
+          <Text style={styles.addButtonText}>Add</Text>
+        </TouchableOpacity>
       </View>
+
+      <FlatList
+        data={itinerary}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.listItem}>
+            <Text style={styles.itemText}>{item.text}</Text>
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDeleteItem(item.id)}
+            >
+              <Text style={styles.deleteButtonText}>✕</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        style={styles.list}
+      />
     </SafeAreaView>
   );
 }
 
-// A simple reusable button component
-const ColorButton = ({ color, title, onPress }) => (
-  <TouchableOpacity
-    style={[styles.button, { backgroundColor: color }]}
-    onPress={onPress}
-  >
-    <Text style={styles.buttonText}>{title}</Text>
-  </TouchableOpacity>
-);
-
 const styles = StyleSheet.create({
-  container: {
+  container: { flex: 1, backgroundColor: "#f9f9f9", padding: 20 },
+  header: { fontSize: 28, fontWeight: "800", marginBottom: 20, marginTop: 10 },
+  inputContainer: { flexDirection: "row", marginBottom: 20 },
+  input: {
     flex: 1,
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#ddd",
+    marginRight: 10,
+  },
+  addButton: {
+    backgroundColor: "#000",
+    paddingHorizontal: 20,
     justifyContent: "center",
-    transition: "background-color 0.2s",
+    borderRadius: 10,
   },
-  header: {
-    fontSize: 24,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 50,
-  },
-  buttonContainer: {
+  addButtonText: { color: "#fff", fontWeight: "bold" },
+  list: { flex: 1 },
+  listItem: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 20,
-  },
-  button: {
-    padding: 20,
-    borderRadius: 50,
-    width: 100,
+    backgroundColor: "#fff",
+    padding: 15,
+    borderRadius: 10,
+    marginBottom: 10,
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.2,
-    shadowRadius: 5,
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#eee",
   },
-  buttonText: {
-    fontWeight: "bold",
-    color: "#000",
-    textShadowColor: "#FFF",
-    textShadowRadius: 2,
-  },
+  itemText: { fontSize: 16, flex: 1 },
+  deleteButton: { padding: 5 },
+  deleteButtonText: { color: "#ff4444", fontWeight: "bold", fontSize: 18 },
 });
