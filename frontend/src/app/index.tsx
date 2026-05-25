@@ -10,9 +10,9 @@ import {
 } from "react-native";
 
 export default function App() {
-  const [socket, setSocket] = useState(null);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
   const [message, setMessage] = useState("");
-  const [chatHistory, setChatHistory] = useState([]);
+  const [chatHistory, setChatHistory] = useState<string[]>([]);
 
   useEffect(() => {
     // 1. Open the connection to the Go server
