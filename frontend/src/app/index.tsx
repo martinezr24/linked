@@ -112,9 +112,7 @@ export default function ItineraryScreen() {
     <SafeAreaView style={styles.container}>
       <Text style={styles.header}>Trip Itinerary</Text>
 
-      {loadError ? (
-        <Text style={styles.errorText}>{loadError}</Text>
-      ) : null}
+      {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
 
       <View style={styles.inputContainer}>
         <TextInput
