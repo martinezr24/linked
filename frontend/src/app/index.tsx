@@ -1,97 +1,120 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  FlatList,
   StyleSheet,
   Text,
-  View,
   TextInput,
   TouchableOpacity,
-  SafeAreaView,
-  FlatList,
+  View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-// Helper to generate a unique ID without needing external libraries right now
+import { getApiBase, getWsUrl } from "@/constants/api";
+
+type ItineraryItem = { id: string; text: string };
+
 const generateId = () =>
   Date.now().toString(36) + Math.random().toString(36).substring(2);
 
-export default function App() {
-  const [socket, setSocket] = useState(null);
+export default function ItineraryScreen() {
+  const [socket, setSocket] = useState<WebSocket | null>(null);
   const [inputText, setInputText] = useState("");
-
-  // The shared array state. Initialized with one item to test with.
-  const [itinerary, setItinerary] = useState([
-    { id: "item_init", text: "Flight arrives in CDMX" },
-  ]);
+  const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
-    // 1. Connect to Go (Change localhost to your Mac's IP if using a physical phone)
-    const ws = new WebSocket("ws://192.168.1.206:8080/ws");
+    const apiBase = getApiBase();
+    const wsUrl = getWsUrl();
 
-    ws.onopen = () => console.log("Connected to Go Server!");
+    const loadHistory = async () => {
+      try {
+        const response = await fetch(`${apiBase}/api/itinerary`);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        const data: ItineraryItem[] = await response.json();
+        setItinerary(Array.isArray(data) ? data : []);
+      } catch (error) {
+        console.error("Failed to load itinerary:", error);
+        setLoadError("Could not reach the server. Is the backend running?");
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-    // 2. Listen for incoming JSON payloads from the Go router
+    loadHistory();
+
+    const ws = new WebSocket(wsUrl);
+
+    ws.onopen = () => {
+      console.log("Connected to Go WebSocket");
+      setSocket(ws);
+    };
+
     ws.onmessage = (event) => {
       try {
         const { action, payload } = JSON.parse(event.data);
-
         switch (action) {
           case "ADD_ITEM":
-            setItinerary((prev) => [...prev, payload]);
+            setItinerary((prev) =>
+              prev.some((item) => item.id === payload.id)
+                ? prev
+                : [...prev, payload],
+            );
             break;
           case "DELETE_ITEM":
             setItinerary((prev) =>
               prev.filter((item) => item.id !== payload.id),
             );
             break;
-          default:
-            console.log("Unknown action:", action);
         }
-      } catch (e) {
-        console.log("Received non-JSON message:", event.data);
+      } catch {
+        console.log("Non-JSON WebSocket message:", event.data);
       }
     };
 
-    setSocket(ws);
+    ws.onerror = () => {
+      console.error("WebSocket error");
+    };
+
     return () => ws.close();
   }, []);
 
-  // --- MUTATION FUNCTIONS ---
-
   const handleAddItem = () => {
-    if (!inputText.trim() || !socket) return;
+    const text = inputText.trim();
+    if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
 
-    const newItem = { id: generateId(), text: inputText };
-
-    // 1. Optimistically update our local screen instantly
+    const newItem: ItineraryItem = { id: generateId(), text };
     setItinerary((prev) => [...prev, newItem]);
-    setInputText(""); // Clear the input box
-
-    // 2. Build the JSON contract and send it to the Go server
-    const message = {
-      action: "ADD_ITEM",
-      payload: newItem,
-    };
-    socket.send(JSON.stringify(message));
+    setInputText("");
+    socket.send(JSON.stringify({ action: "ADD_ITEM", payload: newItem }));
   };
 
-  const handleDeleteItem = (id) => {
-    if (!socket) return;
+  const handleDeleteItem = (id: string) => {
+    if (!socket || socket.readyState !== WebSocket.OPEN) return;
 
-    // 1. Instantly remove it from our local screen
     setItinerary((prev) => prev.filter((item) => item.id !== id));
-
-    // 2. Tell the Go server to tell the partner to delete it
-    const message = {
-      action: "DELETE_ITEM",
-      payload: { id: id },
-    };
-    socket.send(JSON.stringify(message));
+    socket.send(JSON.stringify({ action: "DELETE_ITEM", payload: { id } }));
   };
 
-  // --- UI RENDERING ---
+  if (isLoading) {
+    return (
+      <SafeAreaView style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#000" />
+        <Text style={styles.loadingText}>Loading itinerary…</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <Text style={styles.header}>Trip Itinerary</Text>
+
+      {loadError ? (
+        <Text style={styles.errorText}>{loadError}</Text>
+      ) : null}
 
       <View style={styles.inputContainer}>
         <TextInput
@@ -99,7 +122,7 @@ export default function App() {
           value={inputText}
           onChangeText={setInputText}
           placeholder="Add a new plan..."
-          onSubmitEditing={handleAddItem} // Triggers when you hit enter on the keyboard
+          onSubmitEditing={handleAddItem}
         />
         <TouchableOpacity style={styles.addButton} onPress={handleAddItem}>
           <Text style={styles.addButtonText}>Add</Text>
@@ -109,6 +132,9 @@ export default function App() {
       <FlatList
         data={itinerary}
         keyExtractor={(item) => item.id}
+        ListEmptyComponent={
+          <Text style={styles.emptyText}>No plans yet — add one above.</Text>
+        }
         renderItem={({ item }) => (
           <View style={styles.listItem}>
             <Text style={styles.itemText}>{item.text}</Text>
@@ -128,6 +154,9 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9f9f9", padding: 20 },
+  centered: { justifyContent: "center", alignItems: "center" },
+  loadingText: { marginTop: 15, fontSize: 16, fontWeight: "600" },
+  errorText: { color: "#c0392b", marginBottom: 12 },
   header: { fontSize: 28, fontWeight: "800", marginBottom: 20, marginTop: 10 },
   inputContainer: { flexDirection: "row", marginBottom: 20 },
   input: {
@@ -147,6 +176,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: { color: "#fff", fontWeight: "bold" },
   list: { flex: 1 },
+  emptyText: { textAlign: "center", color: "#888", marginTop: 24 },
   listItem: {
     flexDirection: "row",
     backgroundColor: "#fff",
