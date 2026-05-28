@@ -13,6 +13,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { getApiBase, getWsUrl } from "@/constants/api";
 import * as SecureStore from "expo-secure-store";
 import { router } from "expo-router";
+import { Redirect } from "expo-router";
+import { Platform } from "react-native";
 
 type ItineraryItem = { id: string; text: string };
 
@@ -25,6 +27,8 @@ export default function ItineraryScreen() {
   const [itinerary, setItinerary] = useState<ItineraryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isRouteCheckDone, setIsRouteCheckDone] = useState(false);
+  const [isPaired, setIsPaired] = useState(false);
 
   useEffect(() => {
     const apiBase = getApiBase();
@@ -84,6 +88,22 @@ export default function ItineraryScreen() {
     return () => ws.close();
   }, []);
 
+  useEffect(() => {
+    (async () => {
+      let relationshipId: string | null = null;
+      if (Platform.OS === "web") {
+        relationshipId =
+          typeof window !== "undefined"
+            ? window.localStorage.getItem("relationship_id")
+            : null;
+      } else {
+        relationshipId = await SecureStore.getItemAsync("relationship_id");
+      }
+      setIsPaired(Boolean(relationshipId));
+      setIsRouteCheckDone(true);
+    })();
+  }, []);
+
   const handleAddItem = () => {
     const text = inputText.trim();
     if (!text || !socket || socket.readyState !== WebSocket.OPEN) return;
@@ -102,13 +122,25 @@ export default function ItineraryScreen() {
   };
   const handleDebugReset = async () => {
     try {
-      await SecureStore.deleteItemAsync("relationship_id");
-      await SecureStore.deleteItemAsync("device_id");
+      if (Platform.OS === "web") {
+        window.localStorage.removeItem("relationship_id");
+        window.localStorage.removeItem("device_id");
+      } else {
+        await SecureStore.deleteItemAsync("relationship_id");
+        await SecureStore.deleteItemAsync("device_id");
+      }
       router.replace("/pair");
     } catch (error) {
       console.error("Failed to reset local pairing state:", error);
     }
   };
+
+  if (!isRouteCheckDone) {
+    return null;
+  }
+  if (!isPaired) {
+    return <Redirect href="/pair" />;
+  }
 
   if (isLoading) {
     return (

@@ -147,8 +147,9 @@ func processIncomingPayload(rawMessage []byte) {
 }
 
 func handleGetItinerary(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
+	if applyCORS(w, r) {
+		return
+	}
 
 	rows, err := db.Query(`SELECT id, text FROM itinerary_items ORDER BY created_at ASC`)
 	if err != nil {
@@ -176,6 +177,7 @@ func main() {
 	http.HandleFunc("/api/itinerary", handleGetItinerary)
 	http.HandleFunc("/api/pairing/generate", handlePairingGenerate)
 	http.HandleFunc("/api/pairing/link",     handlePairingLink)	
+	http.HandleFunc("/api/pairing/status", handlePairingStatus)
 
 	fmt.Println("Linked engine running with persistence on :8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -201,6 +203,10 @@ func getOrCreateUser(deviceID string) (*User, error) {
 }
 
 func handlePairingGenerate(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
+		return
+	}
+
     deviceID := r.Header.Get("X-Device-Id")
     if deviceID == "" {
         http.Error(w, "missing X-Device-Id header", http.StatusBadRequest)
@@ -247,6 +253,10 @@ func handlePairingGenerate(w http.ResponseWriter, r *http.Request) {
 }
 
 func handlePairingLink(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
+		return
+	}
+
     deviceID := r.Header.Get("X-Device-Id")
     if deviceID == "" {
         http.Error(w, "missing X-Device-Id header", http.StatusBadRequest)
@@ -330,4 +340,39 @@ func handlePairingLink(w http.ResponseWriter, r *http.Request) {
     json.NewEncoder(w).Encode(map[string]any{
         "relationshipId": relationshipID,
     })
+}
+
+func handlePairingStatus(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
+		return
+	}
+
+	deviceID := r.Header.Get("X-Device-Id")
+	if deviceID == "" {
+		http.Error(w, "missing X-Device-Id header", http.StatusBadRequest)
+		return
+	}
+
+	user, err := getOrCreateUser(deviceID)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"relationshipId": user.RelationshipID, // nil when not paired
+	})
+}
+func applyCORS(w http.ResponseWriter, r *http.Request) bool {
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-Device-Id")
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return true
+	}
+	return false
 }

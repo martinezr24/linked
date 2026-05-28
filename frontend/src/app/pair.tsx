@@ -13,6 +13,7 @@ import * as SecureStore from "expo-secure-store";
 
 import { getApiBase } from "@/constants/api";
 import { getOrCreateDeviceId } from "@/utils/deviceId";
+import { Platform } from "react-native";
 
 export default function PairScreen() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
@@ -33,6 +34,39 @@ export default function PairScreen() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!deviceId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${getApiBase()}/api/pairing/status`, {
+          method: "GET",
+          headers: { "X-Device-Id": deviceId },
+        });
+
+        if (!res.ok) return;
+
+        const data: { relationshipId: string | null } = await res.json();
+
+        if (data.relationshipId) {
+          if (Platform.OS === "web") {
+            window.localStorage.setItem("relationship_id", data.relationshipId);
+          } else {
+            await SecureStore.setItemAsync(
+              "relationship_id",
+              data.relationshipId,
+            );
+          }
+          router.replace("/");
+        }
+      } catch {
+        // Ignore transient network errors during polling.
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [deviceId]);
 
   async function handleGenerate() {
     if (!deviceId) return;
@@ -90,7 +124,11 @@ export default function PairScreen() {
     }
 
     const data = await res.json();
-    await SecureStore.setItemAsync("relationship_id", data.relationshipId);
+    if (Platform.OS === "web") {
+      window.localStorage.setItem("relationship_id", data.relationshipId);
+    } else {
+      await SecureStore.setItemAsync("relationship_id", data.relationshipId);
+    }
     router.replace("/");
   }
 
