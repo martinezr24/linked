@@ -11,6 +11,8 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getApiBase, getWsUrl } from "@/constants/api";
+import * as SecureStore from "expo-secure-store";
+import { router } from "expo-router";
 
 type ItineraryItem = { id: string; text: string };
 
@@ -98,6 +100,15 @@ export default function ItineraryScreen() {
     setItinerary((prev) => prev.filter((item) => item.id !== id));
     socket.send(JSON.stringify({ action: "DELETE_ITEM", payload: { id } }));
   };
+  const handleDebugReset = async () => {
+    try {
+      await SecureStore.deleteItemAsync("relationship_id");
+      await SecureStore.deleteItemAsync("device_id");
+      router.replace("/pair");
+    } catch (error) {
+      console.error("Failed to reset local pairing state:", error);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -146,6 +157,12 @@ export default function ItineraryScreen() {
         )}
         style={styles.list}
       />
+      <TouchableOpacity
+        style={styles.debugResetButton}
+        onPress={handleDebugReset}
+      >
+        <Text style={styles.debugResetButtonText}>Reset pairing (debug)</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -189,4 +206,20 @@ const styles = StyleSheet.create({
   itemText: { fontSize: 16, flex: 1 },
   deleteButton: { padding: 5 },
   deleteButtonText: { color: "#ff4444", fontWeight: "bold", fontSize: 18 },
+
+  debugResetButton: {
+    alignSelf: "flex-start",
+    backgroundColor: "#fce8e6",
+    borderColor: "#f5b7b1",
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  debugResetButtonText: {
+    color: "#b03a2e",
+    fontSize: 12,
+    fontWeight: "700",
+  },
 });
