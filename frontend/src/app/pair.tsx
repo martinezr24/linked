@@ -9,13 +9,12 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
-import * as SecureStore from "expo-secure-store";
-
 import { getApiBase } from "@/constants/api";
+import { useRelationship } from "@/context/RelationshipContext";
 import { getOrCreateDeviceId } from "@/utils/deviceId";
-import { Platform } from "react-native";
 
 export default function PairScreen() {
+  const { setPaired } = useRelationship();
   const [deviceId, setDeviceId] = useState<string | null>(null);
 
   // "generate" state
@@ -50,14 +49,7 @@ export default function PairScreen() {
         const data: { relationshipId: string | null } = await res.json();
 
         if (data.relationshipId) {
-          if (Platform.OS === "web") {
-            window.localStorage.setItem("relationship_id", data.relationshipId);
-          } else {
-            await SecureStore.setItemAsync(
-              "relationship_id",
-              data.relationshipId,
-            );
-          }
+          await setPaired(data.relationshipId);
           router.replace("/");
         }
       } catch {
@@ -124,11 +116,7 @@ export default function PairScreen() {
     }
 
     const data = await res.json();
-    if (Platform.OS === "web") {
-      window.localStorage.setItem("relationship_id", data.relationshipId);
-    } else {
-      await SecureStore.setItemAsync("relationship_id", data.relationshipId);
-    }
+    await setPaired(data.relationshipId);
     router.replace("/");
   }
 

@@ -1,5 +1,4 @@
 # linked
-
 App for long distance couples
 
 ## PostgreSQL (local dev)
@@ -11,7 +10,7 @@ brew install postgresql@18
 ./scripts/start-postgresql.sh
 ```
 
-Create the app database and `itinerary_items` table:
+Create the app database and schema (lists, goals, events, pairing):
 
 ```bash
 ./scripts/setup-database.sh
