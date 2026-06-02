@@ -12,7 +12,7 @@ export type WeeklyGoal = {
   goalText: string;
   weekStart: string;
   done: boolean;
-} | null;
+};
 
 export type SharedEvent = {
   id: string;

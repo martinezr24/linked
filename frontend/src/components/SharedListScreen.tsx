@@ -2,14 +2,16 @@ import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppTextInput } from "@/components/AppTextInput";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import type { ListItem, ListType } from "@/types";
@@ -77,6 +79,7 @@ export function SharedListScreen({
   const handleAdd = () => {
     const text = inputText.trim();
     if (!text) return;
+    Keyboard.dismiss();
 
     const newItem: ListItem = {
       id: generateId(),
@@ -107,59 +110,71 @@ export function SharedListScreen({
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <Text style={styles.header}>{title}</Text>
-      {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
+      <DismissKeyboardView scroll={false} style={styles.flex}>
+        <Text style={styles.header}>{title}</Text>
+        {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
 
-      <View style={styles.inputBlock}>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            value={inputText}
-            onChangeText={setInputText}
-            placeholder={placeholder}
-            onSubmitEditing={handleAdd}
-          />
-          <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
-            <Text style={styles.addButtonText}>Add</Text>
-          </TouchableOpacity>
-        </View>
-        {notePlaceholder ? (
-          <TextInput
-            style={styles.noteInput}
-            value={inputNote}
-            onChangeText={setInputNote}
-            placeholder={notePlaceholder}
-          />
-        ) : null}
-      </View>
-
-      <FlatList
-        data={items}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>Nothing here yet — add one above.</Text>
-        }
-        renderItem={({ item }) => (
-          <View style={styles.listItem}>
-            <View style={styles.itemContent}>
-              <Text style={styles.itemText}>{item.text}</Text>
-              {item.note ? (
-                <Text style={styles.itemNote}>{item.note}</Text>
-              ) : null}
-            </View>
-            <TouchableOpacity onPress={() => handleDelete(item.id)}>
-              <Text style={styles.deleteText}>✕</Text>
+        <View style={styles.inputBlock}>
+          <View style={styles.inputRow}>
+            <AppTextInput
+              style={styles.input}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder={placeholder}
+              returnKeyType="done"
+              blurOnSubmit
+              onSubmitEditing={handleAdd}
+            />
+            <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
+              <Text style={styles.addButtonText}>Add</Text>
             </TouchableOpacity>
           </View>
-        )}
-        style={styles.list}
-      />
+          {notePlaceholder ? (
+            <AppTextInput
+              style={styles.noteInput}
+              value={inputNote}
+              onChangeText={setInputNote}
+              placeholder={notePlaceholder}
+              returnKeyType="done"
+              blurOnSubmit
+            />
+          ) : null}
+        </View>
+
+        <FlatList
+          data={items}
+          keyExtractor={(item) => item.id}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          ListEmptyComponent={
+            <Text style={styles.emptyText}>
+              Nothing here yet — add one above.
+            </Text>
+          }
+          renderItem={({ item }) => (
+            <View style={styles.listItem}>
+              <View style={styles.itemContent}>
+                <Text style={styles.itemText}>{item.text}</Text>
+                {item.note ? (
+                  <Text style={styles.itemNote}>{item.note}</Text>
+                ) : null}
+              </View>
+              <TouchableOpacity onPress={() => handleDelete(item.id)}>
+                <Text style={styles.deleteText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+        />
+      </DismissKeyboardView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9f9f9", padding: 20 },
+  flex: { flex: 1 },
   centered: { justifyContent: "center", alignItems: "center" },
   header: { fontSize: 26, fontWeight: "800", marginBottom: 16 },
   errorText: { color: "#c0392b", marginBottom: 12 },
@@ -190,6 +205,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: { color: "#fff", fontWeight: "bold" },
   list: { flex: 1 },
+  listContent: { paddingBottom: 24 },
   emptyText: { textAlign: "center", color: "#888", marginTop: 24 },
   listItem: {
     flexDirection: "row",

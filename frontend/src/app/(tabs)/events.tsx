@@ -2,14 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Keyboard,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { AppTextInput } from "@/components/AppTextInput";
 import { DatePickerField } from "@/components/DatePickerField";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
@@ -67,6 +68,7 @@ export default function EventsScreen() {
 
   const handleAdd = async () => {
     if (!deviceId || !title.trim() || !eventDate) return;
+    Keyboard.dismiss();
 
     const eventAt = dateToIso(eventDate);
     const ev: SharedEvent = {
@@ -115,27 +117,30 @@ export default function EventsScreen() {
     );
   }
 
-  return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
+  const listHeader = (
+    <View>
       <Text style={styles.header}>Upcoming events</Text>
       <Text style={styles.hint}>Shared dates you both should know about.</Text>
 
-      <TextInput
+      <AppTextInput
         style={styles.input}
         value={title}
         onChangeText={setTitle}
         placeholder="Event title"
+        returnKeyType="next"
       />
       <DatePickerField
         label="Event date"
         value={eventDate}
         onChange={setEventDate}
       />
-      <TextInput
+      <AppTextInput
         style={styles.input}
         value={ownerLabel}
         onChangeText={setOwnerLabel}
         placeholder="Whose event? (optional)"
+        returnKeyType="done"
+        blurOnSubmit
       />
       <TouchableOpacity
         style={[
@@ -147,19 +152,27 @@ export default function EventsScreen() {
       >
         <Text style={styles.buttonText}>Add event</Text>
       </TouchableOpacity>
+    </View>
+  );
 
+  return (
+    <SafeAreaView style={styles.container} edges={["top"]}>
       <FlatList
         data={events}
         keyExtractor={(item) => item.id}
         style={styles.list}
-        ListEmptyComponent={
-          <Text style={styles.empty}>No events yet.</Text>
-        }
+        contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={<Text style={styles.empty}>No events yet.</Text>}
         renderItem={({ item }) => (
           <View style={styles.item}>
             <View style={styles.itemBody}>
               <Text style={styles.itemTitle}>{item.title}</Text>
-              <Text style={styles.itemDate}>{formatMMDDYYYY(item.eventAt)}</Text>
+              <Text style={styles.itemDate}>
+                {formatMMDDYYYY(item.eventAt)}
+              </Text>
               {item.ownerLabel ? (
                 <Text style={styles.itemOwner}>{item.ownerLabel}</Text>
               ) : null}
@@ -197,6 +210,7 @@ const styles = StyleSheet.create({
   buttonDisabled: { backgroundColor: "#ccc" },
   buttonText: { color: "#fff", fontWeight: "700" },
   list: { flex: 1 },
+  listContent: { paddingBottom: 24 },
   empty: { textAlign: "center", color: "#888", marginTop: 24 },
   item: {
     flexDirection: "row",

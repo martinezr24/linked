@@ -3,12 +3,13 @@ import {
   ActivityIndicator,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { AppTextInput } from "@/components/AppTextInput";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 import { getApiBase } from "@/constants/api";
 import { useRelationship } from "@/context/RelationshipContext";
 import { getOrCreateDeviceId } from "@/utils/deviceId";
@@ -125,6 +126,7 @@ export default function PairScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      <DismissKeyboardView>
       <Text style={styles.title}>Link with your partner</Text>
 
       {/* --- GENERATE CODE section --- */}
@@ -153,13 +155,15 @@ export default function PairScreen() {
       {/* --- ENTER CODE section --- */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Enter your partner's code</Text>
-        <TextInput
+        <AppTextInput
           style={styles.input}
           value={enteredCode}
           onChangeText={(t) => setEnteredCode(t.replace(/\D/g, "").slice(0, 6))}
           placeholder="6-digit code"
           keyboardType="number-pad"
           maxLength={6}
+          returnKeyType="done"
+          blurOnSubmit
         />
         <TouchableOpacity
           style={[
@@ -178,6 +182,7 @@ export default function PairScreen() {
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
+      </DismissKeyboardView>
     </SafeAreaView>
   );
 }

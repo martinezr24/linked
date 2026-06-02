@@ -1,16 +1,18 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Keyboard,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { type Href, Link } from "expo-router";
 
+import { AppTextInput } from "@/components/AppTextInput";
 import { DatePickerField } from "@/components/DatePickerField";
+import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { dateToIso, formatMMDDYYYY } from "@/utils/dates";
@@ -36,7 +38,7 @@ export default function HomeScreen() {
   const { deviceId, subscribe, sendMessage } = useRelationship();
   const [nextVisitAt, setNextVisitAt] = useState<string | null>(null);
   const [visitDraft, setVisitDraft] = useState<Date | null>(null);
-  const [goal, setGoal] = useState<WeeklyGoal>(null);
+  const [goals, setGoals] = useState<WeeklyGoal[]>([]);
   const [goalInput, setGoalInput] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -53,8 +55,8 @@ export default function HomeScreen() {
         setNextVisitAt(rel.nextVisitAt ?? null);
       }
       if (goalRes.ok) {
-        const g: WeeklyGoal = await goalRes.json();
-        setGoal(g);
+        const g: WeeklyGoal[] = await goalRes.json();
+        setGoals(Array.isArray(g) ? g : []);
       }
     } finally {
       setLoading(false);
@@ -71,9 +73,19 @@ export default function HomeScreen() {
         const at = msg.payload.nextVisitAt as string | null | undefined;
         setNextVisitAt(at ?? null);
       }
-      if (msg.action === "WEEKLY_GOAL_UPDATED") {
+      if (msg.action === "ADD_WEEKLY_GOAL") {
         const g = msg.payload.goal as WeeklyGoal;
-        setGoal(g ?? null);
+        setGoals((prev) =>
+          prev.some((x) => x.id === g.id) ? prev : [...prev, g],
+        );
+      }
+      if (msg.action === "UPDATE_WEEKLY_GOAL") {
+        const g = msg.payload.goal as WeeklyGoal;
+        setGoals((prev) => prev.map((x) => (x.id === g.id ? g : x)));
+      }
+      if (msg.action === "DELETE_WEEKLY_GOAL") {
+        const id = msg.payload.id as string;
+        setGoals((prev) => prev.filter((x) => x.id !== id));
       }
     });
   }, [subscribe]);
@@ -110,32 +122,44 @@ export default function HomeScreen() {
     }
   };
 
-  const saveGoal = async () => {
+  const addGoal = async () => {
     if (!deviceId || !goalInput.trim()) return;
+    Keyboard.dismiss();
     const res = await apiFetch("/api/goals/current", deviceId, {
-      method: "PUT",
+      method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ goalText: goalInput.trim() }),
     });
     if (res.ok) {
-      const g = await res.json();
-      setGoal(g);
+      const g: WeeklyGoal = await res.json();
+      setGoals((prev) => [...prev, g]);
       setGoalInput("");
-      sendMessage("WEEKLY_GOAL_UPDATED", { goal: g });
+      sendMessage("ADD_WEEKLY_GOAL", { goal: g });
     }
   };
 
-  const toggleGoal = async () => {
-    if (!deviceId || !goal) return;
-    const res = await apiFetch("/api/goals/current", deviceId, {
+  const toggleGoal = async (goal: WeeklyGoal) => {
+    if (!deviceId) return;
+    const res = await apiFetch(`/api/goals/${goal.id}`, deviceId, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !goal.done, goalText: goal.goalText }),
+      body: JSON.stringify({ done: !goal.done }),
     });
     if (res.ok) {
-      const g = await res.json();
-      setGoal(g);
-      sendMessage("WEEKLY_GOAL_UPDATED", { goal: g });
+      const g: WeeklyGoal = await res.json();
+      setGoals((prev) => prev.map((x) => (x.id === g.id ? g : x)));
+      sendMessage("UPDATE_WEEKLY_GOAL", { goal: g });
+    }
+  };
+
+  const deleteGoal = async (id: string) => {
+    if (!deviceId) return;
+    const res = await apiFetch(`/api/goals/${id}`, deviceId, {
+      method: "DELETE",
+    });
+    if (res.ok) {
+      setGoals((prev) => prev.filter((x) => x.id !== id));
+      sendMessage("DELETE_WEEKLY_GOAL", { id });
     }
   };
 
@@ -149,108 +173,141 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      <Text style={styles.title}>Linked</Text>
-      <Text style={styles.subtitle}>Plan your time apart — and together.</Text>
+      <DismissKeyboardView>
+        <Text style={styles.title}>Linked</Text>
+        <Text style={styles.subtitle}>Plan your time apart — and together.</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>Next visit</Text>
-        {nextVisitAt ? (
-          <Text style={styles.countdown}>
-            {formatCountdown(nextVisitAt)}
-            <Text style={styles.dateParen}>
-              {" "}
-              ({formatMMDDYYYY(nextVisitAt)})
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Next visit</Text>
+          {nextVisitAt ? (
+            <Text style={styles.countdown}>
+              {formatCountdown(nextVisitAt)}
+              <Text style={styles.dateParen}>
+                {" "}
+                ({formatMMDDYYYY(nextVisitAt)})
+              </Text>
             </Text>
-          </Text>
-        ) : (
-          <Text style={styles.muted}>Set a date to start the countdown</Text>
-        )}
-        <DatePickerField
-          label="Pick a visit date"
-          value={visitDraft}
-          onChange={setVisitDraft}
-          minimumDate={new Date()}
-        />
-        <TouchableOpacity
-          style={[styles.button, !visitDraft && styles.buttonDisabled]}
-          onPress={saveVisit}
-          disabled={!visitDraft}
-        >
-          <Text style={styles.buttonText}>Save visit date</Text>
-        </TouchableOpacity>
-        {nextVisitAt ? (
-          <TouchableOpacity style={styles.clearButton} onPress={clearVisit}>
-            <Text style={styles.clearButtonText}>Clear visit date</Text>
+          ) : (
+            <Text style={styles.muted}>Set a date to start the countdown</Text>
+          )}
+          <DatePickerField
+            label="Pick a visit date"
+            value={visitDraft}
+            onChange={setVisitDraft}
+            minimumDate={new Date()}
+          />
+          <TouchableOpacity
+            style={[styles.button, !visitDraft && styles.buttonDisabled]}
+            onPress={saveVisit}
+            disabled={!visitDraft}
+          >
+            <Text style={styles.buttonText}>Save visit date</Text>
           </TouchableOpacity>
-        ) : null}
-      </View>
+          {nextVisitAt ? (
+            <TouchableOpacity style={styles.clearButton} onPress={clearVisit}>
+              <Text style={styles.clearButtonText}>Clear visit date</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
 
-      <View style={styles.card}>
-        <Text style={styles.cardTitle}>This week's connection</Text>
-        <TextInput
-          style={styles.input}
-          value={goalInput}
-          onChangeText={setGoalInput}
-          placeholder="e.g. FaceTime Friday night"
-        />
-        <TouchableOpacity
-          style={[styles.button, !goalInput.trim() && styles.buttonDisabled]}
-          onPress={saveGoal}
-          disabled={!goalInput.trim()}
-        >
-          <Text style={styles.buttonText}>Save goal</Text>
-        </TouchableOpacity>
-        {goal ? (
-          <TouchableOpacity style={styles.goalRow} onPress={toggleGoal}>
-            <Text style={styles.checkbox}>{goal.done ? "☑" : "☐"}</Text>
-            <Text
-              style={[styles.goalText, goal.done && styles.goalTextDone]}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>This week's connection</Text>
+          <View style={styles.goalInputRow}>
+            <AppTextInput
+              style={styles.input}
+              value={goalInput}
+              onChangeText={setGoalInput}
+              placeholder="e.g. FaceTime Friday night"
+              returnKeyType="done"
+              blurOnSubmit
+              onSubmitEditing={addGoal}
+            />
+            <TouchableOpacity
+              style={[
+                styles.addGoalButton,
+                !goalInput.trim() && styles.buttonDisabled,
+              ]}
+              onPress={addGoal}
+              disabled={!goalInput.trim()}
             >
-              {goal.goalText}
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-      </View>
+              <Text style={styles.addGoalButtonText}>Add</Text>
+            </TouchableOpacity>
+          </View>
+          {goals.length === 0 ? (
+            <Text style={styles.muted}>No goals yet — add one above.</Text>
+          ) : (
+            goals.map((goal) => (
+              <View key={goal.id} style={styles.goalRow}>
+                <TouchableOpacity
+                  style={styles.goalCheckArea}
+                  onPress={() => toggleGoal(goal)}
+                >
+                  <Text style={styles.checkbox}>{goal.done ? "☑" : "☐"}</Text>
+                  <Text
+                    style={[
+                      styles.goalText,
+                      goal.done && styles.goalTextDone,
+                    ]}
+                  >
+                    {goal.goalText}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => deleteGoal(goal.id)}>
+                  <Text style={styles.goalDelete}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))
+          )}
+        </View>
 
-      <View style={styles.links}>
-        <Link href={"/trip" as Href} style={styles.link}>
-          Trip plans →
-        </Link>
-        <Link href={"/together" as Href} style={styles.link}>
-          When we're together →
-        </Link>
-        <Link href={"/events" as Href} style={styles.link}>
-          Upcoming events →
-        </Link>
-      </View>
+        <View style={styles.links}>
+          <Link href={"/trip" as Href} style={styles.link}>
+            Trip plans →
+          </Link>
+          <Link href={"/together" as Href} style={styles.link}>
+            When we're together →
+          </Link>
+          <Link href={"/events" as Href} style={styles.link}>
+            Upcoming events →
+          </Link>
+        </View>
+      </DismissKeyboardView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9f9f9", padding: 20 },
-  centered: { justifyContent: "center", alignItems: "center" },
-  title: { fontSize: 32, fontWeight: "900", marginTop: 8 },
-  subtitle: { fontSize: 15, color: "#666", marginBottom: 20 },
+  container: { flex: 1, backgroundColor: "#f9f9f9" },
+  centered: { justifyContent: "center", alignItems: "center", padding: 20 },
+  title: { fontSize: 32, fontWeight: "900", marginTop: 8, paddingHorizontal: 20 },
+  subtitle: {
+    fontSize: 15,
+    color: "#666",
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
   card: {
     backgroundColor: "#fff",
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
+    marginHorizontal: 20,
     borderWidth: 1,
     borderColor: "#eee",
   },
   cardTitle: { fontSize: 17, fontWeight: "700", marginBottom: 8 },
   countdown: { fontSize: 22, fontWeight: "800", marginBottom: 12 },
   dateParen: { fontSize: 18, fontWeight: "600", color: "#555" },
-  muted: { color: "#888", marginBottom: 12 },
+  muted: { color: "#888", marginBottom: 4 },
+  goalInputRow: { flexDirection: "row", marginBottom: 12 },
   input: {
+    flex: 1,
     backgroundColor: "#f9f9f9",
     borderWidth: 1,
     borderColor: "#ddd",
     borderRadius: 8,
     padding: 12,
-    marginBottom: 10,
+    marginRight: 10,
   },
   button: {
     backgroundColor: "#000",
@@ -260,12 +317,28 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { backgroundColor: "#aaa" },
   buttonText: { color: "#fff", fontWeight: "700" },
+  addGoalButton: {
+    backgroundColor: "#000",
+    paddingHorizontal: 16,
+    justifyContent: "center",
+    borderRadius: 8,
+  },
+  addGoalButtonText: { color: "#fff", fontWeight: "700" },
   clearButton: { marginTop: 10, alignItems: "center" },
   clearButtonText: { color: "#888", fontSize: 14 },
-  goalRow: { flexDirection: "row", alignItems: "center", marginTop: 14 },
+  goalRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#f0f0f0",
+  },
+  goalCheckArea: { flex: 1, flexDirection: "row", alignItems: "center" },
   checkbox: { fontSize: 22, marginRight: 10 },
   goalText: { fontSize: 16, flex: 1 },
   goalTextDone: { textDecorationLine: "line-through", color: "#888" },
-  links: { marginTop: 8, gap: 12 },
+  goalDelete: { color: "#c0392b", fontSize: 18, padding: 6 },
+  links: { marginTop: 8, gap: 12, paddingHorizontal: 20, paddingBottom: 24 },
   link: { fontSize: 16, fontWeight: "600", color: "#000", marginBottom: 10 },
 });

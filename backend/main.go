@@ -249,8 +249,9 @@ func processIncomingPayload(rawMessage []byte, relationshipID string) {
 		}
 		_, _ = db.Exec(`UPDATE relationships SET next_visit_at = $1 WHERE id = $2`, t, relationshipID)
 
-	case "WEEKLY_GOAL_UPDATED", "SET_WEEKLY_GOAL", "TOGGLE_WEEKLY_GOAL":
-		// Notify-only: REST already persisted; do not mutate DB here (avoids double-toggle).
+	case "ADD_WEEKLY_GOAL", "UPDATE_WEEKLY_GOAL", "DELETE_WEEKLY_GOAL",
+		"WEEKLY_GOAL_UPDATED", "SET_WEEKLY_GOAL", "TOGGLE_WEEKLY_GOAL":
+		// Notify-only: REST already persisted.
 
 	case "ADD_EVENT":
 		var ev SharedEvent
@@ -346,24 +347,30 @@ func handleGetItinerary(w http.ResponseWriter, r *http.Request) {
 	handleGetList(w, r)
 }
 
-func getCurrentWeeklyGoal(relationshipID string) (*WeeklyGoal, error) {
+func listCurrentWeeklyGoals(relationshipID string) ([]WeeklyGoal, error) {
 	ws := weekStartUTC(time.Now())
-	var g WeeklyGoal
-	err := db.QueryRow(
-		`SELECT id, goal_text, week_start, done FROM weekly_goals
-         WHERE relationship_id = $1 AND week_start = $2`,
+	rows, err := db.Query(
+		`SELECT id::text, goal_text, week_start, done FROM weekly_goals
+         WHERE relationship_id = $1 AND week_start = $2
+         ORDER BY created_at ASC`,
 		relationshipID, ws.Format("2006-01-02"),
-	).Scan(&g.ID, &g.GoalText, &g.WeekStart, &g.Done)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
+	)
 	if err != nil {
 		return nil, err
 	}
-	return &g, nil
+	defer rows.Close()
+
+	goals := []WeeklyGoal{}
+	for rows.Next() {
+		var g WeeklyGoal
+		if err := rows.Scan(&g.ID, &g.GoalText, &g.WeekStart, &g.Done); err == nil {
+			goals = append(goals, g)
+		}
+	}
+	return goals, nil
 }
 
-func handleGetWeeklyGoal(w http.ResponseWriter, r *http.Request) {
+func handleGetWeeklyGoals(w http.ResponseWriter, r *http.Request) {
 	if applyCORS(w, r) {
 		return
 	}
@@ -380,19 +387,19 @@ func handleGetWeeklyGoal(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	goal, err := getCurrentWeeklyGoal(relationshipID)
+	goals, err := listCurrentWeeklyGoals(relationshipID)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(w).Encode(goal)
+	json.NewEncoder(w).Encode(goals)
 }
 
-func handlePutWeeklyGoal(w http.ResponseWriter, r *http.Request) {
+func handlePostWeeklyGoal(w http.ResponseWriter, r *http.Request) {
 	if applyCORS(w, r) {
 		return
 	}
-	if r.Method != http.MethodPut {
+	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
@@ -412,45 +419,103 @@ func handlePutWeeklyGoal(w http.ResponseWriter, r *http.Request) {
 
 	var body struct {
 		GoalText string `json:"goalText"`
-		Done     *bool  `json:"done"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-
-	ws := weekStartUTC(time.Now())
-	wsStr := ws.Format("2006-01-02")
-
-	if body.Done != nil {
-		_, err = db.Exec(
-			`INSERT INTO weekly_goals (relationship_id, goal_text, week_start, done)
-             VALUES ($1, COALESCE(NULLIF($2, ''), 'Weekly connection'), $3, $4)
-             ON CONFLICT (relationship_id, week_start)
-             DO UPDATE SET done = EXCLUDED.done`,
-			relationshipID, strings.TrimSpace(body.GoalText), wsStr, *body.Done,
-		)
-	} else {
-		text := strings.TrimSpace(body.GoalText)
-		if text == "" {
-			http.Error(w, "goalText required", http.StatusBadRequest)
-			return
-		}
-		_, err = db.Exec(
-			`INSERT INTO weekly_goals (relationship_id, goal_text, week_start, done)
-             VALUES ($1, $2, $3, FALSE)
-             ON CONFLICT (relationship_id, week_start)
-             DO UPDATE SET goal_text = EXCLUDED.goal_text`,
-			relationshipID, text, wsStr,
-		)
+	text := strings.TrimSpace(body.GoalText)
+	if text == "" {
+		http.Error(w, "goalText required", http.StatusBadRequest)
+		return
 	}
+
+	wsStr := weekStartUTC(time.Now()).Format("2006-01-02")
+	var g WeeklyGoal
+	err = db.QueryRow(
+		`INSERT INTO weekly_goals (relationship_id, goal_text, week_start, done)
+         VALUES ($1, $2, $3, FALSE)
+         RETURNING id::text, goal_text, week_start, done`,
+		relationshipID, text, wsStr,
+	).Scan(&g.ID, &g.GoalText, &g.WeekStart, &g.Done)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
 
-	goal, _ := getCurrentWeeklyGoal(relationshipID)
-	json.NewEncoder(w).Encode(goal)
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(g)
+}
+
+func handleGoalByID(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
+		return
+	}
+
+	goalID := strings.TrimPrefix(r.URL.Path, "/api/goals/")
+	if goalID == "" || goalID == r.URL.Path {
+		http.Error(w, "missing goal id", http.StatusBadRequest)
+		return
+	}
+
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+	relationshipID, err := getRelationshipIDForDevice(deviceID)
+	if err != nil {
+		if errors.Is(err, errNotPaired) {
+			http.Error(w, "not paired", http.StatusForbidden)
+			return
+		}
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodPut:
+		var body struct {
+			Done bool `json:"done"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			http.Error(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		var g WeeklyGoal
+		err = db.QueryRow(
+			`UPDATE weekly_goals SET done = $1
+             WHERE id::text = $2 AND relationship_id = $3
+             RETURNING id::text, goal_text, week_start, done`,
+			body.Done, goalID, relationshipID,
+		).Scan(&g.ID, &g.GoalText, &g.WeekStart, &g.Done)
+		if err == sql.ErrNoRows {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		json.NewEncoder(w).Encode(g)
+
+	case http.MethodDelete:
+		res, err := db.Exec(
+			`DELETE FROM weekly_goals WHERE id::text = $1 AND relationship_id = $2`,
+			goalID, relationshipID,
+		)
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
 }
 
 func handleGetRelationship(w http.ResponseWriter, r *http.Request) {
@@ -746,12 +811,13 @@ func main() {
 	http.HandleFunc("/api/relationship", handleGetRelationship)
 	http.HandleFunc("/api/relationship/visit", handlePutRelationshipVisit)
 	http.HandleFunc("/api/goals/current", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPut {
-			handlePutWeeklyGoal(w, r)
+		if r.Method == http.MethodPost {
+			handlePostWeeklyGoal(w, r)
 			return
 		}
-		handleGetWeeklyGoal(w, r)
+		handleGetWeeklyGoals(w, r)
 	})
+	http.HandleFunc("/api/goals/", handleGoalByID)
 	http.HandleFunc("/api/events", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			handlePostEvent(w, r)

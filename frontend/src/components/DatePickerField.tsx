@@ -12,6 +12,7 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 
+import { PLACEHOLDER_COLOR } from "@/constants/ui";
 import { dateToIso, formatMMDDYYYY } from "@/utils/dates";
 
 type Props = {
@@ -79,6 +80,7 @@ export function DatePickerField({
             borderRadius: 8,
             border: "1px solid #ddd",
             boxSizing: "border-box",
+            color: "#111",
           }}
         />
         {value ? (
@@ -92,7 +94,14 @@ export function DatePickerField({
     <View style={styles.wrap}>
       <Text style={styles.label}>{label}</Text>
       <TouchableOpacity style={styles.button} onPress={openPicker}>
-        <Text style={styles.buttonText}>{display}</Text>
+        <Text
+          style={[
+            styles.buttonText,
+            !value && styles.buttonPlaceholder,
+          ]}
+        >
+          {display}
+        </Text>
       </TouchableOpacity>
 
       {Platform.OS === "ios" ? (
@@ -107,13 +116,19 @@ export function DatePickerField({
                   <Text style={styles.done}>Done</Text>
                 </TouchableOpacity>
               </View>
-              <DateTimePicker
-                value={draft}
-                mode="date"
-                display="spinner"
-                minimumDate={minimumDate}
-                onChange={onPickerChange}
-              />
+              <View style={styles.pickerWrap}>
+                <DateTimePicker
+                  value={draft}
+                  mode="date"
+                  display="spinner"
+                  themeVariant="light"
+                  textColor="#111111"
+                  accentColor="#000000"
+                  minimumDate={minimumDate}
+                  onChange={onPickerChange}
+                  style={styles.picker}
+                />
+              </View>
             </Pressable>
           </Pressable>
         </Modal>
@@ -134,7 +149,7 @@ export function DatePickerField({
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: 10 },
-  label: { fontSize: 14, fontWeight: "600", marginBottom: 6, color: "#444" },
+  label: { fontSize: 14, fontWeight: "600", marginBottom: 6, color: "#333" },
   button: {
     backgroundColor: "#fff",
     borderWidth: 1,
@@ -142,7 +157,8 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
   },
-  buttonText: { fontSize: 16, color: "#000" },
+  buttonText: { fontSize: 16, color: "#111" },
+  buttonPlaceholder: { color: PLACEHOLDER_COLOR },
   preview: { marginTop: 4, fontSize: 13, color: "#666" },
   overlay: {
     flex: 1,
@@ -162,6 +178,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#eee",
   },
-  cancel: { fontSize: 16, color: "#666" },
+  cancel: { fontSize: 16, color: "#444" },
   done: { fontSize: 16, fontWeight: "700", color: "#000" },
+  pickerWrap: {
+    backgroundColor: "#fff",
+    paddingVertical: 8,
+  },
+  picker: {
+    height: 216,
+    width: "100%",
+  },
 });

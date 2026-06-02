@@ -56,16 +56,21 @@ ALTER TABLE itinerary_items
 ALTER TABLE itinerary_items
     ADD COLUMN IF NOT EXISTS note TEXT;
 
--- Weekly connection goal (one per relationship per week)
+-- Weekly connection goals (multiple per week)
 CREATE TABLE IF NOT EXISTS weekly_goals (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     relationship_id UUID NOT NULL REFERENCES relationships(id) ON DELETE CASCADE,
     goal_text TEXT NOT NULL,
     week_start DATE NOT NULL,
     done BOOLEAN NOT NULL DEFAULT FALSE,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (relationship_id, week_start)
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE weekly_goals
+    DROP CONSTRAINT IF EXISTS weekly_goals_relationship_id_week_start_key;
+
+CREATE INDEX IF NOT EXISTS idx_weekly_goals_relationship_week
+    ON weekly_goals (relationship_id, week_start);
 
 -- Shared upcoming events (calendar v0)
 CREATE TABLE IF NOT EXISTS shared_events (
