@@ -10,28 +10,20 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
+import { DatePickerField } from "@/components/DatePickerField";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
+import { dateToIso, formatMMDDYYYY } from "@/utils/dates";
 import type { SharedEvent } from "@/types";
 
 const generateId = () =>
   Date.now().toString(36) + Math.random().toString(36).substring(2);
 
-function formatEventDate(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString(undefined, {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
 export default function EventsScreen() {
   const { deviceId, sendMessage, subscribe } = useRelationship();
   const [events, setEvents] = useState<SharedEvent[]>([]);
   const [title, setTitle] = useState("");
-  const [dateInput, setDateInput] = useState("");
+  const [eventDate, setEventDate] = useState<Date | null>(null);
   const [ownerLabel, setOwnerLabel] = useState("");
   const [loading, setLoading] = useState(true);
 
@@ -58,10 +50,12 @@ export default function EventsScreen() {
       if (msg.action === "ADD_EVENT") {
         const ev = msg.payload as unknown as SharedEvent;
         setEvents((prev) =>
-          prev.some((e) => e.id === ev.id) ? prev : [...prev, ev].sort(
-              (a, b) =>
-                new Date(a.eventAt).getTime() - new Date(b.eventAt).getTime(),
-            ),
+          prev.some((e) => e.id === ev.id)
+            ? prev
+            : [...prev, ev].sort(
+                (a, b) =>
+                  new Date(a.eventAt).getTime() - new Date(b.eventAt).getTime(),
+              ),
         );
       }
       if (msg.action === "DELETE_EVENT") {
@@ -72,9 +66,9 @@ export default function EventsScreen() {
   }, [subscribe]);
 
   const handleAdd = async () => {
-    if (!deviceId || !title.trim() || !dateInput.trim()) return;
+    if (!deviceId || !title.trim() || !eventDate) return;
 
-    const eventAt = new Date(`${dateInput.trim()}T12:00:00`).toISOString();
+    const eventAt = dateToIso(eventDate);
     const ev: SharedEvent = {
       id: generateId(),
       title: title.trim(),
@@ -96,7 +90,7 @@ export default function EventsScreen() {
         ),
       );
       setTitle("");
-      setDateInput("");
+      setEventDate(null);
       setOwnerLabel("");
       sendMessage("ADD_EVENT", ev as unknown as Record<string, unknown>);
     }
@@ -132,11 +126,10 @@ export default function EventsScreen() {
         onChangeText={setTitle}
         placeholder="Event title"
       />
-      <TextInput
-        style={styles.input}
-        value={dateInput}
-        onChangeText={setDateInput}
-        placeholder="Date (YYYY-MM-DD)"
+      <DatePickerField
+        label="Event date"
+        value={eventDate}
+        onChange={setEventDate}
       />
       <TextInput
         style={styles.input}
@@ -144,7 +137,14 @@ export default function EventsScreen() {
         onChangeText={setOwnerLabel}
         placeholder="Whose event? (optional)"
       />
-      <TouchableOpacity style={styles.button} onPress={handleAdd}>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          (!title.trim() || !eventDate) && styles.buttonDisabled,
+        ]}
+        onPress={handleAdd}
+        disabled={!title.trim() || !eventDate}
+      >
         <Text style={styles.buttonText}>Add event</Text>
       </TouchableOpacity>
 
@@ -159,7 +159,7 @@ export default function EventsScreen() {
           <View style={styles.item}>
             <View style={styles.itemBody}>
               <Text style={styles.itemTitle}>{item.title}</Text>
-              <Text style={styles.itemDate}>{formatEventDate(item.eventAt)}</Text>
+              <Text style={styles.itemDate}>{formatMMDDYYYY(item.eventAt)}</Text>
               {item.ownerLabel ? (
                 <Text style={styles.itemOwner}>{item.ownerLabel}</Text>
               ) : null}
@@ -194,6 +194,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 16,
   },
+  buttonDisabled: { backgroundColor: "#ccc" },
   buttonText: { color: "#fff", fontWeight: "700" },
   list: { flex: 1 },
   empty: { textAlign: "center", color: "#888", marginTop: 24 },

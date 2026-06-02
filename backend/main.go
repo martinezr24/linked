@@ -249,29 +249,8 @@ func processIncomingPayload(rawMessage []byte, relationshipID string) {
 		}
 		_, _ = db.Exec(`UPDATE relationships SET next_visit_at = $1 WHERE id = $2`, t, relationshipID)
 
-	case "SET_WEEKLY_GOAL":
-		var body struct {
-			GoalText string `json:"goalText"`
-		}
-		if err := json.Unmarshal(envelope.Payload, &body); err != nil || strings.TrimSpace(body.GoalText) == "" {
-			return
-		}
-		ws := weekStartUTC(time.Now())
-		_, _ = db.Exec(
-			`INSERT INTO weekly_goals (relationship_id, goal_text, week_start, done)
-             VALUES ($1, $2, $3, FALSE)
-             ON CONFLICT (relationship_id, week_start)
-             DO UPDATE SET goal_text = EXCLUDED.goal_text`,
-			relationshipID, strings.TrimSpace(body.GoalText), ws.Format("2006-01-02"),
-		)
-
-	case "TOGGLE_WEEKLY_GOAL":
-		ws := weekStartUTC(time.Now())
-		_, _ = db.Exec(
-			`UPDATE weekly_goals SET done = NOT done
-             WHERE relationship_id = $1 AND week_start = $2`,
-			relationshipID, ws.Format("2006-01-02"),
-		)
+	case "WEEKLY_GOAL_UPDATED", "SET_WEEKLY_GOAL", "TOGGLE_WEEKLY_GOAL":
+		// Notify-only: REST already persisted; do not mutate DB here (avoids double-toggle).
 
 	case "ADD_EVENT":
 		var ev SharedEvent

@@ -10,8 +10,10 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { type Href, Link } from "expo-router";
 
+import { DatePickerField } from "@/components/DatePickerField";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
+import { dateToIso, formatMMDDYYYY } from "@/utils/dates";
 import type { WeeklyGoal } from "@/types";
 
 function formatCountdown(targetIso: string): string {
@@ -33,7 +35,7 @@ function formatCountdown(targetIso: string): string {
 export default function HomeScreen() {
   const { deviceId, subscribe, sendMessage } = useRelationship();
   const [nextVisitAt, setNextVisitAt] = useState<string | null>(null);
-  const [visitInput, setVisitInput] = useState("");
+  const [visitDraft, setVisitDraft] = useState<Date | null>(null);
   const [goal, setGoal] = useState<WeeklyGoal>(null);
   const [goalInput, setGoalInput] = useState("");
   const [loading, setLoading] = useState(true);
@@ -49,14 +51,10 @@ export default function HomeScreen() {
       if (relRes.ok) {
         const rel = await relRes.json();
         setNextVisitAt(rel.nextVisitAt ?? null);
-        if (rel.nextVisitAt) {
-          setVisitInput(rel.nextVisitAt.slice(0, 10));
-        }
       }
       if (goalRes.ok) {
         const g: WeeklyGoal = await goalRes.json();
         setGoal(g);
-        if (g?.goalText) setGoalInput(g.goalText);
       }
     } finally {
       setLoading(false);
@@ -73,21 +71,17 @@ export default function HomeScreen() {
         const at = msg.payload.nextVisitAt as string | null | undefined;
         setNextVisitAt(at ?? null);
       }
-      if (
-        msg.action === "SET_WEEKLY_GOAL" ||
-        msg.action === "TOGGLE_WEEKLY_GOAL"
-      ) {
-        loadAll();
+      if (msg.action === "WEEKLY_GOAL_UPDATED") {
+        const g = msg.payload.goal as WeeklyGoal;
+        setGoal(g ?? null);
       }
     });
-  }, [subscribe, loadAll]);
+  }, [subscribe]);
 
   const saveVisit = async () => {
-    if (!deviceId) return;
-    const trimmed = visitInput.trim();
-    const nextVisitAtValue = trimmed
-      ? new Date(`${trimmed}T12:00:00`).toISOString()
-      : null;
+    if (!deviceId || !visitDraft) return;
+
+    const nextVisitAtValue = dateToIso(visitDraft);
 
     const res = await apiFetch("/api/relationship/visit", deviceId, {
       method: "PUT",
@@ -97,7 +91,22 @@ export default function HomeScreen() {
     if (res.ok) {
       const data = await res.json();
       setNextVisitAt(data.nextVisitAt ?? null);
+      setVisitDraft(null);
       sendMessage("SET_NEXT_VISIT", { nextVisitAt: nextVisitAtValue });
+    }
+  };
+
+  const clearVisit = async () => {
+    if (!deviceId) return;
+    const res = await apiFetch("/api/relationship/visit", deviceId, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nextVisitAt: null }),
+    });
+    if (res.ok) {
+      setNextVisitAt(null);
+      setVisitDraft(null);
+      sendMessage("SET_NEXT_VISIT", { nextVisitAt: null });
     }
   };
 
@@ -111,21 +120,22 @@ export default function HomeScreen() {
     if (res.ok) {
       const g = await res.json();
       setGoal(g);
-      sendMessage("SET_WEEKLY_GOAL", { goalText: goalInput.trim() });
+      setGoalInput("");
+      sendMessage("WEEKLY_GOAL_UPDATED", { goal: g });
     }
   };
 
   const toggleGoal = async () => {
-    if (!deviceId) return;
+    if (!deviceId || !goal) return;
     const res = await apiFetch("/api/goals/current", deviceId, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !goal?.done, goalText: goal?.goalText ?? goalInput }),
+      body: JSON.stringify({ done: !goal.done, goalText: goal.goalText }),
     });
     if (res.ok) {
       const g = await res.json();
       setGoal(g);
-      sendMessage("TOGGLE_WEEKLY_GOAL", {});
+      sendMessage("WEEKLY_GOAL_UPDATED", { goal: g });
     }
   };
 
@@ -145,19 +155,34 @@ export default function HomeScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Next visit</Text>
         {nextVisitAt ? (
-          <Text style={styles.countdown}>{formatCountdown(nextVisitAt)}</Text>
+          <Text style={styles.countdown}>
+            {formatCountdown(nextVisitAt)}
+            <Text style={styles.dateParen}>
+              {" "}
+              ({formatMMDDYYYY(nextVisitAt)})
+            </Text>
+          </Text>
         ) : (
           <Text style={styles.muted}>Set a date to start the countdown</Text>
         )}
-        <TextInput
-          style={styles.input}
-          value={visitInput}
-          onChangeText={setVisitInput}
-          placeholder="YYYY-MM-DD"
+        <DatePickerField
+          label="Pick a visit date"
+          value={visitDraft}
+          onChange={setVisitDraft}
+          minimumDate={new Date()}
         />
-        <TouchableOpacity style={styles.button} onPress={saveVisit}>
+        <TouchableOpacity
+          style={[styles.button, !visitDraft && styles.buttonDisabled]}
+          onPress={saveVisit}
+          disabled={!visitDraft}
+        >
           <Text style={styles.buttonText}>Save visit date</Text>
         </TouchableOpacity>
+        {nextVisitAt ? (
+          <TouchableOpacity style={styles.clearButton} onPress={clearVisit}>
+            <Text style={styles.clearButtonText}>Clear visit date</Text>
+          </TouchableOpacity>
+        ) : null}
       </View>
 
       <View style={styles.card}>
@@ -168,7 +193,11 @@ export default function HomeScreen() {
           onChangeText={setGoalInput}
           placeholder="e.g. FaceTime Friday night"
         />
-        <TouchableOpacity style={styles.button} onPress={saveGoal}>
+        <TouchableOpacity
+          style={[styles.button, !goalInput.trim() && styles.buttonDisabled]}
+          onPress={saveGoal}
+          disabled={!goalInput.trim()}
+        >
           <Text style={styles.buttonText}>Save goal</Text>
         </TouchableOpacity>
         {goal ? (
@@ -213,6 +242,7 @@ const styles = StyleSheet.create({
   },
   cardTitle: { fontSize: 17, fontWeight: "700", marginBottom: 8 },
   countdown: { fontSize: 22, fontWeight: "800", marginBottom: 12 },
+  dateParen: { fontSize: 18, fontWeight: "600", color: "#555" },
   muted: { color: "#888", marginBottom: 12 },
   input: {
     backgroundColor: "#f9f9f9",
@@ -228,7 +258,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: "center",
   },
+  buttonDisabled: { backgroundColor: "#aaa" },
   buttonText: { color: "#fff", fontWeight: "700" },
+  clearButton: { marginTop: 10, alignItems: "center" },
+  clearButtonText: { color: "#888", fontSize: 14 },
   goalRow: { flexDirection: "row", alignItems: "center", marginTop: 14 },
   checkbox: { fontSize: 22, marginRight: 10 },
   goalText: { fontSize: 16, flex: 1 },
