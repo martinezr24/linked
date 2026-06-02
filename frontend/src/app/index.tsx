@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -9,17 +11,67 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Redirect, router } from "expo-router";
+import * as SecureStore from "expo-secure-store";
 
 import { getApiBase, getWsUrl } from "@/constants/api";
-import * as SecureStore from "expo-secure-store";
-import { router } from "expo-router";
-import { Redirect } from "expo-router";
-import { Platform } from "react-native";
+import { getOrCreateDeviceId } from "@/utils/deviceId";
 
 type ItineraryItem = { id: string; text: string };
 
 const generateId = () =>
   Date.now().toString(36) + Math.random().toString(36).substring(2);
+
+async function getStoredRelationshipId(): Promise<string | null> {
+  if (Platform.OS === "web") {
+    return typeof window !== "undefined"
+      ? window.localStorage.getItem("relationship_id")
+      : null;
+  }
+  return SecureStore.getItemAsync("relationship_id");
+}
+
+async function clearStoredRelationshipId(): Promise<void> {
+  if (Platform.OS === "web") {
+    window.localStorage.removeItem("relationship_id");
+  } else {
+    await SecureStore.deleteItemAsync("relationship_id");
+  }
+}
+
+function confirmUnlink(): Promise<boolean> {
+  const title = "Unlink partner?";
+  const message =
+    "This will disconnect you from your partner and permanently delete all shared itinerary history. This cannot be undone.";
+
+  if (Platform.OS === "web") {
+    return Promise.resolve(window.confirm(`${title}\n\n${message}`));
+  }
+
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+      {
+        text: "Unlink",
+        style: "destructive",
+        onPress: () => resolve(true),
+      },
+    ]);
+  });
+}
+
+function alertPartnerUnlinked() {
+  const title = "Partner unlinked";
+  const message =
+    "Your partner ended the link. All shared itinerary history has been deleted.";
+
+  if (Platform.OS === "web") {
+    window.alert(`${title}\n\n${message}`);
+    return;
+  }
+
+  Alert.alert(title, message);
+}
 
 export default function ItineraryScreen() {
   const [socket, setSocket] = useState<WebSocket | null>(null);
@@ -29,14 +81,36 @@ export default function ItineraryScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isRouteCheckDone, setIsRouteCheckDone] = useState(false);
   const [isPaired, setIsPaired] = useState(false);
+  const [relationshipId, setRelationshipId] = useState<string | null>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+  const partnerUnlinkHandled = useRef(false);
 
   useEffect(() => {
+    (async () => {
+      const stored = await getStoredRelationshipId();
+      setRelationshipId(stored);
+      setIsPaired(Boolean(stored));
+      setIsRouteCheckDone(true);
+      const id = await getOrCreateDeviceId();
+      setDeviceId(id);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!relationshipId || !deviceId) return;
+
+    partnerUnlinkHandled.current = false;
     const apiBase = getApiBase();
-    const wsUrl = getWsUrl();
+    const wsUrl = `${getWsUrl()}?deviceId=${encodeURIComponent(deviceId)}`;
+
+    setIsLoading(true);
+    setLoadError(null);
 
     const loadHistory = async () => {
       try {
-        const response = await fetch(`${apiBase}/api/itinerary`);
+        const response = await fetch(`${apiBase}/api/itinerary`, {
+          headers: { "X-Device-Id": deviceId },
+        });
         if (!response.ok) {
           throw new Error(`HTTP ${response.status}`);
         }
@@ -85,24 +159,44 @@ export default function ItineraryScreen() {
       console.error("WebSocket error");
     };
 
-    return () => ws.close();
+    return () => {
+      ws.close();
+      setSocket(null);
+    };
+  }, [relationshipId, deviceId]);
+
+  const handlePartnerUnlinked = useCallback(async () => {
+    if (partnerUnlinkHandled.current) return;
+    partnerUnlinkHandled.current = true;
+    await clearStoredRelationshipId();
+    setRelationshipId(null);
+    setIsPaired(false);
+    alertPartnerUnlinked();
+    router.replace("/pair");
   }, []);
 
   useEffect(() => {
-    (async () => {
-      let relationshipId: string | null = null;
-      if (Platform.OS === "web") {
-        relationshipId =
-          typeof window !== "undefined"
-            ? window.localStorage.getItem("relationship_id")
-            : null;
-      } else {
-        relationshipId = await SecureStore.getItemAsync("relationship_id");
+    if (!deviceId || !relationshipId) return;
+
+    const apiBase = getApiBase();
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch(`${apiBase}/api/pairing/status`, {
+          headers: { "X-Device-Id": deviceId },
+        });
+        if (!res.ok) return;
+
+        const data: { relationshipId: string | null } = await res.json();
+        if (!data.relationshipId) {
+          await handlePartnerUnlinked();
+        }
+      } catch {
+        // Ignore transient network errors during polling.
       }
-      setIsPaired(Boolean(relationshipId));
-      setIsRouteCheckDone(true);
-    })();
-  }, []);
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [deviceId, relationshipId, handlePartnerUnlinked]);
 
   const handleAddItem = () => {
     const text = inputText.trim();
@@ -120,18 +214,38 @@ export default function ItineraryScreen() {
     setItinerary((prev) => prev.filter((item) => item.id !== id));
     socket.send(JSON.stringify({ action: "DELETE_ITEM", payload: { id } }));
   };
-  const handleDebugReset = async () => {
+
+  const performUnlink = async () => {
+    if (!deviceId) return;
+
     try {
-      if (Platform.OS === "web") {
-        window.localStorage.removeItem("relationship_id");
-        window.localStorage.removeItem("device_id");
-      } else {
-        await SecureStore.deleteItemAsync("relationship_id");
-        await SecureStore.deleteItemAsync("device_id");
+      const res = await fetch(`${getApiBase()}/api/pairing/unlink`, {
+        method: "POST",
+        headers: { "X-Device-Id": deviceId },
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        if (Platform.OS === "web") {
+          window.alert(text || "Failed to unlink.");
+        } else {
+          Alert.alert("Unlink failed", text || "Failed to unlink.");
+        }
+        return;
       }
+
+      await clearStoredRelationshipId();
+      setRelationshipId(null);
+      setIsPaired(false);
       router.replace("/pair");
     } catch (error) {
-      console.error("Failed to reset local pairing state:", error);
+      console.error("Failed to unlink:", error);
+    }
+  };
+
+  const handleUnlinkPress = async () => {
+    const confirmed = await confirmUnlink();
+    if (confirmed) {
+      await performUnlink();
     }
   };
 
@@ -189,11 +303,8 @@ export default function ItineraryScreen() {
         )}
         style={styles.list}
       />
-      <TouchableOpacity
-        style={styles.debugResetButton}
-        onPress={handleDebugReset}
-      >
-        <Text style={styles.debugResetButtonText}>Reset pairing (debug)</Text>
+      <TouchableOpacity style={styles.unlinkButton} onPress={handleUnlinkPress}>
+        <Text style={styles.unlinkButtonText}>Unlink partner</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -238,20 +349,14 @@ const styles = StyleSheet.create({
   itemText: { fontSize: 16, flex: 1 },
   deleteButton: { padding: 5 },
   deleteButtonText: { color: "#ff4444", fontWeight: "bold", fontSize: 18 },
-
-  debugResetButton: {
+  unlinkButton: {
     alignSelf: "flex-start",
-    backgroundColor: "#fce8e6",
-    borderColor: "#f5b7b1",
-    borderWidth: 1,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
+    paddingVertical: 8,
     marginBottom: 12,
   },
-  debugResetButtonText: {
+  unlinkButtonText: {
     color: "#b03a2e",
-    fontSize: 12,
-    fontWeight: "700",
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
