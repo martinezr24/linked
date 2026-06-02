@@ -24,6 +24,7 @@ type Props = {
   title: string;
   placeholder: string;
   notePlaceholder?: string;
+  eventId?: string;
 };
 
 export function SharedListScreen({
@@ -31,6 +32,7 @@ export function SharedListScreen({
   title,
   placeholder,
   notePlaceholder,
+  eventId,
 }: Props) {
   const { deviceId, relationshipId, sendMessage, subscribe } = useRelationship();
   const [items, setItems] = useState<ListItem[]>([]);
@@ -39,17 +41,27 @@ export function SharedListScreen({
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const matchesItem = (payload: ListItem) => {
+    if (payload.listType !== listType) return false;
+    if (listType === "visit") {
+      return payload.eventId === eventId;
+    }
+    return true;
+  };
+
   useEffect(() => {
     if (!deviceId || !relationshipId) return;
+    if (listType === "visit" && !eventId) return;
 
     const load = async () => {
       setIsLoading(true);
       setLoadError(null);
       try {
-        const res = await apiFetch(
-          `/api/lists?type=${listType}`,
-          deviceId,
-        );
+        const query =
+          listType === "visit"
+            ? `/api/lists?type=visit&eventId=${encodeURIComponent(eventId!)}`
+            : `/api/lists?type=${listType}`;
+        const res = await apiFetch(query, deviceId);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data: ListItem[] = await res.json();
         setItems(Array.isArray(data) ? data : []);
@@ -63,18 +75,21 @@ export function SharedListScreen({
     load();
 
     return subscribe((msg) => {
-      if (msg.action === "ADD_ITEM" && msg.payload.listType === listType) {
+      if (msg.action === "ADD_ITEM") {
         const payload = msg.payload as unknown as ListItem;
+        if (!matchesItem(payload)) return;
         setItems((prev) =>
           prev.some((i) => i.id === payload.id) ? prev : [...prev, payload],
         );
       }
-      if (msg.action === "DELETE_ITEM" && msg.payload.listType === listType) {
-        const id = msg.payload.id as string;
+      if (msg.action === "DELETE_ITEM") {
+        const payload = msg.payload as unknown as ListItem;
+        if (!matchesItem(payload)) return;
+        const id = payload.id as string;
         setItems((prev) => prev.filter((i) => i.id !== id));
       }
     });
-  }, [deviceId, relationshipId, listType, subscribe]);
+  }, [deviceId, relationshipId, listType, eventId, subscribe]);
 
   const handleAdd = () => {
     const text = inputText.trim();
@@ -88,6 +103,7 @@ export function SharedListScreen({
       ...(notePlaceholder && inputNote.trim()
         ? { note: inputNote.trim() }
         : {}),
+      ...(listType === "visit" && eventId ? { eventId } : {}),
     };
     setItems((prev) => [...prev, newItem]);
     setInputText("");
@@ -97,7 +113,11 @@ export function SharedListScreen({
 
   const handleDelete = (id: string) => {
     setItems((prev) => prev.filter((i) => i.id !== id));
-    sendMessage("DELETE_ITEM", { id, listType });
+    sendMessage("DELETE_ITEM", {
+      id,
+      listType,
+      ...(listType === "visit" && eventId ? { eventId } : {}),
+    });
   };
 
   if (isLoading) {

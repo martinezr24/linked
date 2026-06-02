@@ -25,3 +25,22 @@ export function isoToDate(iso: string): Date {
   const d = new Date(iso);
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
+
+/** e.g. "Mon, Jun 1, 2026" in device local timezone */
+export function formatLocalDateLabel(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+export function getDeviceTimezoneLabel(): string {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "local time";
+  } catch {
+    return "local time";
+  }
+}

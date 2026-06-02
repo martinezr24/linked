@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
 import { AppTextInput } from "@/components/AppTextInput";
 import { DatePickerField } from "@/components/DatePickerField";
@@ -176,6 +177,21 @@ export default function EventsScreen() {
               {item.ownerLabel ? (
                 <Text style={styles.itemOwner}>{item.ownerLabel}</Text>
               ) : null}
+              <TouchableOpacity
+                style={styles.planButton}
+                onPress={() =>
+                  router.push({
+                    pathname: "/visit/[eventId]",
+                    params: {
+                      eventId: item.id,
+                      title: item.title,
+                      eventAt: item.eventAt,
+                    },
+                  })
+                }
+              >
+                <Text style={styles.planButtonText}>Plan this visit →</Text>
+              </TouchableOpacity>
             </View>
             <TouchableOpacity onPress={() => handleDelete(item.id)}>
               <Text style={styles.delete}>✕</Text>
@@ -226,4 +242,6 @@ const styles = StyleSheet.create({
   itemDate: { color: "#444", marginTop: 4 },
   itemOwner: { color: "#888", marginTop: 2, fontSize: 13 },
   delete: { color: "#c0392b", fontSize: 18, fontWeight: "700", padding: 4 },
+  planButton: { marginTop: 10 },
+  planButtonText: { color: "#000", fontWeight: "700", fontSize: 14 },
 });

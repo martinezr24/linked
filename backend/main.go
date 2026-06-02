@@ -44,6 +44,20 @@ type ListItem struct {
 	Text     string  `json:"text"`
 	Note     *string `json:"note,omitempty"`
 	ListType string  `json:"listType"`
+	EventID  *string `json:"eventId,omitempty"`
+}
+
+type CheckIn struct {
+	ID       string  `json:"id"`
+	UserID   string  `json:"userId"`
+	CheckDate string `json:"checkDate"`
+	Note     *string `json:"note,omitempty"`
+	IsMine   bool    `json:"isMine"`
+}
+
+type TodayCheckIns struct {
+	Mine    *CheckIn `json:"mine"`
+	Partner *CheckIn `json:"partner"`
 }
 
 type WeeklyGoal struct {
@@ -191,10 +205,14 @@ func broadcastToRelationship(relationshipID string, messageType int, message []b
 }
 
 func normalizeListType(listType string) string {
-	if listType == "reunion" {
+	switch listType {
+	case "reunion":
 		return "reunion"
+	case "visit":
+		return "visit"
+	default:
+		return "trip"
 	}
-	return "trip"
 }
 
 func processIncomingPayload(rawMessage []byte, relationshipID string) {
@@ -214,11 +232,15 @@ func processIncomingPayload(rawMessage []byte, relationshipID string) {
 		if item.Note != nil {
 			note = *item.Note
 		}
+		var eventID interface{}
+		if item.EventID != nil && *item.EventID != "" {
+			eventID = *item.EventID
+		}
 		_, _ = db.Exec(
-			`INSERT INTO itinerary_items (id, text, note, list_type, relationship_id)
-             VALUES ($1, $2, $3, $4, $5)
+			`INSERT INTO itinerary_items (id, text, note, list_type, relationship_id, event_id)
+             VALUES ($1, $2, $3, $4, $5, $6)
              ON CONFLICT (id) DO NOTHING`,
-			item.ID, item.Text, note, listType, relationshipID,
+			item.ID, item.Text, note, listType, relationshipID, eventID,
 		)
 
 	case "DELETE_ITEM":
@@ -227,10 +249,17 @@ func processIncomingPayload(rawMessage []byte, relationshipID string) {
 			return
 		}
 		listType := normalizeListType(item.ListType)
-		_, _ = db.Exec(
-			`DELETE FROM itinerary_items WHERE id = $1 AND relationship_id = $2 AND list_type = $3`,
-			item.ID, relationshipID, listType,
-		)
+		if listType == "visit" && item.EventID != nil {
+			_, _ = db.Exec(
+				`DELETE FROM itinerary_items WHERE id = $1 AND relationship_id = $2 AND list_type = $3 AND event_id = $4`,
+				item.ID, relationshipID, listType, *item.EventID,
+			)
+		} else {
+			_, _ = db.Exec(
+				`DELETE FROM itinerary_items WHERE id = $1 AND relationship_id = $2 AND list_type = $3 AND event_id IS NULL`,
+				item.ID, relationshipID, listType,
+			)
+		}
 
 	case "SET_NEXT_VISIT":
 		var body struct {
@@ -277,19 +306,39 @@ func processIncomingPayload(rawMessage []byte, relationshipID string) {
 		if err := json.Unmarshal(envelope.Payload, &ev); err != nil {
 			return
 		}
+		_, _ = db.Exec(`DELETE FROM itinerary_items WHERE event_id = $1`, ev.ID)
 		_, _ = db.Exec(
 			`DELETE FROM shared_events WHERE id = $1 AND relationship_id = $2`,
 			ev.ID, relationshipID,
 		)
+
+	case "CHECK_IN":
+		// Notify-only: REST persists check-ins.
 	}
 }
 
-func queryListItems(relationshipID, listType string) ([]ListItem, error) {
-	rows, err := db.Query(
-		`SELECT id, text, note FROM itinerary_items
-         WHERE relationship_id = $1 AND list_type = $2 ORDER BY created_at ASC`,
-		relationshipID, listType,
-	)
+func queryListItems(relationshipID, listType, eventID string) ([]ListItem, error) {
+	var rows *sql.Rows
+	var err error
+
+	if listType == "visit" {
+		if eventID == "" {
+			return nil, fmt.Errorf("eventId required for visit list")
+		}
+		rows, err = db.Query(
+			`SELECT id, text, note, event_id FROM itinerary_items
+             WHERE relationship_id = $1 AND list_type = 'visit' AND event_id = $2
+             ORDER BY created_at ASC`,
+			relationshipID, eventID,
+		)
+	} else {
+		rows, err = db.Query(
+			`SELECT id, text, note, event_id FROM itinerary_items
+             WHERE relationship_id = $1 AND list_type = $2 AND event_id IS NULL
+             ORDER BY created_at ASC`,
+			relationshipID, listType,
+		)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -299,11 +348,16 @@ func queryListItems(relationshipID, listType string) ([]ListItem, error) {
 	for rows.Next() {
 		var item ListItem
 		var note sql.NullString
-		if err := rows.Scan(&item.ID, &item.Text, &note); err == nil {
+		var eid sql.NullString
+		if err := rows.Scan(&item.ID, &item.Text, &note, &eid); err == nil {
 			item.ListType = listType
 			if note.Valid {
 				n := note.String
 				item.Note = &n
+			}
+			if eid.Valid {
+				e := eid.String
+				item.EventID = &e
 			}
 			items = append(items, item)
 		}
@@ -330,7 +384,12 @@ func handleGetList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	listType := normalizeListType(r.URL.Query().Get("type"))
-	items, err := queryListItems(relationshipID, listType)
+	eventID := r.URL.Query().Get("eventId")
+	if listType == "visit" && eventID == "" {
+		http.Error(w, "eventId required for visit list", http.StatusBadRequest)
+		return
+	}
+	items, err := queryListItems(relationshipID, listType, eventID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -724,6 +783,7 @@ func handleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing event id", http.StatusBadRequest)
 		return
 	}
+	_, _ = db.Exec(`DELETE FROM itinerary_items WHERE event_id = $1`, eventID)
 	_, err = db.Exec(
 		`DELETE FROM shared_events WHERE id = $1 AND relationship_id = $2`,
 		eventID, relationshipID,
@@ -735,11 +795,160 @@ func handleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+func handleEventByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodDelete {
+		handleDeleteEvent(w, r)
+		return
+	}
+	handleGetEvent(w, r)
+}
+
+func handleGetEvent(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
+		return
+	}
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+	relationshipID, err := getRelationshipIDForDevice(deviceID)
+	if err != nil {
+		if errors.Is(err, errNotPaired) {
+			http.Error(w, "not paired", http.StatusForbidden)
+			return
+		}
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	eventID := strings.TrimPrefix(r.URL.Path, "/api/events/")
+	if eventID == "" || strings.Contains(eventID, "/") {
+		http.Error(w, "missing event id", http.StatusBadRequest)
+		return
+	}
+
+	var ev SharedEvent
+	var at time.Time
+	var owner sql.NullString
+	err = db.QueryRow(
+		`SELECT id, title, event_at, owner_label FROM shared_events
+         WHERE id = $1 AND relationship_id = $2`,
+		eventID, relationshipID,
+	).Scan(&ev.ID, &ev.Title, &at, &owner)
+	if err == sql.ErrNoRows {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	ev.EventAt = at.UTC().Format(time.RFC3339)
+	if owner.Valid {
+		o := owner.String
+		ev.OwnerLabel = &o
+	}
+	json.NewEncoder(w).Encode(ev)
+}
+
+func todayUTC() string {
+	return time.Now().UTC().Format("2006-01-02")
+}
+
+func handleCheckInsToday(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
+		return
+	}
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+	user, err := getOrCreateUser(deviceID)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if user.RelationshipID == nil {
+		http.Error(w, "not paired", http.StatusForbidden)
+		return
+	}
+	relationshipID := *user.RelationshipID
+	today := todayUTC()
+
+	if r.Method == http.MethodPost {
+		var body struct {
+			Note *string `json:"note"`
+		}
+		json.NewDecoder(r.Body).Decode(&body)
+		var note interface{}
+		if body.Note != nil && strings.TrimSpace(*body.Note) != "" {
+			note = strings.TrimSpace(*body.Note)
+		}
+		var id string
+		err = db.QueryRow(
+			`INSERT INTO daily_checkins (user_id, relationship_id, check_date, note)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (user_id, check_date) DO UPDATE SET note = COALESCE(EXCLUDED.note, daily_checkins.note)
+             RETURNING id::text`,
+			user.ID, relationshipID, today, note,
+		).Scan(&id)
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	resp, err := buildTodayCheckIns(user.ID, relationshipID, today)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if r.Method == http.MethodPost {
+		w.WriteHeader(http.StatusCreated)
+	}
+	json.NewEncoder(w).Encode(resp)
+}
+
+func buildTodayCheckIns(currentUserID, relationshipID, today string) (TodayCheckIns, error) {
+	rows, err := db.Query(
+		`SELECT id::text, user_id::text, check_date, note FROM daily_checkins
+         WHERE relationship_id = $1 AND check_date = $2`,
+		relationshipID, today,
+	)
+	if err != nil {
+		return TodayCheckIns{}, err
+	}
+	defer rows.Close()
+
+	var resp TodayCheckIns
+	for rows.Next() {
+		var c CheckIn
+		var note sql.NullString
+		var checkDate time.Time
+		if err := rows.Scan(&c.ID, &c.UserID, &checkDate, &note); err != nil {
+			continue
+		}
+		c.CheckDate = checkDate.Format("2006-01-02")
+		if note.Valid {
+			n := note.String
+			c.Note = &n
+		}
+		c.IsMine = c.UserID == currentUserID
+		if c.IsMine {
+			resp.Mine = &c
+		} else {
+			resp.Partner = &c
+		}
+	}
+	return resp, nil
+}
+
 func deleteRelationshipData(tx *sql.Tx, relationshipID string) error {
 	tables := []string{
 		`DELETE FROM itinerary_items WHERE relationship_id = $1`,
 		`DELETE FROM weekly_goals WHERE relationship_id = $1`,
 		`DELETE FROM shared_events WHERE relationship_id = $1`,
+		`DELETE FROM daily_checkins WHERE relationship_id = $1`,
 	}
 	for _, q := range tables {
 		if _, err := tx.Exec(q, relationshipID); err != nil {
@@ -825,7 +1034,8 @@ func main() {
 		}
 		handleGetEvents(w, r)
 	})
-	http.HandleFunc("/api/events/", handleDeleteEvent)
+	http.HandleFunc("/api/events/", handleEventByID)
+	http.HandleFunc("/api/checkins/today", handleCheckInsToday)
 	http.HandleFunc("/api/pairing/generate", handlePairingGenerate)
 	http.HandleFunc("/api/pairing/link", handlePairingLink)
 	http.HandleFunc("/api/pairing/status", handlePairingStatus)

@@ -44,6 +44,20 @@ CREATE INDEX IF NOT EXISTS idx_itinerary_items_relationship
 CREATE INDEX IF NOT EXISTS idx_itinerary_items_list_type
     ON itinerary_items (relationship_id, list_type);
 
+-- Daily check-in (one per user per day)
+CREATE TABLE IF NOT EXISTS daily_checkins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    relationship_id UUID NOT NULL REFERENCES relationships(id) ON DELETE CASCADE,
+    check_date DATE NOT NULL,
+    note TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, check_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_checkins_relationship_date
+    ON daily_checkins (relationship_id, check_date);
+
 ALTER TABLE relationships
     ADD COLUMN IF NOT EXISTS next_visit_at TIMESTAMPTZ;
 
@@ -84,3 +98,10 @@ CREATE TABLE IF NOT EXISTS shared_events (
 
 CREATE INDEX IF NOT EXISTS idx_shared_events_relationship
     ON shared_events (relationship_id, event_at);
+
+ALTER TABLE itinerary_items
+    ADD COLUMN IF NOT EXISTS event_id TEXT REFERENCES shared_events(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_itinerary_items_event
+    ON itinerary_items (event_id)
+    WHERE event_id IS NOT NULL;

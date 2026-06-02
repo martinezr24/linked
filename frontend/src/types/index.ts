@@ -1,10 +1,11 @@
-export type ListType = "trip" | "reunion";
+export type ListType = "trip" | "reunion" | "visit";
 
 export type ListItem = {
   id: string;
   text: string;
   note?: string;
   listType: ListType;
+  eventId?: string;
 };
 
 export type WeeklyGoal = {
@@ -19,6 +20,19 @@ export type SharedEvent = {
   title: string;
   eventAt: string;
   ownerLabel?: string;
+};
+
+export type CheckIn = {
+  id: string;
+  userId: string;
+  checkDate: string;
+  note?: string;
+  isMine: boolean;
+};
+
+export type TodayCheckIns = {
+  mine: CheckIn | null;
+  partner: CheckIn | null;
 };
 
 export type WsMessage = {
