@@ -1203,7 +1203,17 @@ func handleAsyncNotes(w http.ResponseWriter, r *http.Request) {
 			triggerType = "anytime"
 		}
 		var triggerVal interface{}
-		if body.TriggerValue != nil && strings.TrimSpace(*body.TriggerValue) != "" {
+		if triggerType == "custom" {
+			if body.TriggerValue == nil || strings.TrimSpace(*body.TriggerValue) == "" {
+				http.Error(w, "triggerValue required for custom category", http.StatusBadRequest)
+				return
+			}
+			v := strings.TrimSpace(*body.TriggerValue)
+			if len(v) > 80 {
+				v = v[:80]
+			}
+			triggerVal = v
+		} else if body.TriggerValue != nil && strings.TrimSpace(*body.TriggerValue) != "" {
 			triggerVal = strings.TrimSpace(*body.TriggerValue)
 		}
 		var n AsyncNote

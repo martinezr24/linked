@@ -1,10 +1,15 @@
-import { Image } from "react-native";
+import { Platform, StyleSheet } from "react-native";
 import { Redirect, Tabs } from "expo-router";
+import { BlurView } from "expo-blur";
 
+import {
+  TabEventsIcon,
+  TabHomeIcon,
+  TabPlansIcon,
+  TabSettingsIcon,
+} from "@/components/ui/TabIcons";
 import { useRelationship } from "@/context/RelationshipContext";
-
-const homeIcon = require("../../../assets/images/tabIcons/home.png");
-const exploreIcon = require("../../../assets/images/tabIcons/explore.png");
+import { colors } from "@/theme/tokens";
 
 export default function TabsLayout() {
   const { isReady, isPaired } = useRelationship();
@@ -21,8 +26,18 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#000",
-        tabBarInactiveTintColor: "#888",
+        tabBarActiveTintColor: colors.text.primary,
+        tabBarInactiveTintColor: colors.text.muted,
+        tabBarStyle: styles.tabBar,
+        tabBarBackground: () =>
+          Platform.OS === "ios" ? (
+            <BlurView
+              intensity={60}
+              tint="dark"
+              style={StyleSheet.absoluteFill}
+            />
+          ) : undefined,
+        tabBarLabelStyle: styles.tabLabel,
       }}
     >
       <Tabs.Screen
@@ -31,50 +46,31 @@ export default function TabsLayout() {
           title: "Home",
           tabBarLabel: "Home",
           tabBarIcon: ({ focused }) => (
-            <Image
-              source={homeIcon}
-              style={{
-                width: 24,
-                height: 24,
-                opacity: focused ? 1 : 0.45,
-              }}
+            <TabHomeIcon
+              color={focused ? colors.text.primary : colors.text.muted}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="plans"
+        options={{
+          title: "Plans",
+          tabBarLabel: "Plans",
+          tabBarIcon: ({ focused }) => (
+            <TabPlansIcon
+              color={focused ? colors.text.primary : colors.text.muted}
             />
           ),
         }}
       />
       <Tabs.Screen
         name="trip"
-        options={{
-          title: "Trip",
-          tabBarLabel: "Trip",
-          tabBarIcon: ({ focused }) => (
-            <Image
-              source={exploreIcon}
-              style={{
-                width: 24,
-                height: 24,
-                opacity: focused ? 1 : 0.45,
-              }}
-            />
-          ),
-        }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="together"
-        options={{
-          title: "Together",
-          tabBarLabel: "Together",
-          tabBarIcon: ({ focused }) => (
-            <Image
-              source={exploreIcon}
-              style={{
-                width: 24,
-                height: 24,
-                opacity: focused ? 1 : 0.45,
-              }}
-            />
-          ),
-        }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="events"
@@ -82,13 +78,8 @@ export default function TabsLayout() {
           title: "Events",
           tabBarLabel: "Events",
           tabBarIcon: ({ focused }) => (
-            <Image
-              source={exploreIcon}
-              style={{
-                width: 24,
-                height: 24,
-                opacity: focused ? 1 : 0.45,
-              }}
+            <TabEventsIcon
+              color={focused ? colors.text.primary : colors.text.muted}
             />
           ),
         }}
@@ -99,13 +90,8 @@ export default function TabsLayout() {
           title: "Settings",
           tabBarLabel: "Settings",
           tabBarIcon: ({ focused }) => (
-            <Image
-              source={homeIcon}
-              style={{
-                width: 24,
-                height: 24,
-                opacity: focused ? 0.35 : 0.25,
-              }}
+            <TabSettingsIcon
+              color={focused ? colors.text.primary : colors.text.muted}
             />
           ),
         }}
@@ -113,3 +99,18 @@ export default function TabsLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    position: "absolute",
+    backgroundColor: Platform.OS === "ios" ? "transparent" : colors.overlay.glass,
+    borderTopColor: colors.border.subtle,
+    borderTopWidth: 1,
+    height: Platform.OS === "ios" ? 88 : 64,
+    paddingTop: 8,
+  },
+  tabLabel: {
+    fontFamily: "DMSans_600SemiBold",
+    fontSize: 11,
+  },
+});

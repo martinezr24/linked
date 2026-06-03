@@ -4,7 +4,6 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -12,7 +11,9 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 
-import { PLACEHOLDER_COLOR } from "@/constants/ui";
+import { AppText } from "@/components/ui/AppText";
+import { colors } from "@/theme/tokens";
+import { useTheme } from "@/theme/useTheme";
 import { dateToIso, formatMMDDYYYY } from "@/utils/dates";
 
 type Props = {
@@ -28,6 +29,7 @@ export function DatePickerField({
   onChange,
   minimumDate,
 }: Props) {
+  const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<Date>(value ?? new Date());
 
@@ -63,7 +65,9 @@ export function DatePickerField({
 
     return (
       <View style={styles.wrap}>
-        <Text style={styles.label}>{label}</Text>
+        <AppText variant="bodySemibold" color="secondary" style={styles.label}>
+          {label}
+        </AppText>
         <input
           type="date"
           value={webValue}
@@ -78,13 +82,16 @@ export function DatePickerField({
             padding: 12,
             fontSize: 16,
             borderRadius: 8,
-            border: "1px solid #ddd",
+            border: `1px solid ${colors.border.subtle}`,
             boxSizing: "border-box",
-            color: "#111",
+            color: colors.text.primary,
+            backgroundColor: colors.surface.input,
           }}
         />
         {value ? (
-          <Text style={styles.preview}>{formatMMDDYYYY(dateToIso(value))}</Text>
+          <AppText variant="caption" color="muted" style={styles.preview}>
+            {formatMMDDYYYY(dateToIso(value))}
+          </AppText>
         ) : null}
       </View>
     );
@@ -92,28 +99,49 @@ export function DatePickerField({
 
   return (
     <View style={styles.wrap}>
-      <Text style={styles.label}>{label}</Text>
-      <TouchableOpacity style={styles.button} onPress={openPicker}>
-        <Text
-          style={[
-            styles.buttonText,
-            !value && styles.buttonPlaceholder,
-          ]}
-        >
+      <AppText variant="bodySemibold" color="secondary" style={styles.label}>
+        {label}
+      </AppText>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          {
+            backgroundColor: theme.colors.surface.input,
+            borderColor: theme.colors.border.subtle,
+          },
+        ]}
+        onPress={openPicker}
+      >
+        <AppText variant="body" color={value ? "primary" : "muted"}>
           {display}
-        </Text>
+        </AppText>
       </TouchableOpacity>
 
       {Platform.OS === "ios" ? (
         <Modal visible={open} transparent animationType="slide">
           <Pressable style={styles.overlay} onPress={() => setOpen(false)}>
-            <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-              <View style={styles.sheetHeader}>
+            <Pressable
+              style={[
+                styles.sheet,
+                { backgroundColor: theme.colors.surface.card },
+              ]}
+              onPress={(e) => e.stopPropagation()}
+            >
+              <View
+                style={[
+                  styles.sheetHeader,
+                  { borderBottomColor: theme.colors.border.subtle },
+                ]}
+              >
                 <TouchableOpacity onPress={() => setOpen(false)}>
-                  <Text style={styles.cancel}>Cancel</Text>
+                  <AppText variant="body" color="secondary">
+                    Cancel
+                  </AppText>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={confirmIOS}>
-                  <Text style={styles.done}>Done</Text>
+                  <AppText variant="bodySemibold" color="accent">
+                    Done
+                  </AppText>
                 </TouchableOpacity>
               </View>
               <View style={styles.pickerWrap}>
@@ -121,9 +149,9 @@ export function DatePickerField({
                   value={draft}
                   mode="date"
                   display="spinner"
-                  themeVariant="light"
-                  textColor="#111111"
-                  accentColor="#000000"
+                  themeVariant="dark"
+                  textColor={theme.colors.text.primary}
+                  accentColor={theme.colors.accent.primary}
                   minimumDate={minimumDate}
                   onChange={onPickerChange}
                   style={styles.picker}
@@ -149,24 +177,19 @@ export function DatePickerField({
 
 const styles = StyleSheet.create({
   wrap: { marginBottom: 10 },
-  label: { fontSize: 14, fontWeight: "600", marginBottom: 6, color: "#333" },
+  label: { marginBottom: 6 },
   button: {
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
+    borderRadius: 10,
     padding: 12,
   },
-  buttonText: { fontSize: 16, color: "#111" },
-  buttonPlaceholder: { color: PLACEHOLDER_COLOR },
-  preview: { marginTop: 4, fontSize: 13, color: "#666" },
+  preview: { marginTop: 4 },
   overlay: {
     flex: 1,
     justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.4)",
+    backgroundColor: "rgba(0,0,0,0.65)",
   },
   sheet: {
-    backgroundColor: "#fff",
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     paddingBottom: 24,
@@ -176,14 +199,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#eee",
   },
-  cancel: { fontSize: 16, color: "#444" },
-  done: { fontSize: 16, fontWeight: "700", color: "#000" },
-  pickerWrap: {
-    backgroundColor: "#fff",
-    paddingVertical: 8,
-  },
+  pickerWrap: { paddingVertical: 8 },
   picker: {
     height: 216,
     width: "100%",

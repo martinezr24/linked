@@ -4,7 +4,6 @@ import {
   FlatList,
   Keyboard,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -14,6 +13,10 @@ import { router } from "expo-router";
 
 import { AppTextInput } from "@/components/AppTextInput";
 import { DatePickerField } from "@/components/DatePickerField";
+import { AppText } from "@/components/ui/AppText";
+import { ArtifactCard } from "@/components/ui/ArtifactCard";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
 import { fetchEvents } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
@@ -21,9 +24,11 @@ import { apiFetch } from "@/utils/api";
 import { dateToIso, formatMMDDYYYY } from "@/utils/dates";
 import { showMutationError } from "@/utils/errors";
 import { generateId } from "@/utils/id";
+import { useTheme } from "@/theme/useTheme";
 import type { SharedEvent } from "@/types";
 
 export default function EventsScreen() {
+  const theme = useTheme();
   const { deviceId } = useRelationship();
   const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
@@ -79,138 +84,155 @@ export default function EventsScreen() {
     addEvent.mutate(ev);
   };
 
+  const inputStyle = [
+    styles.input,
+    {
+      backgroundColor: theme.colors.surface.input,
+      borderColor: theme.colors.border.subtle,
+      color: theme.colors.text.primary,
+    },
+  ];
+
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#000" />
-      </SafeAreaView>
+      <ScreenBackground>
+        <SafeAreaView style={[styles.safe, styles.centered]}>
+          <ActivityIndicator size="large" color={theme.colors.accent.primary} />
+        </SafeAreaView>
+      </ScreenBackground>
     );
   }
 
   const listHeader = (
-    <View>
-      <Text style={styles.header}>Upcoming events</Text>
-      <Text style={styles.hint}>Shared dates you both should know about.</Text>
+    <View style={styles.headerBlock}>
+      <AppText variant="h1" style={styles.pageTitle}>
+        Upcoming events
+      </AppText>
+      <AppText variant="body" color="secondary" style={styles.hint}>
+        Shared dates you both should know about.
+      </AppText>
 
-      <AppTextInput
-        style={styles.input}
-        value={title}
-        onChangeText={setTitle}
-        placeholder="Event title"
-        returnKeyType="next"
-      />
-      <DatePickerField
-        label="Event date"
-        value={eventDate}
-        onChange={setEventDate}
-      />
-      <AppTextInput
-        style={styles.input}
-        value={ownerLabel}
-        onChangeText={setOwnerLabel}
-        placeholder="Whose event? (optional)"
-        returnKeyType="done"
-        blurOnSubmit
-      />
-      <TouchableOpacity
-        style={[
-          styles.button,
-          (!title.trim() || !eventDate) && styles.buttonDisabled,
-        ]}
-        onPress={handleAdd}
-        disabled={!title.trim() || !eventDate}
-      >
-        <Text style={styles.buttonText}>Add event</Text>
-      </TouchableOpacity>
+      <ArtifactCard category="New event">
+        <AppTextInput
+          style={inputStyle}
+          value={title}
+          onChangeText={setTitle}
+          placeholder="Event title"
+          placeholderTextColor={theme.colors.text.muted}
+          returnKeyType="next"
+        />
+        <DatePickerField
+          label="Event date"
+          value={eventDate}
+          onChange={setEventDate}
+        />
+        <AppTextInput
+          style={inputStyle}
+          value={ownerLabel}
+          onChangeText={setOwnerLabel}
+          placeholder="Whose event? (optional)"
+          placeholderTextColor={theme.colors.text.muted}
+          returnKeyType="done"
+          blurOnSubmit
+        />
+        <PrimaryButton
+          label="Add event"
+          onPress={handleAdd}
+          disabled={!title.trim() || !eventDate}
+        />
+      </ArtifactCard>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <FlatList
-        data={events}
-        keyExtractor={(item) => item.id}
-        style={styles.list}
-        contentContainerStyle={styles.listContent}
-        keyboardShouldPersistTaps="handled"
-        keyboardDismissMode="on-drag"
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={<Text style={styles.empty}>No events yet.</Text>}
-        renderItem={({ item }) => (
-          <View style={styles.item}>
-            <View style={styles.itemBody}>
-              <Text style={styles.itemTitle}>{item.title}</Text>
-              <Text style={styles.itemDate}>
-                {formatMMDDYYYY(item.eventAt)}
-              </Text>
-              {item.ownerLabel ? (
-                <Text style={styles.itemOwner}>{item.ownerLabel}</Text>
-              ) : null}
-              <TouchableOpacity
-                style={styles.planButton}
-                onPress={() =>
-                  router.push({
-                    pathname: "/visit/[eventId]",
-                    params: {
-                      eventId: item.id,
-                      title: item.title,
-                      eventAt: item.eventAt,
-                    },
-                  })
-                }
-              >
-                <Text style={styles.planButtonText}>Plan this visit →</Text>
+    <ScreenBackground>
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <FlatList
+          data={events}
+          keyExtractor={(item) => item.id}
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={
+            <AppText variant="body" color="muted" style={styles.empty}>
+              No events yet.
+            </AppText>
+          }
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.item,
+                {
+                  backgroundColor: theme.colors.surface.card,
+                  borderColor: theme.colors.border.subtle,
+                },
+              ]}
+            >
+              <View style={styles.itemBody}>
+                <AppText variant="bodySemibold">{item.title}</AppText>
+                <AppText variant="body" color="secondary" style={styles.itemDate}>
+                  {formatMMDDYYYY(item.eventAt)}
+                </AppText>
+                {item.ownerLabel ? (
+                  <AppText variant="caption" color="muted">
+                    {item.ownerLabel}
+                  </AppText>
+                ) : null}
+                <TouchableOpacity
+                  style={styles.planButton}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/visit/[eventId]",
+                      params: {
+                        eventId: item.id,
+                        title: item.title,
+                        eventAt: item.eventAt,
+                      },
+                    })
+                  }
+                >
+                  <AppText variant="bodySemibold" color="accent">
+                    Plan this visit →
+                  </AppText>
+                </TouchableOpacity>
+              </View>
+              <TouchableOpacity onPress={() => deleteEvent.mutate(item.id)}>
+                <AppText color="accent">✕</AppText>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => deleteEvent.mutate(item.id)}>
-              <Text style={styles.delete}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      />
-    </SafeAreaView>
+          )}
+        />
+      </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9f9f9", padding: 20 },
-  centered: { justifyContent: "center", alignItems: "center" },
-  header: { fontSize: 26, fontWeight: "800", marginBottom: 4 },
-  hint: { color: "#666", marginBottom: 16 },
+  safe: { flex: 1 },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  headerBlock: { paddingHorizontal: 20, paddingTop: 8 },
+  pageTitle: { marginBottom: 4, fontFamily: "DMSans_700Bold" },
+  hint: { marginBottom: 16 },
   input: {
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 10,
     padding: 12,
     marginBottom: 10,
+    fontSize: 16,
   },
-  button: {
-    backgroundColor: "#000",
-    padding: 14,
-    borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 16,
-  },
-  buttonDisabled: { backgroundColor: "#ccc" },
-  buttonText: { color: "#fff", fontWeight: "700" },
   list: { flex: 1 },
-  listContent: { paddingBottom: 24 },
-  empty: { textAlign: "center", color: "#888", marginTop: 24 },
+  listContent: { paddingHorizontal: 20, paddingBottom: 100 },
+  empty: { textAlign: "center", marginTop: 24 },
   item: {
     flexDirection: "row",
-    backgroundColor: "#fff",
     padding: 14,
-    borderRadius: 10,
+    borderRadius: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#eee",
   },
   itemBody: { flex: 1 },
-  itemTitle: { fontSize: 16, fontWeight: "700" },
-  itemDate: { color: "#444", marginTop: 4 },
-  itemOwner: { color: "#888", marginTop: 2, fontSize: 13 },
-  delete: { color: "#c0392b", fontSize: 18, fontWeight: "700", padding: 4 },
+  itemDate: { marginTop: 4 },
   planButton: { marginTop: 10 },
-  planButtonText: { color: "#000", fontWeight: "700", fontSize: 14 },
 });

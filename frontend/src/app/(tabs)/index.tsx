@@ -2,8 +2,8 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
+  ScrollView,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -16,6 +16,12 @@ import { WidgetPreviewCard } from "@/components/WidgetPreviewCard";
 import { AppTextInput } from "@/components/AppTextInput";
 import { DatePickerField } from "@/components/DatePickerField";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { AppText } from "@/components/ui/AppText";
+import { ArtifactCard } from "@/components/ui/ArtifactCard";
+import { ConnectedHeader } from "@/components/ui/ConnectedHeader";
+import { CoupleProgressCard } from "@/components/ui/CoupleProgressCard";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
 import {
   fetchCheckIns,
@@ -33,6 +39,8 @@ import {
   getDeviceTimezoneLabel,
 } from "@/utils/dates";
 import { showMutationError } from "@/utils/errors";
+import { hapticSuccess } from "@/utils/haptics";
+import { useTheme } from "@/theme/useTheme";
 import type { SharedEvent, WeeklyGoal } from "@/types";
 
 function formatCountdown(targetIso: string): string {
@@ -51,6 +59,12 @@ function formatCountdown(targetIso: string): string {
   return `${hours} hour${hours === 1 ? "" : "s"}, ${minutes} min`;
 }
 
+function countdownDays(targetIso: string): string {
+  const diff = new Date(targetIso).getTime() - Date.now();
+  if (diff <= 0) return "0";
+  return String(Math.floor(diff / (1000 * 60 * 60 * 24)));
+}
+
 function nextUpcomingEvent(events: SharedEvent[]): SharedEvent | null {
   const now = Date.now();
   const upcoming = events
@@ -63,6 +77,7 @@ function nextUpcomingEvent(events: SharedEvent[]): SharedEvent | null {
 }
 
 export default function HomeScreen() {
+  const theme = useTheme();
   const { deviceId } = useRelationship();
   const queryClient = useQueryClient();
   const [visitDraft, setVisitDraft] = useState<Date | null>(null);
@@ -197,6 +212,7 @@ export default function HomeScreen() {
     },
     onSuccess: () => {
       setCheckInNote("");
+      void hapticSuccess();
       void queryClient.invalidateQueries({ queryKey: queryKeys.checkIns });
       void queryClient.invalidateQueries({ queryKey: queryKeys.streak });
     },
@@ -205,300 +221,305 @@ export default function HomeScreen() {
 
   const upcoming = nextUpcomingEvent(events);
   const openGoals = goals.filter((g) => !g.done);
+  const streakCount = streak?.currentStreak ?? 0;
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#000" />
-      </SafeAreaView>
+      <ScreenBackground>
+        <SafeAreaView style={[styles.centered, styles.safe]}>
+          <ActivityIndicator size="large" color={theme.colors.accent.primary} />
+        </SafeAreaView>
+      </ScreenBackground>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <DismissKeyboardView>
-        <Text style={styles.title}>Linked</Text>
-        <Text style={styles.subtitle}>Plan your time apart — and together.</Text>
-
-        {streak && streak.currentStreak > 0 ? (
-          <View style={styles.streakBanner}>
-            <Text style={styles.streakText}>
-              {streak.currentStreak}-day connection streak
-              {streak.bothCheckedInToday ? " — both checked in today!" : ""}
-            </Text>
-          </View>
-        ) : null}
-
-        {(upcoming || openGoals.length > 0) && (
-          <View style={styles.summaryCard}>
-            <Text style={styles.cardTitle}>At a glance</Text>
-            {upcoming ? (
-              <TouchableOpacity
-                onPress={() =>
-                  router.push({
-                    pathname: "/visit/[eventId]",
-                    params: {
-                      eventId: upcoming.id,
-                      title: upcoming.title,
-                      eventAt: upcoming.eventAt,
-                    },
-                  })
-                }
-              >
-                <Text style={styles.summaryLine}>
-                  Next event: {upcoming.title} (
-                  {formatMMDDYYYY(upcoming.eventAt)})
-                </Text>
-              </TouchableOpacity>
-            ) : null}
-            {openGoals.length > 0 ? (
-              <Text style={styles.summaryLine}>
-                {openGoals.length} open connection goal
-                {openGoals.length === 1 ? "" : "s"} this week
-              </Text>
-            ) : null}
-          </View>
-        )}
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Thinking of you</Text>
-          {checkIns?.mine ? (
-            <Text style={styles.checkInDone}>
-              You checked in today
-              {checkIns.mine.note ? `: “${checkIns.mine.note}”` : ""}
-            </Text>
-          ) : (
-            <>
-              <AppTextInput
-                style={styles.input}
-                value={checkInNote}
-                onChangeText={setCheckInNote}
-                placeholder="Optional note for your partner"
-              />
-              <TouchableOpacity
-                style={styles.button}
-                onPress={() => {
-                  Keyboard.dismiss();
-                  sendCheckIn.mutate(checkInNote.trim());
-                }}
-              >
-                <Text style={styles.buttonText}>Send check-in</Text>
-              </TouchableOpacity>
-            </>
-          )}
-          <Text style={styles.checkInPartner}>
-            {checkIns?.partner
-              ? `Partner checked in today${checkIns.partner.note ? `: “${checkIns.partner.note}”` : ""}`
-              : "Partner hasn’t checked in yet today"}
-          </Text>
-          <Text style={styles.checkInResetHint}>
-            Resets at midnight ({tzLabel})
-          </Text>
-        </View>
-
-        <AsyncNotesCard />
-
-        <WidgetPreviewCard />
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Next visit</Text>
-          {nextVisitAt ? (
-            <>
-              <Text style={styles.countdown}>
-                {formatCountdown(nextVisitAt)}
-                <Text style={styles.dateParen}>
-                  {" "}
-                  ({formatMMDDYYYY(nextVisitAt)})
-                </Text>
-              </Text>
-              <Text style={styles.tzHint}>
-                {formatLocalDateLabel(nextVisitAt)} · {tzLabel}
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.muted}>Set a date to start the countdown</Text>
-          )}
-          <DatePickerField
-            label="Pick a visit date"
-            value={visitDraft}
-            onChange={setVisitDraft}
-            minimumDate={new Date()}
+    <ScreenBackground>
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <DismissKeyboardView>
+          <ConnectedHeader
+            streakCount={streakCount}
+            mineCheckedIn={Boolean(checkIns?.mine)}
+            partnerCheckedIn={Boolean(checkIns?.partner)}
           />
-          <TouchableOpacity
-            style={[styles.button, !visitDraft && styles.buttonDisabled]}
-            onPress={() => visitDraft && saveVisit.mutate(visitDraft)}
-            disabled={!visitDraft}
+
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
           >
-            <Text style={styles.buttonText}>Save visit date</Text>
-          </TouchableOpacity>
-          {nextVisitAt ? (
-            <TouchableOpacity
-              style={styles.clearButton}
-              onPress={() => clearVisit.mutate()}
-            >
-              <Text style={styles.clearButtonText}>Clear visit date</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>This week's connection</Text>
-          <View style={styles.goalInputRow}>
-            <AppTextInput
-              style={styles.input}
-              value={goalInput}
-              onChangeText={setGoalInput}
-              placeholder="e.g. FaceTime Friday night"
-              returnKeyType="done"
-              blurOnSubmit
-              onSubmitEditing={() => {
-                if (goalInput.trim()) addGoal.mutate(goalInput.trim());
-              }}
-            />
-            <TouchableOpacity
-              style={[
-                styles.addGoalButton,
-                !goalInput.trim() && styles.buttonDisabled,
-              ]}
-              onPress={() => {
-                if (goalInput.trim()) addGoal.mutate(goalInput.trim());
-              }}
-              disabled={!goalInput.trim()}
-            >
-              <Text style={styles.addGoalButtonText}>Add</Text>
-            </TouchableOpacity>
-          </View>
-          {goals.length === 0 ? (
-            <Text style={styles.muted}>No goals yet — add one above.</Text>
-          ) : (
-            goals.map((goal) => (
-              <View key={goal.id} style={styles.goalRow}>
-                <TouchableOpacity
-                  style={styles.goalCheckArea}
-                  onPress={() => toggleGoal.mutate(goal)}
-                >
-                  <Text style={styles.checkbox}>{goal.done ? "☑" : "☐"}</Text>
-                  <Text
-                    style={[
-                      styles.goalText,
-                      goal.done && styles.goalTextDone,
-                    ]}
-                  >
-                    {goal.goalText}
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => deleteGoal.mutate(goal.id)}>
-                  <Text style={styles.goalDelete}>✕</Text>
-                </TouchableOpacity>
+            {streak?.bothCheckedInToday ? (
+              <View
+                style={[
+                  styles.celebration,
+                  {
+                    backgroundColor: "rgba(230,57,70,0.12)",
+                    borderColor: theme.colors.border.emphasis,
+                  },
+                ]}
+              >
+                <AppText variant="bodySemibold" color="accent">
+                  Both checked in today — your connection is strong.
+                </AppText>
               </View>
-            ))
-          )}
-        </View>
+            ) : null}
 
-        <View style={styles.links}>
-          <Link href={"/trip" as Href} style={styles.link}>
-            Trip plans →
-          </Link>
-          <Link href={"/together" as Href} style={styles.link}>
-            When we're together →
-          </Link>
-          <Link href={"/events" as Href} style={styles.link}>
-            Upcoming events →
-          </Link>
-        </View>
-      </DismissKeyboardView>
-    </SafeAreaView>
+            {(upcoming || openGoals.length > 0) && (
+              <View style={styles.section}>
+                <ArtifactCard category="Featured" title="At a glance">
+                  {upcoming ? (
+                    <TouchableOpacity
+                      onPress={() =>
+                        router.push({
+                          pathname: "/visit/[eventId]",
+                          params: {
+                            eventId: upcoming.id,
+                            title: upcoming.title,
+                            eventAt: upcoming.eventAt,
+                          },
+                        })
+                      }
+                    >
+                      <AppText variant="body">
+                        Next event: {upcoming.title} (
+                        {formatMMDDYYYY(upcoming.eventAt)})
+                      </AppText>
+                    </TouchableOpacity>
+                  ) : null}
+                  {openGoals.length > 0 ? (
+                    <AppText variant="body" color="secondary" style={styles.glanceGap}>
+                      {openGoals.length} open connection goal
+                      {openGoals.length === 1 ? "" : "s"} this week
+                    </AppText>
+                  ) : null}
+                </ArtifactCard>
+              </View>
+            )}
+
+            <CoupleProgressCard
+              checkIns={checkIns}
+              note={checkInNote}
+              onChangeNote={setCheckInNote}
+              onSend={() => sendCheckIn.mutate(checkInNote.trim())}
+              sending={sendCheckIn.isPending}
+              tzLabel={tzLabel}
+            />
+
+            <ScrollView
+              horizontal
+              nestedScrollEnabled
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.hScroll}
+              style={styles.hScrollWrap}
+            >
+              <View style={styles.hCard}>
+                <WidgetPreviewCard compact />
+              </View>
+              <TouchableOpacity
+                style={[
+                  styles.miniCard,
+                  {
+                    backgroundColor: theme.colors.surface.card,
+                    borderColor: theme.colors.border.subtle,
+                  },
+                ]}
+                onPress={() => router.push("/plans")}
+              >
+                <AppText variant="label" color="secondary">
+                  PLANS
+                </AppText>
+                <AppText variant="h2" style={styles.miniTitle}>
+                  Shared lists
+                </AppText>
+                <AppText variant="body" color="muted">
+                  Trip & reunion →
+                </AppText>
+              </TouchableOpacity>
+            </ScrollView>
+
+            <View style={styles.section}>
+              <AsyncNotesCard />
+            </View>
+
+            <View style={styles.section}>
+              <ArtifactCard category="Visit" title="Next visit" stacked>
+                {nextVisitAt ? (
+                  <>
+                    <AppText display variant="displayHero" style={styles.visitDays}>
+                      {countdownDays(nextVisitAt)}
+                    </AppText>
+                    <AppText variant="caption" color="secondary" style={styles.visitLabel}>
+                      DAYS UNTIL YOU'RE TOGETHER
+                    </AppText>
+                    <AppText variant="body" style={styles.visitSub}>
+                      {formatCountdown(nextVisitAt)}
+                    </AppText>
+                    <AppText variant="label" color="muted">
+                      {formatLocalDateLabel(nextVisitAt)} · {tzLabel}
+                    </AppText>
+                  </>
+                ) : (
+                  <AppText variant="body" color="muted">
+                    Set a date to start the countdown
+                  </AppText>
+                )}
+                <DatePickerField
+                  label="Pick a visit date"
+                  value={visitDraft}
+                  onChange={setVisitDraft}
+                  minimumDate={new Date()}
+                />
+                <PrimaryButton
+                  label="Save visit date"
+                  onPress={() => visitDraft && saveVisit.mutate(visitDraft)}
+                  disabled={!visitDraft}
+                  style={styles.visitBtn}
+                />
+                {nextVisitAt ? (
+                  <PrimaryButton
+                    label="Clear visit date"
+                    variant="ghost"
+                    onPress={() => clearVisit.mutate()}
+                    style={styles.visitBtn}
+                  />
+                ) : null}
+              </ArtifactCard>
+            </View>
+
+            <View style={styles.section}>
+              <ArtifactCard
+                category="This week"
+                title="Connection goals"
+                stacked
+              >
+                <View style={styles.goalInputRow}>
+                  <AppTextInput
+                    style={[
+                      styles.goalInput,
+                      {
+                        backgroundColor: theme.colors.surface.input,
+                        borderColor: theme.colors.border.subtle,
+                        color: theme.colors.text.primary,
+                      },
+                    ]}
+                    value={goalInput}
+                    onChangeText={setGoalInput}
+                    placeholder="e.g. FaceTime Friday night"
+                    placeholderTextColor={theme.colors.text.muted}
+                    returnKeyType="done"
+                    blurOnSubmit
+                    onSubmitEditing={() => {
+                      if (goalInput.trim()) addGoal.mutate(goalInput.trim());
+                    }}
+                  />
+                  <PrimaryButton
+                    label="Add"
+                    onPress={() => {
+                      if (goalInput.trim()) addGoal.mutate(goalInput.trim());
+                    }}
+                    disabled={!goalInput.trim()}
+                    style={styles.addGoalBtn}
+                  />
+                </View>
+                {goals.length === 0 ? (
+                  <AppText variant="body" color="muted">
+                    No goals yet — add one above.
+                  </AppText>
+                ) : (
+                  goals.map((goal) => (
+                    <View key={goal.id} style={styles.goalRow}>
+                      <TouchableOpacity
+                        style={styles.goalCheckArea}
+                        onPress={() => toggleGoal.mutate(goal)}
+                      >
+                        <AppText style={styles.checkbox}>
+                          {goal.done ? "🔥" : "○"}
+                        </AppText>
+                        <AppText
+                          variant="body"
+                          style={goal.done ? styles.goalDone : undefined}
+                        >
+                          {goal.goalText}
+                        </AppText>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => deleteGoal.mutate(goal.id)}>
+                        <AppText color="accent">✕</AppText>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </ArtifactCard>
+            </View>
+
+            <View style={styles.links}>
+              <Link href={"/plans" as Href}>
+                <AppText variant="bodySemibold" color="accent">
+                  Shared plans →
+                </AppText>
+              </Link>
+              <Link href={"/events" as Href}>
+                <AppText variant="bodySemibold" color="accent">
+                  Upcoming events →
+                </AppText>
+              </Link>
+            </View>
+          </ScrollView>
+        </DismissKeyboardView>
+      </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9f9f9" },
-  centered: { justifyContent: "center", alignItems: "center", padding: 20 },
-  title: { fontSize: 32, fontWeight: "900", marginTop: 8, paddingHorizontal: 20 },
-  subtitle: {
-    fontSize: 15,
-    color: "#666",
-    marginBottom: 20,
-    paddingHorizontal: 20,
+  safe: { flex: 1 },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  scroll: { paddingBottom: 32 },
+  section: { paddingHorizontal: 20 },
+  celebration: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
   },
-  streakBanner: {
-    backgroundColor: "#e8f5e9",
+  glanceGap: { marginTop: 8 },
+  hScrollWrap: { marginBottom: 8 },
+  hScroll: { paddingHorizontal: 20, gap: 12 },
+  hCard: { width: 200 },
+  miniCard: {
+    width: 160,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    justifyContent: "center",
+  },
+  miniTitle: { marginVertical: 8 },
+  visitDays: {
+    fontFamily: "Fraunces_700Bold",
+    marginBottom: 4,
+  },
+  visitLabel: { marginBottom: 12 },
+  visitSub: { marginBottom: 8 },
+  visitBtn: { marginTop: 12 },
+  goalInputRow: { flexDirection: "row", marginBottom: 12, gap: 8 },
+  goalInput: {
+    flex: 1,
+    borderWidth: 1,
     borderRadius: 10,
     padding: 12,
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#c8e6c9",
+    fontSize: 16,
   },
-  streakText: { fontSize: 15, fontWeight: "600", color: "#2e7d32" },
-  summaryCard: {
-    backgroundColor: "#f0f4ff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    marginHorizontal: 20,
-    borderWidth: 1,
-    borderColor: "#d8e0f5",
-  },
-  summaryLine: { fontSize: 15, color: "#333", marginTop: 6 },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    marginHorizontal: 20,
-    borderWidth: 1,
-    borderColor: "#eee",
-  },
-  cardTitle: { fontSize: 17, fontWeight: "700", marginBottom: 8 },
-  countdown: { fontSize: 22, fontWeight: "800", marginBottom: 4 },
-  dateParen: { fontSize: 18, fontWeight: "600", color: "#555" },
-  tzHint: { fontSize: 13, color: "#666", marginBottom: 12 },
-  muted: { color: "#888", marginBottom: 4 },
-  checkInDone: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
-  checkInPartner: { fontSize: 14, color: "#666", marginTop: 10 },
-  checkInResetHint: { fontSize: 12, color: "#aaa", marginTop: 6 },
-  goalInputRow: { flexDirection: "row", marginBottom: 12 },
-  input: {
-    flex: 1,
-    backgroundColor: "#f9f9f9",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 8,
-    padding: 12,
-    marginRight: 10,
-    marginBottom: 10,
-  },
-  button: {
-    backgroundColor: "#000",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  buttonDisabled: { backgroundColor: "#aaa" },
-  buttonText: { color: "#fff", fontWeight: "700" },
-  addGoalButton: {
-    backgroundColor: "#000",
-    paddingHorizontal: 16,
-    justifyContent: "center",
-    borderRadius: 8,
-  },
-  addGoalButtonText: { color: "#fff", fontWeight: "700" },
-  clearButton: { marginTop: 10, alignItems: "center" },
-  clearButtonText: { color: "#888", fontSize: 14 },
+  addGoalBtn: { alignSelf: "stretch", justifyContent: "center" },
   goalRow: {
     flexDirection: "row",
     alignItems: "center",
     marginTop: 10,
     paddingTop: 10,
     borderTopWidth: 1,
-    borderTopColor: "#f0f0f0",
+    borderTopColor: "rgba(255,255,255,0.08)",
   },
-  goalCheckArea: { flex: 1, flexDirection: "row", alignItems: "center" },
-  checkbox: { fontSize: 22, marginRight: 10 },
-  goalText: { fontSize: 16, flex: 1 },
-  goalTextDone: { textDecorationLine: "line-through", color: "#888" },
-  goalDelete: { color: "#c0392b", fontSize: 18, padding: 6 },
-  links: { marginTop: 8, gap: 12, paddingHorizontal: 20, paddingBottom: 24 },
-  link: { fontSize: 16, fontWeight: "600", color: "#000", marginBottom: 10 },
+  goalCheckArea: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
+  checkbox: { fontSize: 18 },
+  goalDone: { textDecorationLine: "line-through", opacity: 0.5 },
+  links: { paddingHorizontal: 20, gap: 12, marginTop: 8 },
 });

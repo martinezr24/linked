@@ -3,39 +3,52 @@ import {
   ActivityIndicator,
   Keyboard,
   Modal,
+  Pressable,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AppTextInput } from "@/components/AppTextInput";
+import { AppText } from "@/components/ui/AppText";
+import { ArtifactCard } from "@/components/ui/ArtifactCard";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { queryKeys } from "@/api/queryKeys";
 import { fetchAsyncNotes } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { showMutationError } from "@/utils/errors";
+import { useTheme } from "@/theme/useTheme";
 import type { AsyncNote } from "@/types";
 
-const TRIGGERS = [
+const PRESET_TRIGGERS = [
   { id: "anytime", label: "Surprise me anytime" },
   { id: "hard_day", label: "Open when you're having a hard day" },
   { id: "miss_me", label: "Open when you miss me" },
   { id: "happy", label: "Open when you're happy" },
 ];
 
-function triggerLabel(type: string, value?: string) {
-  const found = TRIGGERS.find((t) => t.id === type);
+const CUSTOM_TRIGGER_ID = "custom";
+const MAX_CUSTOM_LABEL = 80;
+
+export function triggerLabel(type: string, value?: string) {
+  if (type === CUSTOM_TRIGGER_ID && value) {
+    return `Open when ${value}`;
+  }
+  const found = PRESET_TRIGGERS.find((t) => t.id === type);
   if (found) return found.label;
   return value ?? type;
 }
 
 export function AsyncNotesCard() {
+  const theme = useTheme();
   const { deviceId } = useRelationship();
   const queryClient = useQueryClient();
+  const [expanded, setExpanded] = useState(false);
   const [body, setBody] = useState("");
   const [triggerType, setTriggerType] = useState("anytime");
+  const [customLabel, setCustomLabel] = useState("");
   const [revealed, setRevealed] = useState<AsyncNote | null>(null);
   const [revealing, setRevealing] = useState(false);
 
@@ -45,24 +58,41 @@ export function AsyncNotesCard() {
     enabled: Boolean(deviceId),
   });
 
+  const unreceived = notes.filter((n) => !n.isMine && !n.openedAt);
+  const isCustom = triggerType === CUSTOM_TRIGGER_ID;
+  const canSend =
+    body.trim().length > 0 &&
+    (!isCustom || customLabel.trim().length > 0);
+
   const createNote = useMutation({
     mutationFn: async () => {
+      const payload: {
+        triggerType: string;
+        body: string;
+        triggerValue?: string;
+      } = {
+        triggerType,
+        body: body.trim(),
+      };
+      if (isCustom) {
+        payload.triggerValue = customLabel.trim().slice(0, MAX_CUSTOM_LABEL);
+      }
       const res = await apiFetch("/api/async-notes", deviceId!, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ triggerType, body: body.trim() }),
+        body: JSON.stringify(payload),
       });
       if (!res.ok) throw new Error("Failed to send note");
       return res.json() as Promise<AsyncNote>;
     },
     onSuccess: () => {
       setBody("");
+      setCustomLabel("");
+      setTriggerType("anytime");
       void queryClient.invalidateQueries({ queryKey: queryKeys.asyncNotes });
     },
     onError: () => showMutationError("Could not send your note. Try again."),
   });
-
-  const unreceived = notes.filter((n) => !n.isMine && !n.openedAt);
 
   const openNote = async (note: AsyncNote) => {
     if (!deviceId) return;
@@ -86,171 +116,256 @@ export function AsyncNotesCard() {
 
   if (isLoading) {
     return (
-      <View style={styles.card}>
-        <ActivityIndicator color="#000" />
+      <View style={styles.loader}>
+        <ActivityIndicator color={theme.colors.accent.primary} />
       </View>
     );
   }
 
   return (
-    <View style={styles.card}>
-      <Text style={styles.cardTitle}>Open when…</Text>
-      <Text style={styles.hint}>
-        Leave a note for your partner to discover when they need it.
-      </Text>
-
-      {unreceived.length > 0 ? (
-        <View style={styles.inbox}>
-          <Text style={styles.inboxTitle}>
-            {unreceived.length} note{unreceived.length === 1 ? "" : "s"} waiting
-            for you
-          </Text>
-          {unreceived.map((note) => (
-            <TouchableOpacity
-              key={note.id}
-              style={styles.revealButton}
-              onPress={() => openNote(note)}
-              disabled={revealing}
-            >
-              <Text style={styles.revealButtonText}>
-                {triggerLabel(note.triggerType, note.triggerValue)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      ) : null}
-
-      <View style={styles.triggerRow}>
-        {TRIGGERS.map((t) => (
-          <TouchableOpacity
-            key={t.id}
-            style={[
-              styles.triggerChip,
-              triggerType === t.id && styles.triggerChipActive,
-            ]}
-            onPress={() => setTriggerType(t.id)}
-          >
-            <Text
+    <ArtifactCard category="Open when" stacked>
+      <Pressable
+        style={styles.headerRow}
+        onPress={() => setExpanded((e) => !e)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded }}
+      >
+        <AppText variant="h2">Open when…</AppText>
+        <View style={styles.headerRight}>
+          {unreceived.length > 0 ? (
+            <View
               style={[
-                styles.triggerChipText,
-                triggerType === t.id && styles.triggerChipTextActive,
+                styles.badge,
+                { borderColor: theme.colors.border.emphasis },
               ]}
             >
-              {t.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+              <AppText variant="label" color="accent">
+                {unreceived.length} waiting
+              </AppText>
+            </View>
+          ) : null}
+          <AppText color="muted">{expanded ? "▼" : "▶"}</AppText>
+        </View>
+      </Pressable>
 
-      <AppTextInput
-        style={styles.input}
-        value={body}
-        onChangeText={setBody}
-        placeholder="Write something they'll treasure…"
-        multiline
-      />
-      <TouchableOpacity
-        style={[styles.button, !body.trim() && styles.buttonDisabled]}
-        onPress={() => {
-          Keyboard.dismiss();
-          createNote.mutate();
-        }}
-        disabled={!body.trim() || createNote.isPending}
-      >
-        <Text style={styles.buttonText}>Send to partner</Text>
-      </TouchableOpacity>
+      {expanded ? (
+        <>
+          <AppText variant="body" color="secondary" style={styles.hint}>
+            Leave a note for your partner to discover when they need it.
+          </AppText>
+
+          {unreceived.length > 0 ? (
+            <View
+              style={[
+                styles.inbox,
+                {
+                  backgroundColor: "rgba(230,57,70,0.08)",
+                  borderColor: theme.colors.border.emphasis,
+                },
+              ]}
+            >
+              <AppText variant="bodySemibold" style={styles.inboxTitle}>
+                {unreceived.length} note{unreceived.length === 1 ? "" : "s"}{" "}
+                waiting for you
+              </AppText>
+              {unreceived.map((note) => (
+                <PrimaryButton
+                  key={note.id}
+                  label={triggerLabel(note.triggerType, note.triggerValue)}
+                  onPress={() => openNote(note)}
+                  style={styles.revealBtn}
+                />
+              ))}
+            </View>
+          ) : null}
+
+          <View style={styles.triggerRow}>
+            {PRESET_TRIGGERS.map((t) => (
+              <TouchableOpacity
+                key={t.id}
+                style={[
+                  styles.triggerChip,
+                  {
+                    borderColor: theme.colors.border.subtle,
+                    backgroundColor:
+                      triggerType === t.id
+                        ? theme.colors.accent.primary
+                        : "transparent",
+                  },
+                ]}
+                onPress={() => setTriggerType(t.id)}
+              >
+                <AppText
+                  variant="caption"
+                  style={{
+                    color:
+                      triggerType === t.id
+                        ? theme.colors.text.onAccent
+                        : theme.colors.text.secondary,
+                  }}
+                >
+                  {t.label}
+                </AppText>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={[
+                styles.triggerChip,
+                {
+                  borderColor: theme.colors.border.subtle,
+                  backgroundColor: isCustom
+                    ? theme.colors.accent.primary
+                    : "transparent",
+                },
+              ]}
+              onPress={() => setTriggerType(CUSTOM_TRIGGER_ID)}
+            >
+              <AppText
+                variant="caption"
+                style={{
+                  color: isCustom
+                    ? theme.colors.text.onAccent
+                    : theme.colors.text.secondary,
+                }}
+              >
+                Custom…
+              </AppText>
+            </TouchableOpacity>
+          </View>
+
+          {isCustom ? (
+            <AppTextInput
+              style={[
+                styles.customInput,
+                {
+                  backgroundColor: theme.colors.surface.input,
+                  borderColor: theme.colors.border.subtle,
+                  color: theme.colors.text.primary,
+                },
+              ]}
+              value={customLabel}
+              onChangeText={setCustomLabel}
+              placeholder={'e.g. "we fight", "our anniversary"'}
+              placeholderTextColor={theme.colors.text.muted}
+              maxLength={MAX_CUSTOM_LABEL}
+            />
+          ) : null}
+
+          <AppTextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.colors.surface.input,
+                borderColor: theme.colors.border.subtle,
+                color: theme.colors.text.primary,
+              },
+            ]}
+            value={body}
+            onChangeText={setBody}
+            placeholder="Write something they'll treasure…"
+            placeholderTextColor={theme.colors.text.muted}
+            multiline
+          />
+          <PrimaryButton
+            label="Send to partner"
+            onPress={() => {
+              Keyboard.dismiss();
+              createNote.mutate();
+            }}
+            disabled={!canSend}
+            loading={createNote.isPending}
+          />
+        </>
+      ) : null}
 
       <Modal visible={revealed !== null} transparent animationType="fade">
         <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Text style={styles.modalTitle}>
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: theme.colors.surface.card },
+            ]}
+          >
+            <AppText variant="h2" style={styles.modalTitle}>
               {revealed
                 ? triggerLabel(revealed.triggerType, revealed.triggerValue)
                 : ""}
-            </Text>
-            <Text style={styles.modalBody}>{revealed?.body}</Text>
-            <TouchableOpacity
-              style={styles.button}
-              onPress={() => setRevealed(null)}
-            >
-              <Text style={styles.buttonText}>Close</Text>
-            </TouchableOpacity>
+            </AppText>
+            <AppText display variant="body" style={styles.modalBody}>
+              {revealed?.body}
+            </AppText>
+            <PrimaryButton label="Close" onPress={() => setRevealed(null)} />
           </View>
         </View>
       </Modal>
-    </View>
+    </ArtifactCard>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    marginHorizontal: 20,
-    borderWidth: 1,
-    borderColor: "#eee",
+  loader: { padding: 24, alignItems: "center" },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 4,
   },
-  cardTitle: { fontSize: 17, fontWeight: "700", marginBottom: 8 },
-  hint: { fontSize: 14, color: "#666", marginBottom: 12 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  badge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  hint: { marginTop: 12, marginBottom: 12 },
   inbox: {
-    backgroundColor: "#fdf6ec",
     borderRadius: 10,
     padding: 12,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#f5e6c8",
   },
-  inboxTitle: { fontWeight: "600", marginBottom: 8 },
-  revealButton: {
-    backgroundColor: "#000",
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 6,
-  },
-  revealButtonText: { color: "#fff", fontWeight: "600", textAlign: "center" },
+  inboxTitle: { marginBottom: 8 },
+  revealBtn: { marginTop: 6 },
   triggerRow: { flexWrap: "wrap", flexDirection: "row", gap: 8, marginBottom: 10 },
   triggerChip: {
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
     marginBottom: 4,
   },
-  triggerChipActive: { backgroundColor: "#000", borderColor: "#000" },
-  triggerChipText: { fontSize: 13, color: "#444" },
-  triggerChipTextActive: { color: "#fff" },
-  input: {
-    backgroundColor: "#f9f9f9",
+  customInput: {
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 10,
+    fontSize: 16,
+  },
+  input: {
+    borderWidth: 1,
     borderRadius: 8,
     padding: 12,
     marginBottom: 10,
     minHeight: 80,
     textAlignVertical: "top",
+    fontSize: 16,
   },
-  button: {
-    backgroundColor: "#000",
-    padding: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  buttonDisabled: { backgroundColor: "#aaa" },
-  buttonText: { color: "#fff", fontWeight: "700" },
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: "rgba(0,0,0,0.65)",
     justifyContent: "center",
     padding: 24,
   },
   modalCard: {
-    backgroundColor: "#fff",
     borderRadius: 16,
     padding: 24,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
   },
-  modalTitle: { fontSize: 18, fontWeight: "800", marginBottom: 16 },
-  modalBody: { fontSize: 17, lineHeight: 26, marginBottom: 20, color: "#333" },
+  modalTitle: { marginBottom: 16 },
+  modalBody: {
+    lineHeight: 26,
+    marginBottom: 20,
+    fontFamily: "Fraunces_600SemiBold",
+  },
 });

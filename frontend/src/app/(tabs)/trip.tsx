@@ -1,11 +1,5 @@
-import { SharedListScreen } from "@/components/SharedListScreen";
+import { Redirect } from "expo-router";
 
-export default function TripScreen() {
-  return (
-    <SharedListScreen
-      listType="trip"
-      title="Trip itinerary"
-      placeholder="Add a trip plan..."
-    />
-  );
+export default function TripRedirect() {
+  return <Redirect href="/(tabs)/plans" />;
 }

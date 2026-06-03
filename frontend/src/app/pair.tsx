@@ -1,29 +1,28 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+
 import { AppTextInput } from "@/components/AppTextInput";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { AppMark } from "@/components/ui/AppMark";
+import { AppText } from "@/components/ui/AppText";
+import { ArtifactCard } from "@/components/ui/ArtifactCard";
+import { ConnectionLink } from "@/components/ui/ConnectionLink";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { getApiBase } from "@/constants/api";
 import { useRelationship } from "@/context/RelationshipContext";
 import { getOrCreateDeviceId } from "@/utils/deviceId";
+import { useTheme } from "@/theme/useTheme";
 
 export default function PairScreen() {
+  const theme = useTheme();
   const { setPaired } = useRelationship();
   const [deviceId, setDeviceId] = useState<string | null>(null);
-
-  // "generate" state
   const [generatedCode, setGeneratedCode] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  // "enter code" state
   const [enteredCode, setEnteredCode] = useState("");
   const [linking, setLinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +78,6 @@ export default function PairScreen() {
     const data = await res.json();
     setGeneratedCode(data.code);
 
-    // start countdown timer (10 minutes = 600 seconds)
     if (timerRef.current) clearInterval(timerRef.current);
     setSecondsLeft(600);
     timerRef.current = setInterval(() => {
@@ -124,96 +122,130 @@ export default function PairScreen() {
   const minutes = Math.floor(secondsLeft / 60);
   const secs = String(secondsLeft % 60).padStart(2, "0");
 
+  const inputStyle = [
+    styles.input,
+    {
+      backgroundColor: theme.colors.surface.input,
+      borderColor: theme.colors.border.subtle,
+      color: theme.colors.text.primary,
+    },
+  ];
+
   return (
-    <SafeAreaView style={styles.container}>
-      <DismissKeyboardView>
-      <Text style={styles.title}>Link with your partner</Text>
-
-      {/* --- GENERATE CODE section --- */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Generate a code</Text>
-        <Text style={styles.hint}>
-          Share this code with your partner. It expires in 10 minutes.
-        </Text>
-
-        {generatedCode ? (
-          <View style={styles.codeBox}>
-            <Text style={styles.codeText}>{generatedCode}</Text>
-            <Text style={styles.timer}>
-              Expires in {minutes}:{secs}
-            </Text>
+    <ScreenBackground>
+      <SafeAreaView style={styles.safe}>
+        <DismissKeyboardView>
+          <View style={styles.brandRow}>
+            <AppMark size={36} />
+            <AppText variant="h1" style={styles.title}>
+              Link together
+            </AppText>
           </View>
-        ) : (
-          <TouchableOpacity style={styles.button} onPress={handleGenerate}>
-            <Text style={styles.buttonText}>Generate code</Text>
-          </TouchableOpacity>
-        )}
-      </View>
 
-      <Text style={styles.divider}>— or —</Text>
+          <View style={styles.linkVisual}>
+            <View
+              style={[
+                styles.deviceDot,
+                { backgroundColor: theme.colors.avatar.mine },
+              ]}
+            />
+            <ConnectionLink length={80} />
+            <View
+              style={[
+                styles.deviceDot,
+                { backgroundColor: theme.colors.avatar.partner },
+              ]}
+            />
+          </View>
 
-      {/* --- ENTER CODE section --- */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Enter your partner's code</Text>
-        <AppTextInput
-          style={styles.input}
-          value={enteredCode}
-          onChangeText={(t) => setEnteredCode(t.replace(/\D/g, "").slice(0, 6))}
-          placeholder="6-digit code"
-          keyboardType="number-pad"
-          maxLength={6}
-          returnKeyType="done"
-          blurOnSubmit
-        />
-        <TouchableOpacity
-          style={[
-            styles.button,
-            enteredCode.length !== 6 && styles.buttonDisabled,
-          ]}
-          onPress={handleLink}
-          disabled={enteredCode.length !== 6 || linking}
-        >
-          {linking ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Link accounts</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          <ArtifactCard category="Share" title="Generate a code">
+            <AppText variant="body" color="secondary" style={styles.hint}>
+              Share this code with your partner. It expires in 10 minutes.
+            </AppText>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      </DismissKeyboardView>
-    </SafeAreaView>
+            {generatedCode ? (
+              <View style={styles.codeBox}>
+                <AppText display variant="displayHero" style={styles.codeText}>
+                  {generatedCode}
+                </AppText>
+                <AppText variant="body" color="muted">
+                  Expires in {minutes}:{secs}
+                </AppText>
+              </View>
+            ) : (
+              <PrimaryButton label="Generate code" onPress={handleGenerate} />
+            )}
+          </ArtifactCard>
+
+          <AppText variant="body" color="muted" style={styles.divider}>
+            — or —
+          </AppText>
+
+          <ArtifactCard category="Join" title="Enter partner's code">
+            <AppTextInput
+              style={inputStyle}
+              value={enteredCode}
+              onChangeText={(t) => setEnteredCode(t.replace(/\D/g, "").slice(0, 6))}
+              placeholder="6-digit code"
+              placeholderTextColor={theme.colors.text.muted}
+              keyboardType="number-pad"
+              maxLength={6}
+              returnKeyType="done"
+              blurOnSubmit
+            />
+            <PrimaryButton
+              label="Link accounts"
+              onPress={handleLink}
+              disabled={enteredCode.length !== 6 || linking}
+              loading={linking}
+            />
+          </ArtifactCard>
+
+          {error ? (
+            <AppText variant="body" color="accent" style={styles.error}>
+              {error}
+            </AppText>
+          ) : null}
+        </DismissKeyboardView>
+      </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9f9f9", padding: 24 },
-  title: { fontSize: 26, fontWeight: "800", marginBottom: 32, marginTop: 10 },
-  section: { marginBottom: 24 },
-  sectionTitle: { fontSize: 17, fontWeight: "700", marginBottom: 6 },
-  hint: { color: "#666", marginBottom: 12 },
-  codeBox: { alignItems: "center", marginTop: 8 },
-  codeText: { fontSize: 48, fontWeight: "900", letterSpacing: 8 },
-  timer: { color: "#888", marginTop: 8 },
-  divider: { textAlign: "center", color: "#aaa", marginVertical: 16 },
+  safe: { flex: 1, padding: 24 },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 24,
+    marginTop: 10,
+  },
+  title: { fontFamily: "DMSans_700Bold", flex: 1 },
+  linkVisual: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 24,
+  },
+  deviceDot: { width: 36, height: 36, borderRadius: 18 },
+  hint: { marginBottom: 12 },
+  codeBox: { alignItems: "center", marginVertical: 12 },
+  codeText: {
+    letterSpacing: 8,
+    fontFamily: "Fraunces_700Bold",
+    marginBottom: 8,
+  },
+  divider: { textAlign: "center", marginVertical: 16 },
   input: {
-    backgroundColor: "#fff",
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 10,
     padding: 15,
     fontSize: 24,
     letterSpacing: 6,
     marginBottom: 12,
+    textAlign: "center",
   },
-  button: {
-    backgroundColor: "#000",
-    padding: 16,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  buttonDisabled: { backgroundColor: "#ccc" },
-  buttonText: { color: "#fff", fontWeight: "700", fontSize: 16 },
-  error: { color: "#c0392b", textAlign: "center", marginTop: 12 },
+  error: { textAlign: "center", marginTop: 12 },
 });

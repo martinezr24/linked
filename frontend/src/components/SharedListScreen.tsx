@@ -4,7 +4,6 @@ import {
   FlatList,
   Keyboard,
   StyleSheet,
-  Text,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -14,6 +13,9 @@ import { router } from "expo-router";
 
 import { AppTextInput } from "@/components/AppTextInput";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { AppText } from "@/components/ui/AppText";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
 import {
   deleteListItem,
@@ -23,6 +25,7 @@ import {
 import { useRelationship } from "@/context/RelationshipContext";
 import { showMutationError } from "@/utils/errors";
 import { generateId } from "@/utils/id";
+import { useTheme } from "@/theme/useTheme";
 import type { ListItem, ListType } from "@/types";
 
 type Props = {
@@ -42,6 +45,7 @@ export function SharedListScreen({
   eventId,
   showBack,
 }: Props) {
+  const theme = useTheme();
   const { deviceId, relationshipId } = useRelationship();
   const queryClient = useQueryClient();
   const queryKey = queryKeys.list(listType, eventId);
@@ -92,136 +96,143 @@ export function SharedListScreen({
     addItem.mutate(newItem);
   };
 
+  const inputStyle = [
+    styles.input,
+    {
+      backgroundColor: theme.colors.surface.input,
+      borderColor: theme.colors.border.subtle,
+      color: theme.colors.text.primary,
+    },
+  ];
+
   if (isLoading) {
     return (
-      <SafeAreaView style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#000" />
-      </SafeAreaView>
+      <ScreenBackground>
+        <SafeAreaView style={[styles.safe, styles.centered]}>
+          <ActivityIndicator size="large" color={theme.colors.accent.primary} />
+        </SafeAreaView>
+      </ScreenBackground>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <DismissKeyboardView scroll={false} style={styles.flex}>
-        {showBack ? (
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-            <Text style={styles.backButtonText}>← Back</Text>
-          </TouchableOpacity>
-        ) : null}
-        <Text style={styles.header}>{title}</Text>
-        {error ? (
-          <Text style={styles.errorText}>
-            Could not load list. Is the backend running?
-          </Text>
-        ) : null}
-
-        <View style={styles.inputBlock}>
-          <View style={styles.inputRow}>
-            <AppTextInput
-              style={styles.input}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder={placeholder}
-              returnKeyType="done"
-              blurOnSubmit
-              onSubmitEditing={handleAdd}
-            />
-            <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
-              <Text style={styles.addButtonText}>Add</Text>
+    <ScreenBackground>
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <DismissKeyboardView scroll={false} style={styles.flex}>
+          {showBack ? (
+            <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <AppText variant="bodySemibold" color="accent">
+                ← Back
+              </AppText>
             </TouchableOpacity>
-          </View>
-          {notePlaceholder ? (
-            <AppTextInput
-              style={styles.noteInput}
-              value={inputNote}
-              onChangeText={setInputNote}
-              placeholder={notePlaceholder}
-              returnKeyType="done"
-              blurOnSubmit
-            />
           ) : null}
-        </View>
+          <AppText variant="h1" style={styles.header}>
+            {title}
+          </AppText>
+          {error ? (
+            <AppText variant="body" color="accent" style={styles.errorText}>
+              Could not load list. Is the backend running?
+            </AppText>
+          ) : null}
 
-        <FlatList
-          data={items}
-          keyExtractor={(item) => item.id}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          ListEmptyComponent={
-            <Text style={styles.emptyText}>
-              Nothing here yet — add one above.
-            </Text>
-          }
-          renderItem={({ item }) => (
-            <View style={styles.listItem}>
-              <View style={styles.itemContent}>
-                <Text style={styles.itemText}>{item.text}</Text>
-                {item.note ? (
-                  <Text style={styles.itemNote}>{item.note}</Text>
-                ) : null}
-              </View>
-              <TouchableOpacity onPress={() => removeItem.mutate(item.id)}>
-                <Text style={styles.deleteText}>✕</Text>
-              </TouchableOpacity>
+          <View style={styles.inputBlock}>
+            <View style={styles.inputRow}>
+              <AppTextInput
+                style={inputStyle}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder={placeholder}
+                placeholderTextColor={theme.colors.text.muted}
+                returnKeyType="done"
+                blurOnSubmit
+                onSubmitEditing={handleAdd}
+              />
+              <PrimaryButton label="Add" onPress={handleAdd} style={styles.addBtn} />
             </View>
-          )}
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-        />
-      </DismissKeyboardView>
-    </SafeAreaView>
+            {notePlaceholder ? (
+              <AppTextInput
+                style={[inputStyle, styles.noteInput]}
+                value={inputNote}
+                onChangeText={setInputNote}
+                placeholder={notePlaceholder}
+                placeholderTextColor={theme.colors.text.muted}
+                returnKeyType="done"
+                blurOnSubmit
+              />
+            ) : null}
+          </View>
+
+          <FlatList
+            data={items}
+            keyExtractor={(item) => item.id}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
+            ListEmptyComponent={
+              <AppText variant="body" color="muted" style={styles.emptyText}>
+                Nothing here yet — add one above.
+              </AppText>
+            }
+            renderItem={({ item }) => (
+              <View
+                style={[
+                  styles.listItem,
+                  {
+                    backgroundColor: theme.colors.surface.card,
+                    borderColor: theme.colors.border.subtle,
+                  },
+                ]}
+              >
+                <View style={styles.itemContent}>
+                  <AppText variant="bodySemibold">{item.text}</AppText>
+                  {item.note ? (
+                    <AppText variant="body" color="secondary" style={styles.itemNote}>
+                      {item.note}
+                    </AppText>
+                  ) : null}
+                </View>
+                <TouchableOpacity onPress={() => removeItem.mutate(item.id)}>
+                  <AppText color="accent">✕</AppText>
+                </TouchableOpacity>
+              </View>
+            )}
+            style={styles.list}
+            contentContainerStyle={styles.listContent}
+          />
+        </DismissKeyboardView>
+      </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9f9f9", padding: 20 },
+  safe: { flex: 1, padding: 20 },
   flex: { flex: 1 },
-  centered: { justifyContent: "center", alignItems: "center" },
+  centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   backButton: { marginBottom: 12, alignSelf: "flex-start" },
-  backButtonText: { fontSize: 16, fontWeight: "600", color: "#000" },
-  header: { fontSize: 26, fontWeight: "800", marginBottom: 16 },
-  errorText: { color: "#c0392b", marginBottom: 12 },
+  header: { marginBottom: 16, fontFamily: "DMSans_700Bold" },
+  errorText: { marginBottom: 12 },
   inputBlock: { marginBottom: 16 },
-  inputRow: { flexDirection: "row" },
+  inputRow: { flexDirection: "row", gap: 8 },
   input: {
     flex: 1,
-    backgroundColor: "#fff",
     padding: 14,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#ddd",
-    marginRight: 10,
+    fontSize: 16,
   },
-  noteInput: {
-    backgroundColor: "#fff",
-    padding: 12,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    marginTop: 10,
-  },
-  addButton: {
-    backgroundColor: "#000",
-    paddingHorizontal: 18,
-    justifyContent: "center",
-    borderRadius: 10,
-  },
-  addButtonText: { color: "#fff", fontWeight: "bold" },
+  noteInput: { marginTop: 10 },
+  addBtn: { justifyContent: "center" },
   list: { flex: 1 },
   listContent: { paddingBottom: 24 },
-  emptyText: { textAlign: "center", color: "#888", marginTop: 24 },
+  emptyText: { textAlign: "center", marginTop: 24 },
   listItem: {
     flexDirection: "row",
-    backgroundColor: "#fff",
     padding: 14,
-    borderRadius: 10,
+    borderRadius: 16,
     marginBottom: 10,
     borderWidth: 1,
-    borderColor: "#eee",
     alignItems: "flex-start",
   },
   itemContent: { flex: 1 },
-  itemText: { fontSize: 16, fontWeight: "600" },
-  itemNote: { fontSize: 14, color: "#666", marginTop: 4 },
-  deleteText: { color: "#ff4444", fontSize: 18, fontWeight: "bold", padding: 4 },
+  itemNote: { marginTop: 4 },
 });

@@ -1,12 +1,5 @@
-import { SharedListScreen } from "@/components/SharedListScreen";
+import { Redirect } from "expo-router";
 
-export default function TogetherScreen() {
-  return (
-    <SharedListScreen
-      listType="reunion"
-      title="When we're together"
-      placeholder="Something to do together..."
-      notePlaceholder="Optional note..."
-    />
-  );
+export default function TogetherRedirect() {
+  return <Redirect href="/(tabs)/plans" />;
 }

@@ -1,21 +1,31 @@
 import "react-native-gesture-handler";
 
 import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { SyncBootstrap } from "@/components/SyncBootstrap";
 import { QueryProvider } from "@/context/QueryProvider";
 import { RelationshipProvider } from "@/context/RelationshipContext";
+import { ThemeProvider } from "@/theme/ThemeProvider";
 
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <QueryProvider>
-        <RelationshipProvider>
-          <SyncBootstrap />
-          <Stack screenOptions={{ headerShown: false }} />
-        </RelationshipProvider>
-      </QueryProvider>
+      <ThemeProvider>
+        <QueryProvider>
+          <RelationshipProvider>
+            <SyncBootstrap />
+            <StatusBar style="light" />
+            <Stack screenOptions={{ headerShown: false }}>
+              <Stack.Screen
+                name="streak"
+                options={{ presentation: "modal", headerShown: false }}
+              />
+            </Stack>
+          </RelationshipProvider>
+        </QueryProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

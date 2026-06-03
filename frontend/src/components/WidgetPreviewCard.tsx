@@ -1,12 +1,19 @@
-import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
 import { fetchWidgetSummary } from "@/api/fetchers";
+import { AppText } from "@/components/ui/AppText";
+import { ArtifactCard } from "@/components/ui/ArtifactCard";
+import { FlameIcon } from "@/components/ui/FlameIcon";
 import { useRelationship } from "@/context/RelationshipContext";
 import { formatCountdown } from "@/utils/widgetFormat";
+import { useTheme } from "@/theme/useTheme";
 
-export function WidgetPreviewCard() {
+type Props = { compact?: boolean };
+
+export function WidgetPreviewCard({ compact = false }: Props) {
+  const theme = useTheme();
   const { deviceId } = useRelationship();
 
   const { data, isLoading } = useQuery({
@@ -17,8 +24,8 @@ export function WidgetPreviewCard() {
 
   if (isLoading) {
     return (
-      <View style={styles.card}>
-        <ActivityIndicator color="#000" />
+      <View style={[styles.loader, compact && styles.compactLoader]}>
+        <ActivityIndicator color={theme.colors.accent.primary} />
       </View>
     );
   }
@@ -32,37 +39,81 @@ export function WidgetPreviewCard() {
         ? formatCountdown(data.nextEventAt)
         : null;
 
-  return (
-    <View style={styles.card}>
-      <Text style={styles.label}>Widget preview</Text>
+  const content = (
+    <>
       {countdown ? (
-        <Text style={styles.countdown}>{countdown}</Text>
+        <AppText variant="h2" style={styles.countdown}>
+          {countdown}
+        </AppText>
       ) : (
-        <Text style={styles.muted}>No upcoming visit set</Text>
+        <AppText variant="body" color="muted">
+          No upcoming visit
+        </AppText>
       )}
-      <Text style={styles.pulse}>
-        {data.partnerCheckedIn ? "Partner checked in ✓" : "Partner not yet today"}
-        {" · "}
-        {data.currentStreak}d streak
-      </Text>
-      <Text style={styles.hint}>
-        Add a home screen widget — see widgets/README.md
-      </Text>
+      <View style={styles.row}>
+        <FlameIcon
+          size={12}
+          outer={theme.colors.accent.flame}
+          inner={theme.colors.accent.flameInner}
+        />
+        <AppText variant="caption" color="secondary">
+          {data.currentStreak}d ·{" "}
+          {data.partnerCheckedIn ? "Partner in" : "Waiting"}
+        </AppText>
+      </View>
+      {!compact ? (
+        <AppText variant="label" color="muted" style={styles.hint}>
+          Home screen widget — see widgets/README.md
+        </AppText>
+      ) : null}
+    </>
+  );
+
+  if (compact) {
+    return (
+      <View
+        style={[
+          styles.compact,
+          {
+            backgroundColor: theme.colors.surface.card,
+            borderColor: theme.colors.border.subtle,
+          },
+        ]}
+      >
+        <AppText variant="label" color="secondary">
+          WIDGET
+        </AppText>
+        {content}
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.wrap}>
+      <ArtifactCard category="Widget" title="At a glance" stacked>
+        {content}
+      </ArtifactCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: "#1a1a1a",
-    borderRadius: 16,
-    padding: 16,
+  wrap: { marginHorizontal: 20 },
+  loader: {
     marginHorizontal: 20,
     marginBottom: 16,
+    padding: 24,
+    alignItems: "center",
   },
-  label: { color: "#888", fontSize: 12, fontWeight: "600", marginBottom: 8 },
-  countdown: { color: "#fff", fontSize: 22, fontWeight: "800", marginBottom: 6 },
-  pulse: { color: "#ccc", fontSize: 14 },
-  muted: { color: "#aaa", fontSize: 15, marginBottom: 6 },
-  hint: { color: "#666", fontSize: 11, marginTop: 10 },
+  compactLoader: { marginHorizontal: 0, padding: 16 },
+  compact: {
+    flex: 1,
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    minHeight: 120,
+  },
+  countdown: { marginVertical: 8, fontFamily: "DMSans_700Bold" },
+  row: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  hint: { marginTop: 10 },
 });

@@ -1,15 +1,20 @@
-import { Alert, Platform, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Platform, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
+import { AppText } from "@/components/ui/AppText";
+import { ArtifactCard } from "@/components/ui/ArtifactCard";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { showMutationError } from "@/utils/errors";
+import { useTheme } from "@/theme/useTheme";
 
 function confirmUnlink(): Promise<boolean> {
   const title = "Unlink partner?";
   const message =
-    "This will disconnect you from your partner and permanently delete all shared data — trip plans, reunion list, countdown, goals, and events. This cannot be undone.";
+    "This will disconnect you from your partner and permanently delete all shared data — shared plans, countdown, goals, and events. This cannot be undone.";
 
   if (Platform.OS === "web") {
     return Promise.resolve(window.confirm(`${title}\n\n${message}`));
@@ -28,6 +33,7 @@ function confirmUnlink(): Promise<boolean> {
 }
 
 export default function SettingsScreen() {
+  const theme = useTheme();
   const { deviceId, clearPaired } = useRelationship();
 
   const handleUnlink = async () => {
@@ -52,41 +58,42 @@ export default function SettingsScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <Text style={styles.header}>Settings</Text>
+    <ScreenBackground>
+      <SafeAreaView style={styles.safe} edges={["top"]}>
+        <AppText variant="h1" style={styles.header}>
+          Settings
+        </AppText>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Account</Text>
-        <Text style={styles.hint}>
-          Unlinking removes all shared history for both partners.
-        </Text>
-        <TouchableOpacity style={styles.unlinkButton} onPress={handleUnlink}>
-          <Text style={styles.unlinkText}>Unlink partner</Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+        <View style={styles.section}>
+          <ArtifactCard category="Account" title="Partner">
+            <AppText variant="body" color="secondary" style={styles.hint}>
+              Unlinking removes all shared history for both partners.
+            </AppText>
+            <PrimaryButton
+              label="Unlink partner"
+              onPress={handleUnlink}
+              style={[
+                styles.unlinkBtn,
+                {
+                  borderColor: theme.colors.accent.primaryMuted,
+                },
+              ]}
+            />
+          </ArtifactCard>
+        </View>
+      </SafeAreaView>
+    </ScreenBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f9f9f9", padding: 20 },
-  header: { fontSize: 26, fontWeight: "800", marginBottom: 24, marginTop: 8 },
-  section: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#eee",
+  safe: { flex: 1, padding: 20 },
+  header: {
+    marginBottom: 24,
+    marginTop: 8,
+    fontFamily: "DMSans_700Bold",
   },
-  sectionTitle: { fontSize: 17, fontWeight: "700", marginBottom: 8 },
-  hint: { color: "#666", marginBottom: 16, lineHeight: 20 },
-  unlinkButton: {
-    backgroundColor: "#fce8e6",
-    borderColor: "#f5b7b1",
-    borderWidth: 1,
-    padding: 14,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  unlinkText: { color: "#b03a2e", fontWeight: "700" },
+  section: {},
+  hint: { marginBottom: 16, lineHeight: 22 },
+  unlinkBtn: { marginTop: 4 },
 });
