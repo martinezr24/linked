@@ -8,7 +8,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { type Href, Link, router } from "expo-router";
+import { type Href, Link, router, useFocusEffect } from "expo-router";
 
 import { AppTextInput } from "@/components/AppTextInput";
 import { DatePickerField } from "@/components/DatePickerField";
@@ -96,9 +96,24 @@ export default function HomeScreen() {
     }
   }, [deviceId]);
 
+  const refreshEvents = useCallback(async () => {
+    if (!deviceId) return;
+    const res = await apiFetch("/api/events", deviceId);
+    if (res.ok) {
+      const ev: SharedEvent[] = await res.json();
+      setEvents(Array.isArray(ev) ? ev : []);
+    }
+  }, [deviceId]);
+
   useEffect(() => {
     loadAll();
   }, [loadAll]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshEvents();
+    }, [refreshEvents]),
+  );
 
   useEffect(() => {
     return subscribe((msg) => {
@@ -140,6 +155,10 @@ export default function HomeScreen() {
                   new Date(b.eventAt).getTime(),
               ),
         );
+      }
+      if (msg.action === "DELETE_EVENT") {
+        const id = msg.payload.id as string;
+        setEvents((prev) => prev.filter((e) => e.id !== id));
       }
     });
   }, [deviceId, subscribe]);
