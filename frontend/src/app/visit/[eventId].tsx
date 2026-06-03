@@ -27,6 +27,7 @@ export default function VisitPlanScreen() {
       placeholder="Add a plan for this visit..."
       notePlaceholder="Optional note..."
       eventId={eventId}
+      showBack
     />
   );
 }

@@ -121,8 +121,13 @@ export default function HomeScreen() {
         setGoals((prev) => prev.filter((x) => x.id !== id));
       }
       if (msg.action === "CHECK_IN") {
-        const c = msg.payload.checkIns as TodayCheckIns;
-        if (c) setCheckIns(c);
+        void (async () => {
+          const res = await apiFetch("/api/checkins/today", deviceId);
+          if (res.ok) {
+            const c: TodayCheckIns = await res.json();
+            setCheckIns(c);
+          }
+        })();
       }
       if (msg.action === "ADD_EVENT") {
         const ev = msg.payload as unknown as SharedEvent;
@@ -137,7 +142,7 @@ export default function HomeScreen() {
         );
       }
     });
-  }, [subscribe]);
+  }, [deviceId, subscribe]);
 
   const saveVisit = async () => {
     if (!deviceId || !visitDraft) return;
@@ -303,6 +308,9 @@ export default function HomeScreen() {
               ? `Partner checked in today${checkIns.partner.note ? `: “${checkIns.partner.note}”` : ""}`
               : "Partner hasn’t checked in yet today"}
           </Text>
+          <Text style={styles.checkInResetHint}>
+            Resets at midnight ({tzLabel})
+          </Text>
         </View>
 
         <View style={styles.card}>
@@ -445,6 +453,7 @@ const styles = StyleSheet.create({
   muted: { color: "#888", marginBottom: 4 },
   checkInDone: { fontSize: 16, fontWeight: "600", marginBottom: 8 },
   checkInPartner: { fontSize: 14, color: "#666", marginTop: 10 },
+  checkInResetHint: { fontSize: 12, color: "#aaa", marginTop: 6 },
   goalInputRow: { flexDirection: "row", marginBottom: 12 },
   input: {
     flex: 1,

@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router } from "expo-router";
 
 import { AppTextInput } from "@/components/AppTextInput";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
@@ -25,6 +26,7 @@ type Props = {
   placeholder: string;
   notePlaceholder?: string;
   eventId?: string;
+  showBack?: boolean;
 };
 
 export function SharedListScreen({
@@ -33,6 +35,7 @@ export function SharedListScreen({
   placeholder,
   notePlaceholder,
   eventId,
+  showBack,
 }: Props) {
   const { deviceId, relationshipId, sendMessage, subscribe } = useRelationship();
   const [items, setItems] = useState<ListItem[]>([]);
@@ -131,6 +134,11 @@ export function SharedListScreen({
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <DismissKeyboardView scroll={false} style={styles.flex}>
+        {showBack ? (
+          <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+            <Text style={styles.backButtonText}>← Back</Text>
+          </TouchableOpacity>
+        ) : null}
         <Text style={styles.header}>{title}</Text>
         {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
 
@@ -196,6 +204,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f9f9f9", padding: 20 },
   flex: { flex: 1 },
   centered: { justifyContent: "center", alignItems: "center" },
+  backButton: { marginBottom: 12, alignSelf: "flex-start" },
+  backButtonText: { fontSize: 16, fontWeight: "600", color: "#000" },
   header: { fontSize: 26, fontWeight: "800", marginBottom: 16 },
   errorText: { color: "#c0392b", marginBottom: 12 },
   inputBlock: { marginBottom: 16 },

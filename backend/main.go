@@ -855,6 +855,16 @@ func todayUTC() string {
 	return time.Now().UTC().Format("2006-01-02")
 }
 
+func clientLocalDate(r *http.Request) string {
+	d := strings.TrimSpace(r.Header.Get("X-Local-Date"))
+	if len(d) == 10 && d[4] == '-' && d[7] == '-' {
+		if _, err := time.Parse("2006-01-02", d); err == nil {
+			return d
+		}
+	}
+	return todayUTC()
+}
+
 func handleCheckInsToday(w http.ResponseWriter, r *http.Request) {
 	if applyCORS(w, r) {
 		return
@@ -873,7 +883,7 @@ func handleCheckInsToday(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	relationshipID := *user.RelationshipID
-	today := todayUTC()
+	today := clientLocalDate(r)
 
 	if r.Method == http.MethodPost {
 		var body struct {

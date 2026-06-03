@@ -1,7 +1,11 @@
 import { getApiBase } from "@/constants/api";
+import { localDateString } from "@/utils/dates";
 
 export function apiHeaders(deviceId: string): HeadersInit {
-  return { "X-Device-Id": deviceId };
+  return {
+    "X-Device-Id": deviceId,
+    "X-Local-Date": localDateString(),
+  };
 }
 
 export async function apiFetch(
