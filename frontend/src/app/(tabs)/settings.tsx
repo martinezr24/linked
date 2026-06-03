@@ -4,7 +4,7 @@ import { router } from "expo-router";
 
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
-import { clearStoredRelationshipId } from "@/utils/relationshipStorage";
+import { showMutationError } from "@/utils/errors";
 
 function confirmUnlink(): Promise<boolean> {
   const title = "Unlink partner?";
@@ -28,7 +28,7 @@ function confirmUnlink(): Promise<boolean> {
 }
 
 export default function SettingsScreen() {
-  const { deviceId } = useRelationship();
+  const { deviceId, clearPaired } = useRelationship();
 
   const handleUnlink = async () => {
     const confirmed = await confirmUnlink();
@@ -40,17 +40,14 @@ export default function SettingsScreen() {
       });
       if (!res.ok) {
         const text = await res.text();
-        if (Platform.OS === "web") {
-          window.alert(text || "Failed to unlink.");
-        } else {
-          Alert.alert("Unlink failed", text || "Failed to unlink.");
-        }
+        showMutationError(text || "Failed to unlink.");
         return;
       }
-      await clearStoredRelationshipId();
+      await clearPaired();
       router.replace("/pair");
     } catch (error) {
       console.error("Failed to unlink:", error);
+      showMutationError("Failed to unlink.");
     }
   };
 

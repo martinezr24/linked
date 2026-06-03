@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -9,16 +9,21 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 
 import { AppTextInput } from "@/components/AppTextInput";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { queryKeys } from "@/api/queryKeys";
+import {
+  deleteListItem,
+  fetchListItems,
+  postListItem,
+} from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
-import { apiFetch } from "@/utils/api";
+import { showMutationError } from "@/utils/errors";
+import { generateId } from "@/utils/id";
 import type { ListItem, ListType } from "@/types";
-
-const generateId = () =>
-  Date.now().toString(36) + Math.random().toString(36).substring(2);
 
 type Props = {
   listType: ListType;
@@ -37,66 +42,40 @@ export function SharedListScreen({
   eventId,
   showBack,
 }: Props) {
-  const { deviceId, relationshipId, sendMessage, subscribe } = useRelationship();
-  const [items, setItems] = useState<ListItem[]>([]);
+  const { deviceId, relationshipId } = useRelationship();
+  const queryClient = useQueryClient();
+  const queryKey = queryKeys.list(listType, eventId);
   const [inputText, setInputText] = useState("");
   const [inputNote, setInputNote] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
-  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const matchesItem = (payload: ListItem) => {
-    if (payload.listType !== listType) return false;
-    if (listType === "visit") {
-      return payload.eventId === eventId;
-    }
-    return true;
-  };
+  const {
+    data: items = [],
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey,
+    queryFn: () => fetchListItems(deviceId!, listType, eventId),
+    enabled:
+      Boolean(deviceId && relationshipId) &&
+      (listType !== "visit" || Boolean(eventId)),
+  });
 
-  useEffect(() => {
-    if (!deviceId || !relationshipId) return;
-    if (listType === "visit" && !eventId) return;
+  const addItem = useMutation({
+    mutationFn: (item: ListItem) => postListItem(deviceId!, item),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
+    onError: () => showMutationError("Could not add item."),
+  });
 
-    const load = async () => {
-      setIsLoading(true);
-      setLoadError(null);
-      try {
-        const query =
-          listType === "visit"
-            ? `/api/lists?type=visit&eventId=${encodeURIComponent(eventId!)}`
-            : `/api/lists?type=${listType}`;
-        const res = await apiFetch(query, deviceId);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const data: ListItem[] = await res.json();
-        setItems(Array.isArray(data) ? data : []);
-      } catch {
-        setLoadError("Could not load list. Is the backend running?");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    load();
-
-    return subscribe((msg) => {
-      if (msg.action === "ADD_ITEM") {
-        const payload = msg.payload as unknown as ListItem;
-        if (!matchesItem(payload)) return;
-        setItems((prev) =>
-          prev.some((i) => i.id === payload.id) ? prev : [...prev, payload],
-        );
-      }
-      if (msg.action === "DELETE_ITEM") {
-        const payload = msg.payload as unknown as ListItem;
-        if (!matchesItem(payload)) return;
-        const id = payload.id as string;
-        setItems((prev) => prev.filter((i) => i.id !== id));
-      }
-    });
-  }, [deviceId, relationshipId, listType, eventId, subscribe]);
+  const removeItem = useMutation({
+    mutationFn: (id: string) =>
+      deleteListItem(deviceId!, id, listType, eventId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey }),
+    onError: () => showMutationError("Could not delete item."),
+  });
 
   const handleAdd = () => {
     const text = inputText.trim();
-    if (!text) return;
+    if (!text || !deviceId) return;
     Keyboard.dismiss();
 
     const newItem: ListItem = {
@@ -108,19 +87,9 @@ export function SharedListScreen({
         : {}),
       ...(listType === "visit" && eventId ? { eventId } : {}),
     };
-    setItems((prev) => [...prev, newItem]);
     setInputText("");
     setInputNote("");
-    sendMessage("ADD_ITEM", newItem as unknown as Record<string, unknown>);
-  };
-
-  const handleDelete = (id: string) => {
-    setItems((prev) => prev.filter((i) => i.id !== id));
-    sendMessage("DELETE_ITEM", {
-      id,
-      listType,
-      ...(listType === "visit" && eventId ? { eventId } : {}),
-    });
+    addItem.mutate(newItem);
   };
 
   if (isLoading) {
@@ -140,7 +109,11 @@ export function SharedListScreen({
           </TouchableOpacity>
         ) : null}
         <Text style={styles.header}>{title}</Text>
-        {loadError ? <Text style={styles.errorText}>{loadError}</Text> : null}
+        {error ? (
+          <Text style={styles.errorText}>
+            Could not load list. Is the backend running?
+          </Text>
+        ) : null}
 
         <View style={styles.inputBlock}>
           <View style={styles.inputRow}>
@@ -187,7 +160,7 @@ export function SharedListScreen({
                   <Text style={styles.itemNote}>{item.note}</Text>
                 ) : null}
               </View>
-              <TouchableOpacity onPress={() => handleDelete(item.id)}>
+              <TouchableOpacity onPress={() => removeItem.mutate(item.id)}>
                 <Text style={styles.deleteText}>✕</Text>
               </TouchableOpacity>
             </View>

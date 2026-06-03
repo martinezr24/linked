@@ -35,6 +35,31 @@ export type TodayCheckIns = {
   partner: CheckIn | null;
 };
 
+export type ConnectionStreak = {
+  currentStreak: number;
+  longestStreak: number;
+  bothCheckedInToday: boolean;
+};
+
+export type AsyncNote = {
+  id: string;
+  triggerType: string;
+  triggerValue?: string;
+  body: string;
+  isMine: boolean;
+  openedAt?: string;
+  createdAt: string;
+};
+
+export type WidgetSummary = {
+  nextVisitAt?: string | null;
+  nextEventTitle?: string | null;
+  nextEventAt?: string | null;
+  partnerCheckedIn: boolean;
+  mineCheckedIn: boolean;
+  currentStreak: number;
+};
+
 export type WsMessage = {
   action: string;
   payload: Record<string, unknown>;

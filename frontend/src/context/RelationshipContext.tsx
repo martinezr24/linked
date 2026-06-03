@@ -11,7 +11,6 @@ import { Alert, Platform } from "react-native";
 import { router } from "expo-router";
 
 import { getWsUrl } from "@/constants/api";
-import { apiFetch } from "@/utils/api";
 import {
   clearStoredRelationshipId,
   getStoredRelationshipId,
@@ -25,7 +24,7 @@ type RelationshipContextValue = {
   isReady: boolean;
   isPaired: boolean;
   setPaired: (relationshipId: string) => Promise<void>;
-  sendMessage: (action: string, payload: Record<string, unknown>) => void;
+  clearPaired: () => Promise<void>;
   subscribe: (handler: (msg: WsMessage) => void) => () => void;
 };
 
@@ -51,6 +50,10 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
   const subscribersRef = useRef<Set<(msg: WsMessage) => void>>(new Set());
   const partnerUnlinkHandled = useRef(false);
 
+  const notify = useCallback((msg: WsMessage) => {
+    subscribersRef.current.forEach((h) => h(msg));
+  }, []);
+
   useEffect(() => {
     (async () => {
       const [stored, id] = await Promise.all([
@@ -67,16 +70,6 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
     subscribersRef.current.add(handler);
     return () => subscribersRef.current.delete(handler);
   }, []);
-
-  const sendMessage = useCallback(
-    (action: string, payload: Record<string, unknown>) => {
-      const ws = socketRef.current;
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ action, payload }));
-      }
-    },
-    [],
-  );
 
   const handlePartnerUnlinked = useCallback(async () => {
     if (partnerUnlinkHandled.current) return;
@@ -101,10 +94,18 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
     const ws = new WebSocket(wsUrl);
     socketRef.current = ws;
 
+    ws.onopen = () => {
+      notify({ action: "WS_CONNECTED", payload: {} });
+    };
+
     ws.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data) as WsMessage;
-        subscribersRef.current.forEach((h) => h(msg));
+        if (msg.action === "RELATIONSHIP_ENDED") {
+          void handlePartnerUnlinked();
+          return;
+        }
+        notify(msg);
       } catch {
         // ignore non-json
       }
@@ -116,26 +117,7 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
         socketRef.current = null;
       }
     };
-  }, [deviceId, relationshipId]);
-
-  useEffect(() => {
-    if (!deviceId || !relationshipId) return;
-
-    const interval = setInterval(async () => {
-      try {
-        const res = await apiFetch("/api/pairing/status", deviceId);
-        if (!res.ok) return;
-        const data: { relationshipId: string | null } = await res.json();
-        if (!data.relationshipId) {
-          await handlePartnerUnlinked();
-        }
-      } catch {
-        // ignore
-      }
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [deviceId, relationshipId, handlePartnerUnlinked]);
+  }, [deviceId, relationshipId, notify, handlePartnerUnlinked]);
 
   const setPaired = useCallback(async (id: string) => {
     const { setStoredRelationshipId } = await import(
@@ -145,13 +127,20 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
     setRelationshipId(id);
   }, []);
 
+  const clearPaired = useCallback(async () => {
+    socketRef.current?.close();
+    socketRef.current = null;
+    await clearStoredRelationshipId();
+    setRelationshipId(null);
+  }, []);
+
   const value: RelationshipContextValue = {
     deviceId,
     relationshipId,
     isReady,
     isPaired: Boolean(relationshipId),
     setPaired,
-    sendMessage,
+    clearPaired,
     subscribe,
   };
 

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
@@ -8,11 +8,22 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { type Href, Link, router, useFocusEffect } from "expo-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { type Href, Link, router } from "expo-router";
 
+import { AsyncNotesCard } from "@/components/AsyncNotesCard";
+import { WidgetPreviewCard } from "@/components/WidgetPreviewCard";
 import { AppTextInput } from "@/components/AppTextInput";
 import { DatePickerField } from "@/components/DatePickerField";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { queryKeys } from "@/api/queryKeys";
+import {
+  fetchCheckIns,
+  fetchEvents,
+  fetchGoals,
+  fetchRelationship,
+  fetchStreak,
+} from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import {
@@ -21,7 +32,8 @@ import {
   formatMMDDYYYY,
   getDeviceTimezoneLabel,
 } from "@/utils/dates";
-import type { SharedEvent, TodayCheckIns, WeeklyGoal } from "@/types";
+import { showMutationError } from "@/utils/errors";
+import type { SharedEvent, WeeklyGoal } from "@/types";
 
 function formatCountdown(targetIso: string): string {
   const target = new Date(targetIso).getTime();
@@ -51,208 +63,145 @@ function nextUpcomingEvent(events: SharedEvent[]): SharedEvent | null {
 }
 
 export default function HomeScreen() {
-  const { deviceId, subscribe, sendMessage } = useRelationship();
-  const [nextVisitAt, setNextVisitAt] = useState<string | null>(null);
+  const { deviceId } = useRelationship();
+  const queryClient = useQueryClient();
   const [visitDraft, setVisitDraft] = useState<Date | null>(null);
-  const [goals, setGoals] = useState<WeeklyGoal[]>([]);
-  const [events, setEvents] = useState<SharedEvent[]>([]);
-  const [checkIns, setCheckIns] = useState<TodayCheckIns>({
-    mine: null,
-    partner: null,
-  });
   const [checkInNote, setCheckInNote] = useState("");
   const [goalInput, setGoalInput] = useState("");
-  const [loading, setLoading] = useState(true);
   const tzLabel = getDeviceTimezoneLabel();
 
-  const loadAll = useCallback(async () => {
-    if (!deviceId) return;
-    setLoading(true);
-    try {
-      const [relRes, goalRes, eventsRes, checkRes] = await Promise.all([
-        apiFetch("/api/relationship", deviceId),
-        apiFetch("/api/goals/current", deviceId),
-        apiFetch("/api/events", deviceId),
-        apiFetch("/api/checkins/today", deviceId),
-      ]);
-      if (relRes.ok) {
-        const rel = await relRes.json();
-        setNextVisitAt(rel.nextVisitAt ?? null);
-      }
-      if (goalRes.ok) {
-        const g: WeeklyGoal[] = await goalRes.json();
-        setGoals(Array.isArray(g) ? g : []);
-      }
-      if (eventsRes.ok) {
-        const ev: SharedEvent[] = await eventsRes.json();
-        setEvents(Array.isArray(ev) ? ev : []);
-      }
-      if (checkRes.ok) {
-        const c: TodayCheckIns = await checkRes.json();
-        setCheckIns(c);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [deviceId]);
+  const enabled = Boolean(deviceId);
 
-  const refreshEvents = useCallback(async () => {
-    if (!deviceId) return;
-    const res = await apiFetch("/api/events", deviceId);
-    if (res.ok) {
-      const ev: SharedEvent[] = await res.json();
-      setEvents(Array.isArray(ev) ? ev : []);
-    }
-  }, [deviceId]);
+  const { data: relationship, isLoading: relLoading } = useQuery({
+    queryKey: queryKeys.relationship,
+    queryFn: () => fetchRelationship(deviceId!),
+    enabled,
+  });
 
-  useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+  const { data: goals = [], isLoading: goalsLoading } = useQuery({
+    queryKey: queryKeys.goals,
+    queryFn: () => fetchGoals(deviceId!),
+    enabled,
+  });
 
-  useFocusEffect(
-    useCallback(() => {
-      void refreshEvents();
-    }, [refreshEvents]),
-  );
+  const { data: events = [], isLoading: eventsLoading } = useQuery({
+    queryKey: queryKeys.events,
+    queryFn: () => fetchEvents(deviceId!),
+    enabled,
+  });
 
-  useEffect(() => {
-    return subscribe((msg) => {
-      if (msg.action === "SET_NEXT_VISIT") {
-        const at = msg.payload.nextVisitAt as string | null | undefined;
-        setNextVisitAt(at ?? null);
-      }
-      if (msg.action === "ADD_WEEKLY_GOAL") {
-        const g = msg.payload.goal as WeeklyGoal;
-        setGoals((prev) =>
-          prev.some((x) => x.id === g.id) ? prev : [...prev, g],
-        );
-      }
-      if (msg.action === "UPDATE_WEEKLY_GOAL") {
-        const g = msg.payload.goal as WeeklyGoal;
-        setGoals((prev) => prev.map((x) => (x.id === g.id ? g : x)));
-      }
-      if (msg.action === "DELETE_WEEKLY_GOAL") {
-        const id = msg.payload.id as string;
-        setGoals((prev) => prev.filter((x) => x.id !== id));
-      }
-      if (msg.action === "CHECK_IN") {
-        void (async () => {
-          const res = await apiFetch("/api/checkins/today", deviceId);
-          if (res.ok) {
-            const c: TodayCheckIns = await res.json();
-            setCheckIns(c);
-          }
-        })();
-      }
-      if (msg.action === "ADD_EVENT") {
-        const ev = msg.payload as unknown as SharedEvent;
-        setEvents((prev) =>
-          prev.some((e) => e.id === ev.id)
-            ? prev
-            : [...prev, ev].sort(
-                (a, b) =>
-                  new Date(a.eventAt).getTime() -
-                  new Date(b.eventAt).getTime(),
-              ),
-        );
-      }
-      if (msg.action === "DELETE_EVENT") {
-        const id = msg.payload.id as string;
-        setEvents((prev) => prev.filter((e) => e.id !== id));
-      }
-    });
-  }, [deviceId, subscribe]);
+  const { data: checkIns, isLoading: checkInsLoading } = useQuery({
+    queryKey: queryKeys.checkIns,
+    queryFn: () => fetchCheckIns(deviceId!),
+    enabled,
+  });
 
-  const saveVisit = async () => {
-    if (!deviceId || !visitDraft) return;
+  const { data: streak } = useQuery({
+    queryKey: queryKeys.streak,
+    queryFn: () => fetchStreak(deviceId!),
+    enabled,
+  });
 
-    const nextVisitAtValue = dateToIso(visitDraft);
+  const nextVisitAt = relationship?.nextVisitAt ?? null;
+  const loading =
+    relLoading || goalsLoading || eventsLoading || checkInsLoading;
 
-    const res = await apiFetch("/api/relationship/visit", deviceId, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nextVisitAt: nextVisitAtValue }),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      setNextVisitAt(data.nextVisitAt ?? null);
+  const invalidateRelationship = () =>
+    queryClient.invalidateQueries({ queryKey: queryKeys.relationship });
+
+  const saveVisit = useMutation({
+    mutationFn: async (date: Date) => {
+      const nextVisitAtValue = dateToIso(date);
+      const res = await apiFetch("/api/relationship/visit", deviceId!, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nextVisitAt: nextVisitAtValue }),
+      });
+      if (!res.ok) throw new Error("Failed to save visit");
+      return res.json();
+    },
+    onSuccess: () => {
       setVisitDraft(null);
-      sendMessage("SET_NEXT_VISIT", { nextVisitAt: nextVisitAtValue });
-    }
-  };
+      void invalidateRelationship();
+    },
+    onError: () => showMutationError("Could not save visit date."),
+  });
 
-  const clearVisit = async () => {
-    if (!deviceId) return;
-    const res = await apiFetch("/api/relationship/visit", deviceId, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ nextVisitAt: null }),
-    });
-    if (res.ok) {
-      setNextVisitAt(null);
+  const clearVisit = useMutation({
+    mutationFn: async () => {
+      const res = await apiFetch("/api/relationship/visit", deviceId!, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nextVisitAt: null }),
+      });
+      if (!res.ok) throw new Error("Failed to clear visit");
+    },
+    onSuccess: () => {
       setVisitDraft(null);
-      sendMessage("SET_NEXT_VISIT", { nextVisitAt: null });
-    }
-  };
+      void invalidateRelationship();
+    },
+    onError: () => showMutationError("Could not clear visit date."),
+  });
 
-  const addGoal = async () => {
-    if (!deviceId || !goalInput.trim()) return;
-    Keyboard.dismiss();
-    const res = await apiFetch("/api/goals/current", deviceId, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ goalText: goalInput.trim() }),
-    });
-    if (res.ok) {
-      const g: WeeklyGoal = await res.json();
-      setGoals((prev) => [...prev, g]);
+  const addGoal = useMutation({
+    mutationFn: async (text: string) => {
+      const res = await apiFetch("/api/goals/current", deviceId!, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ goalText: text }),
+      });
+      if (!res.ok) throw new Error("Failed to add goal");
+      return res.json() as Promise<WeeklyGoal>;
+    },
+    onSuccess: () => {
       setGoalInput("");
-      sendMessage("ADD_WEEKLY_GOAL", { goal: g });
-    }
-  };
+      void queryClient.invalidateQueries({ queryKey: queryKeys.goals });
+    },
+    onError: () => showMutationError("Could not add goal."),
+  });
 
-  const toggleGoal = async (goal: WeeklyGoal) => {
-    if (!deviceId) return;
-    const res = await apiFetch(`/api/goals/${goal.id}`, deviceId, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ done: !goal.done }),
-    });
-    if (res.ok) {
-      const g: WeeklyGoal = await res.json();
-      setGoals((prev) => prev.map((x) => (x.id === g.id ? g : x)));
-      sendMessage("UPDATE_WEEKLY_GOAL", { goal: g });
-    }
-  };
+  const toggleGoal = useMutation({
+    mutationFn: async (goal: WeeklyGoal) => {
+      const res = await apiFetch(`/api/goals/${goal.id}`, deviceId!, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ done: !goal.done }),
+      });
+      if (!res.ok) throw new Error("Failed to update goal");
+    },
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: queryKeys.goals }),
+    onError: () => showMutationError("Could not update goal."),
+  });
 
-  const deleteGoal = async (id: string) => {
-    if (!deviceId) return;
-    const res = await apiFetch(`/api/goals/${id}`, deviceId, {
-      method: "DELETE",
-    });
-    if (res.ok) {
-      setGoals((prev) => prev.filter((x) => x.id !== id));
-      sendMessage("DELETE_WEEKLY_GOAL", { id });
-    }
-  };
+  const deleteGoal = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiFetch(`/api/goals/${id}`, deviceId!, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete goal");
+    },
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: queryKeys.goals }),
+    onError: () => showMutationError("Could not delete goal."),
+  });
 
-  const sendCheckIn = async () => {
-    if (!deviceId || checkIns.mine) return;
-    Keyboard.dismiss();
-    const res = await apiFetch("/api/checkins/today", deviceId, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        note: checkInNote.trim() || undefined,
-      }),
-    });
-    if (res.ok) {
-      const c: TodayCheckIns = await res.json();
-      setCheckIns(c);
+  const sendCheckIn = useMutation({
+    mutationFn: async (note: string) => {
+      const res = await apiFetch("/api/checkins/today", deviceId!, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note: note || undefined }),
+      });
+      if (!res.ok) throw new Error("Failed to check in");
+    },
+    onSuccess: () => {
       setCheckInNote("");
-      sendMessage("CHECK_IN", { checkIns: c });
-    }
-  };
+      void queryClient.invalidateQueries({ queryKey: queryKeys.checkIns });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.streak });
+    },
+    onError: () => showMutationError("Could not send check-in."),
+  });
 
   const upcoming = nextUpcomingEvent(events);
   const openGoals = goals.filter((g) => !g.done);
@@ -270,6 +219,15 @@ export default function HomeScreen() {
       <DismissKeyboardView>
         <Text style={styles.title}>Linked</Text>
         <Text style={styles.subtitle}>Plan your time apart — and together.</Text>
+
+        {streak && streak.currentStreak > 0 ? (
+          <View style={styles.streakBanner}>
+            <Text style={styles.streakText}>
+              {streak.currentStreak}-day connection streak
+              {streak.bothCheckedInToday ? " — both checked in today!" : ""}
+            </Text>
+          </View>
+        ) : null}
 
         {(upcoming || openGoals.length > 0) && (
           <View style={styles.summaryCard}>
@@ -304,7 +262,7 @@ export default function HomeScreen() {
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Thinking of you</Text>
-          {checkIns.mine ? (
+          {checkIns?.mine ? (
             <Text style={styles.checkInDone}>
               You checked in today
               {checkIns.mine.note ? `: “${checkIns.mine.note}”` : ""}
@@ -317,13 +275,19 @@ export default function HomeScreen() {
                 onChangeText={setCheckInNote}
                 placeholder="Optional note for your partner"
               />
-              <TouchableOpacity style={styles.button} onPress={sendCheckIn}>
+              <TouchableOpacity
+                style={styles.button}
+                onPress={() => {
+                  Keyboard.dismiss();
+                  sendCheckIn.mutate(checkInNote.trim());
+                }}
+              >
                 <Text style={styles.buttonText}>Send check-in</Text>
               </TouchableOpacity>
             </>
           )}
           <Text style={styles.checkInPartner}>
-            {checkIns.partner
+            {checkIns?.partner
               ? `Partner checked in today${checkIns.partner.note ? `: “${checkIns.partner.note}”` : ""}`
               : "Partner hasn’t checked in yet today"}
           </Text>
@@ -331,6 +295,10 @@ export default function HomeScreen() {
             Resets at midnight ({tzLabel})
           </Text>
         </View>
+
+        <AsyncNotesCard />
+
+        <WidgetPreviewCard />
 
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Next visit</Text>
@@ -358,13 +326,16 @@ export default function HomeScreen() {
           />
           <TouchableOpacity
             style={[styles.button, !visitDraft && styles.buttonDisabled]}
-            onPress={saveVisit}
+            onPress={() => visitDraft && saveVisit.mutate(visitDraft)}
             disabled={!visitDraft}
           >
             <Text style={styles.buttonText}>Save visit date</Text>
           </TouchableOpacity>
           {nextVisitAt ? (
-            <TouchableOpacity style={styles.clearButton} onPress={clearVisit}>
+            <TouchableOpacity
+              style={styles.clearButton}
+              onPress={() => clearVisit.mutate()}
+            >
               <Text style={styles.clearButtonText}>Clear visit date</Text>
             </TouchableOpacity>
           ) : null}
@@ -380,14 +351,18 @@ export default function HomeScreen() {
               placeholder="e.g. FaceTime Friday night"
               returnKeyType="done"
               blurOnSubmit
-              onSubmitEditing={addGoal}
+              onSubmitEditing={() => {
+                if (goalInput.trim()) addGoal.mutate(goalInput.trim());
+              }}
             />
             <TouchableOpacity
               style={[
                 styles.addGoalButton,
                 !goalInput.trim() && styles.buttonDisabled,
               ]}
-              onPress={addGoal}
+              onPress={() => {
+                if (goalInput.trim()) addGoal.mutate(goalInput.trim());
+              }}
               disabled={!goalInput.trim()}
             >
               <Text style={styles.addGoalButtonText}>Add</Text>
@@ -400,7 +375,7 @@ export default function HomeScreen() {
               <View key={goal.id} style={styles.goalRow}>
                 <TouchableOpacity
                   style={styles.goalCheckArea}
-                  onPress={() => toggleGoal(goal)}
+                  onPress={() => toggleGoal.mutate(goal)}
                 >
                   <Text style={styles.checkbox}>{goal.done ? "☑" : "☐"}</Text>
                   <Text
@@ -412,7 +387,7 @@ export default function HomeScreen() {
                     {goal.goalText}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity onPress={() => deleteGoal(goal.id)}>
+                <TouchableOpacity onPress={() => deleteGoal.mutate(goal.id)}>
                   <Text style={styles.goalDelete}>✕</Text>
                 </TouchableOpacity>
               </View>
@@ -446,6 +421,16 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     paddingHorizontal: 20,
   },
+  streakBanner: {
+    backgroundColor: "#e8f5e9",
+    borderRadius: 10,
+    padding: 12,
+    marginHorizontal: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#c8e6c9",
+  },
+  streakText: { fontSize: 15, fontWeight: "600", color: "#2e7d32" },
   summaryCard: {
     backgroundColor: "#f0f4ff",
     borderRadius: 12,

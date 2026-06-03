@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -9,108 +9,77 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 
 import { AppTextInput } from "@/components/AppTextInput";
 import { DatePickerField } from "@/components/DatePickerField";
+import { queryKeys } from "@/api/queryKeys";
+import { fetchEvents } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { dateToIso, formatMMDDYYYY } from "@/utils/dates";
+import { showMutationError } from "@/utils/errors";
+import { generateId } from "@/utils/id";
 import type { SharedEvent } from "@/types";
 
-const generateId = () =>
-  Date.now().toString(36) + Math.random().toString(36).substring(2);
-
 export default function EventsScreen() {
-  const { deviceId, sendMessage, subscribe } = useRelationship();
-  const [events, setEvents] = useState<SharedEvent[]>([]);
+  const { deviceId } = useRelationship();
+  const queryClient = useQueryClient();
   const [title, setTitle] = useState("");
   const [eventDate, setEventDate] = useState<Date | null>(null);
   const [ownerLabel, setOwnerLabel] = useState("");
-  const [loading, setLoading] = useState(true);
 
-  const loadEvents = useCallback(async () => {
-    if (!deviceId) return;
-    setLoading(true);
-    try {
-      const res = await apiFetch("/api/events", deviceId);
-      if (res.ok) {
-        const data: SharedEvent[] = await res.json();
-        setEvents(Array.isArray(data) ? data : []);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [deviceId]);
+  const { data: events = [], isLoading } = useQuery({
+    queryKey: queryKeys.events,
+    queryFn: () => fetchEvents(deviceId!),
+    enabled: Boolean(deviceId),
+  });
 
-  useEffect(() => {
-    loadEvents();
-  }, [loadEvents]);
-
-  useEffect(() => {
-    return subscribe((msg) => {
-      if (msg.action === "ADD_EVENT") {
-        const ev = msg.payload as unknown as SharedEvent;
-        setEvents((prev) =>
-          prev.some((e) => e.id === ev.id)
-            ? prev
-            : [...prev, ev].sort(
-                (a, b) =>
-                  new Date(a.eventAt).getTime() - new Date(b.eventAt).getTime(),
-              ),
-        );
-      }
-      if (msg.action === "DELETE_EVENT") {
-        const id = msg.payload.id as string;
-        setEvents((prev) => prev.filter((e) => e.id !== id));
-      }
-    });
-  }, [subscribe]);
-
-  const handleAdd = async () => {
-    if (!deviceId || !title.trim() || !eventDate) return;
-    Keyboard.dismiss();
-
-    const eventAt = dateToIso(eventDate);
-    const ev: SharedEvent = {
-      id: generateId(),
-      title: title.trim(),
-      eventAt,
-      ...(ownerLabel.trim() ? { ownerLabel: ownerLabel.trim() } : {}),
-    };
-
-    const res = await apiFetch("/api/events", deviceId, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(ev),
-    });
-
-    if (res.ok) {
-      setEvents((prev) =>
-        [...prev, ev].sort(
-          (a, b) =>
-            new Date(a.eventAt).getTime() - new Date(b.eventAt).getTime(),
-        ),
-      );
+  const addEvent = useMutation({
+    mutationFn: async (ev: SharedEvent) => {
+      const res = await apiFetch("/api/events", deviceId!, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ev),
+      });
+      if (!res.ok) throw new Error("Failed to add event");
+      return ev;
+    },
+    onSuccess: () => {
       setTitle("");
       setEventDate(null);
       setOwnerLabel("");
-      sendMessage("ADD_EVENT", ev as unknown as Record<string, unknown>);
-    }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.events });
+    },
+    onError: () => showMutationError("Could not add event."),
+  });
+
+  const deleteEvent = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiFetch(`/api/events/${id}`, deviceId!, {
+        method: "DELETE",
+      });
+      if (!res.ok) throw new Error("Failed to delete event");
+    },
+    onSuccess: () =>
+      void queryClient.invalidateQueries({ queryKey: queryKeys.events }),
+    onError: () => showMutationError("Could not delete event."),
+  });
+
+  const handleAdd = () => {
+    if (!deviceId || !title.trim() || !eventDate) return;
+    Keyboard.dismiss();
+    const ev: SharedEvent = {
+      id: generateId(),
+      title: title.trim(),
+      eventAt: dateToIso(eventDate),
+      ...(ownerLabel.trim() ? { ownerLabel: ownerLabel.trim() } : {}),
+    };
+    addEvent.mutate(ev);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!deviceId) return;
-    const res = await apiFetch(`/api/events/${id}`, deviceId, {
-      method: "DELETE",
-    });
-    if (res.ok) {
-      setEvents((prev) => prev.filter((e) => e.id !== id));
-      sendMessage("DELETE_EVENT", { id });
-    }
-  };
-
-  if (loading) {
+  if (isLoading) {
     return (
       <SafeAreaView style={[styles.container, styles.centered]}>
         <ActivityIndicator size="large" color="#000" />
@@ -193,7 +162,7 @@ export default function EventsScreen() {
                 <Text style={styles.planButtonText}>Plan this visit →</Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity onPress={() => handleDelete(item.id)}>
+            <TouchableOpacity onPress={() => deleteEvent.mutate(item.id)}>
               <Text style={styles.delete}>✕</Text>
             </TouchableOpacity>
           </View>

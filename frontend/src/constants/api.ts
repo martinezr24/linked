@@ -14,9 +14,17 @@ export function getDevServerHost(): string {
 }
 
 export function getApiBase(): string {
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) {
+    return envUrl.replace(/\/$/, "");
+  }
   return `http://${getDevServerHost()}:8080`;
 }
 
 export function getWsUrl(): string {
-  return `ws://${getDevServerHost()}:8080/ws`;
+  const base = getApiBase();
+  if (base.startsWith("https://")) {
+    return base.replace(/^https:/, "wss:") + "/ws";
+  }
+  return base.replace(/^http:/, "ws:") + "/ws";
 }
