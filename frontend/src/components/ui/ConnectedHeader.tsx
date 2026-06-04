@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 
 import { AppMark } from "./AppMark";
@@ -12,6 +13,7 @@ type Props = {
   partnerInitial?: string;
   partnerCheckedIn?: boolean;
   mineCheckedIn?: boolean;
+  headerRight?: ReactNode;
 };
 
 function AvatarCircle({
@@ -54,6 +56,7 @@ export function ConnectedHeader({
   partnerInitial = "Y",
   partnerCheckedIn,
   mineCheckedIn,
+  headerRight,
 }: Props) {
   return (
     <View style={styles.row}>
@@ -73,7 +76,10 @@ export function ConnectedHeader({
           />
         </View>
       </View>
-      <StreakPill count={streakCount} />
+      <View style={styles.right}>
+        {headerRight}
+        <StreakPill count={streakCount} />
+      </View>
     </View>
   );
 }
@@ -113,4 +119,5 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontFamily: "DMSans_700Bold",
   },
+  right: { flexDirection: "row", alignItems: "center", gap: 8 },
 });

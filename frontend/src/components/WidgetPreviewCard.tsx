@@ -57,14 +57,14 @@ export function WidgetPreviewCard({ compact = false }: Props) {
           inner={theme.colors.accent.flameInner}
         />
         <AppText variant="caption" color="secondary">
-          {data.currentStreak}d streak
+          {data.currentStreak}d photo streak
           {data.mineCheckedIn && data.partnerCheckedIn
-            ? " · Both in today"
+            ? " · Both sent today"
             : data.partnerCheckedIn
-              ? " · Partner checked in"
+              ? " · Partner sent"
               : data.mineCheckedIn
                 ? " · Waiting for partner"
-                : " · Check in today"}
+                : " · Send today's photo"}
         </AppText>
       </View>
       {!compact ? (

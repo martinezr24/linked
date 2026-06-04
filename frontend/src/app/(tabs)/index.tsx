@@ -17,16 +17,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 
 import { AsyncNotesCard } from "@/components/AsyncNotesCard";
+import { DailyPhotoCard } from "@/components/photos/DailyPhotoCard";
+import { PartnerPresenceCard } from "@/components/presence/PartnerPresenceCard";
 import { VisitCountdownHero } from "@/components/VisitCountdownHero";
 import { VisitEditSheet } from "@/components/VisitEditSheet";
 import { WidgetPreviewCard } from "@/components/WidgetPreviewCard";
-import { AppTextInput } from "@/components/AppTextInput";
-import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { WeeklyGoalsCard } from "@/components/goals/WeeklyGoalsCard";
 import { useCoupleNames } from "@/hooks/useCoupleNames";
 import { initialFromName } from "@/utils/coupleNames";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
+import { TreatsModal } from "@/components/treats/TreatsModal";
 import { ConnectedHeader } from "@/components/ui/ConnectedHeader";
+import { TreatButton } from "@/components/ui/TreatButton";
 import { CoupleProgressCard } from "@/components/ui/CoupleProgressCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
@@ -36,7 +39,7 @@ import {
   fetchEvents,
   fetchGoals,
   fetchRelationship,
-  fetchStreak,
+  fetchPhotoToday,
 } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
@@ -48,7 +51,7 @@ import {
 import { showMutationError } from "@/utils/errors";
 import { hapticSuccess } from "@/utils/haptics";
 import { useTheme } from "@/theme/useTheme";
-import type { SharedEvent, WeeklyGoal } from "@/types";
+import type { SharedEvent } from "@/types";
 
 function formatCountdown(targetIso: string): string {
   const target = new Date(targetIso).getTime();
@@ -94,8 +97,8 @@ export default function HomeScreen() {
   const [visitDraft, setVisitDraft] = useState<Date | null>(null);
   const [visitSheetOpen, setVisitSheetOpen] = useState(false);
   const [checkInNote, setCheckInNote] = useState("");
-  const [goalInput, setGoalInput] = useState("");
   const [goalsExpanded, setGoalsExpanded] = useState(false);
+  const [treatsOpen, setTreatsOpen] = useState(false);
   const tzLabel = getDeviceTimezoneLabel();
   const { mineName, partnerName } = useCoupleNames();
 
@@ -125,9 +128,9 @@ export default function HomeScreen() {
     enabled,
   });
 
-  const { data: streak } = useQuery({
-    queryKey: queryKeys.streak,
-    queryFn: () => fetchStreak(deviceId!),
+  const { data: photoToday } = useQuery({
+    queryKey: queryKeys.photoToday,
+    queryFn: () => fetchPhotoToday(deviceId!),
     enabled,
   });
 
@@ -172,49 +175,6 @@ export default function HomeScreen() {
     onError: () => showMutationError("Could not clear visit date."),
   });
 
-  const addGoal = useMutation({
-    mutationFn: async (text: string) => {
-      const res = await apiFetch("/api/goals/current", deviceId!, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ goalText: text }),
-      });
-      if (!res.ok) throw new Error("Failed to add goal");
-      return res.json() as Promise<WeeklyGoal>;
-    },
-    onSuccess: () => {
-      setGoalInput("");
-      void queryClient.invalidateQueries({ queryKey: queryKeys.goals });
-    },
-    onError: () => showMutationError("Could not add goal."),
-  });
-
-  const toggleGoal = useMutation({
-    mutationFn: async (goal: WeeklyGoal) => {
-      const res = await apiFetch(`/api/goals/${goal.id}`, deviceId!, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ done: !goal.done }),
-      });
-      if (!res.ok) throw new Error("Failed to update goal");
-    },
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: queryKeys.goals }),
-    onError: () => showMutationError("Could not update goal."),
-  });
-
-  const deleteGoal = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await apiFetch(`/api/goals/${id}`, deviceId!, {
-        method: "DELETE",
-      });
-      if (!res.ok) throw new Error("Failed to delete goal");
-    },
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: queryKeys.goals }),
-    onError: () => showMutationError("Could not delete goal."),
-  });
-
   const sendCheckIn = useMutation({
     mutationFn: async (note: string) => {
       const res = await apiFetch("/api/checkins/today", deviceId!, {
@@ -235,7 +195,7 @@ export default function HomeScreen() {
   });
 
   const upcoming = nextUpcomingEvent(events);
-  const streakCount = streak?.currentStreak ?? 0;
+  const streakCount = photoToday?.currentStreak ?? 0;
   const bothCheckedInToday =
     Boolean(checkIns?.mine) && Boolean(checkIns?.partner);
 
@@ -256,13 +216,21 @@ export default function HomeScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        <DismissKeyboardView scroll={false} style={styles.flex}>
+        <View style={styles.flex}>
           <ConnectedHeader
             streakCount={streakCount}
             mineInitial={initialFromName(mineName, "M")}
             partnerInitial={initialFromName(partnerName, "Y")}
             mineCheckedIn={Boolean(checkIns?.mine)}
             partnerCheckedIn={Boolean(checkIns?.partner)}
+            headerRight={
+              <TreatButton onPress={() => setTreatsOpen(true)} />
+            }
+          />
+          <TreatsModal
+            visible={treatsOpen}
+            onClose={() => setTreatsOpen(false)}
+            partnerName={partnerName ?? undefined}
           />
 
           <ScrollView
@@ -290,6 +258,10 @@ export default function HomeScreen() {
                 </AppText>
               </View>
             ) : null}
+
+            <PartnerPresenceCard />
+
+            <DailyPhotoCard />
 
             <CoupleProgressCard
               checkIns={checkIns}
@@ -362,73 +334,11 @@ export default function HomeScreen() {
               <AsyncNotesCard />
             </View>
 
-            <View style={styles.section}>
-              <Pressable onPress={() => setGoalsExpanded((e) => !e)}>
-                <AppText variant="label" color="secondary">
-                  THIS WEEK {goalsExpanded ? "" : "(tap to expand)"}
-                </AppText>
-              </Pressable>
-              {goalsExpanded ? (
-              <ArtifactCard category="This week" title="Connection goals">
-                <View style={styles.goalInputRow}>
-                  <AppTextInput
-                    style={[
-                      styles.goalInput,
-                      {
-                        backgroundColor: theme.colors.surface.input,
-                        borderColor: theme.colors.border.subtle,
-                        color: theme.colors.text.primary,
-                      },
-                    ]}
-                    value={goalInput}
-                    onChangeText={setGoalInput}
-                    placeholder="e.g. FaceTime Friday night"
-                    placeholderTextColor={theme.colors.text.muted}
-                    returnKeyType="done"
-                    blurOnSubmit
-                    onSubmitEditing={() => {
-                      if (goalInput.trim()) addGoal.mutate(goalInput.trim());
-                    }}
-                  />
-                  <PrimaryButton
-                    label="Add"
-                    onPress={() => {
-                      if (goalInput.trim()) addGoal.mutate(goalInput.trim());
-                    }}
-                    disabled={!goalInput.trim()}
-                    style={styles.addGoalBtn}
-                  />
-                </View>
-                {goals.length === 0 ? (
-                  <AppText variant="body" color="muted">
-                    No goals yet — add one above.
-                  </AppText>
-                ) : (
-                  goals.map((goal) => (
-                    <View key={goal.id} style={styles.goalRow}>
-                      <TouchableOpacity
-                        style={styles.goalCheckArea}
-                        onPress={() => toggleGoal.mutate(goal)}
-                      >
-                        <AppText style={styles.checkbox}>
-                          {goal.done ? "🔥" : "○"}
-                        </AppText>
-                        <AppText
-                          variant="body"
-                          style={goal.done ? styles.goalDone : undefined}
-                        >
-                          {goal.goalText}
-                        </AppText>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={() => deleteGoal.mutate(goal.id)}>
-                        <AppText color="accent">✕</AppText>
-                      </TouchableOpacity>
-                    </View>
-                  ))
-                )}
-              </ArtifactCard>
-              ) : null}
-            </View>
+            <WeeklyGoalsCard
+              goals={goals}
+              expanded={goalsExpanded}
+              onToggleExpanded={() => setGoalsExpanded((e) => !e)}
+            />
           </ScrollView>
 
           <VisitEditSheet
@@ -451,7 +361,7 @@ export default function HomeScreen() {
               });
             }}
           />
-        </DismissKeyboardView>
+        </View>
       </SafeAreaView>
     </ScreenBackground>
   );
@@ -461,7 +371,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  scroll: { flexGrow: 1 },
+  scroll: { paddingTop: 4 },
   section: { paddingHorizontal: 20 },
   celebration: {
     marginHorizontal: 20,

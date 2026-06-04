@@ -6,6 +6,7 @@ import {
   TabEventsIcon,
   TabHomeIcon,
   TabPlansIcon,
+  TabPlayIcon,
   TabSettingsIcon,
 } from "@/components/ui/TabIcons";
 import { useRelationship } from "@/context/RelationshipContext";
@@ -71,6 +72,18 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="together"
         options={{ href: null }}
+      />
+      <Tabs.Screen
+        name="play"
+        options={{
+          title: "Play",
+          tabBarLabel: "Play",
+          tabBarIcon: ({ focused }) => (
+            <TabPlayIcon
+              color={focused ? colors.text.primary : colors.text.muted}
+            />
+          ),
+        }}
       />
       <Tabs.Screen
         name="events"

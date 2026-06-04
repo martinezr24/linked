@@ -3,6 +3,10 @@ import type {
   AsyncNote,
   ConnectionStreak,
   ListItem,
+  PartnerPresence,
+  PhotoDayGroup,
+  PhotoStreak,
+  PhotoToday,
   SharedEvent,
   TodayCheckIns,
   WeeklyGoal,
@@ -39,6 +43,34 @@ export async function fetchStreak(deviceId: string) {
   const res = await apiFetch("/api/checkins/streak", deviceId);
   if (!res.ok) throw new Error("Failed to load streak");
   return res.json() as Promise<ConnectionStreak>;
+}
+
+export async function fetchPhotoStreak(deviceId: string) {
+  const res = await apiFetch("/api/photos/streak", deviceId);
+  if (!res.ok) throw new Error("Failed to load photo streak");
+  return res.json() as Promise<PhotoStreak>;
+}
+
+export async function fetchPhotoToday(deviceId: string) {
+  const res = await apiFetch("/api/photos/today", deviceId);
+  if (!res.ok) throw new Error("Failed to load photos");
+  return res.json() as Promise<PhotoToday>;
+}
+
+export async function fetchPhotoHistory(deviceId: string, cursor?: string) {
+  const q = cursor ? `?cursor=${encodeURIComponent(cursor)}` : "";
+  const res = await apiFetch(`/api/photos/history${q}`, deviceId);
+  if (!res.ok) throw new Error("Failed to load photo history");
+  return res.json() as Promise<{
+    days: PhotoDayGroup[];
+    nextCursor: string | null;
+  }>;
+}
+
+export async function fetchPartnerPresence(deviceId: string) {
+  const res = await apiFetch("/api/partner/presence", deviceId);
+  if (!res.ok) throw new Error("Failed to load partner presence");
+  return res.json() as Promise<PartnerPresence>;
 }
 
 export async function fetchAsyncNotes(deviceId: string) {

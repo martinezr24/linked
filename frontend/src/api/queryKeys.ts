@@ -6,6 +6,11 @@ export const queryKeys = {
   streak: ["streak"] as const,
   asyncNotes: ["asyncNotes"] as const,
   widgetSummary: ["widgetSummary"] as const,
+  photoToday: ["photoToday"] as const,
+  photoStreak: ["photoStreak"] as const,
+  photoHistory: (cursor?: string) => ["photoHistory", cursor ?? ""] as const,
+  partnerPresence: ["partnerPresence"] as const,
+  triviaGame: ["triviaGame"] as const,
   list: (listType: string, eventId?: string) =>
     ["list", listType, eventId ?? ""] as const,
 };

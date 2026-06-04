@@ -41,11 +41,52 @@ export type ConnectionStreak = {
   bothCheckedInToday: boolean;
 };
 
+export type PhotoStreak = {
+  currentStreak: number;
+  longestStreak: number;
+  bothSentToday: boolean;
+};
+
+export type DailyPhoto = {
+  id: string;
+  photoDate: string;
+  caption?: string;
+  imageUrl: string;
+  isMine: boolean;
+  createdAt: string;
+};
+
+export type PhotoToday = {
+  mine: DailyPhoto | null;
+  partner: DailyPhoto | null;
+  currentStreak: number;
+  longestStreak: number;
+  bothSentToday: boolean;
+};
+
+export type PhotoDayGroup = {
+  photoDate: string;
+  mine: DailyPhoto | null;
+  partner: DailyPhoto | null;
+  bothSent: boolean;
+};
+
+export type PartnerPresence = {
+  timezone: string;
+  weatherCity?: string;
+  localTime: string;
+  weatherSummary?: string;
+  temperatureF?: number;
+};
+
 export type AsyncNote = {
   id: string;
   triggerType: string;
   triggerValue?: string;
-  body: string;
+  lockType: "state" | "time";
+  opensAt?: string;
+  body: string | null;
+  isLocked: boolean;
   isMine: boolean;
   openedAt?: string;
   createdAt: string;

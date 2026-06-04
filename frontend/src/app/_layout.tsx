@@ -22,6 +22,10 @@ export default function RootLayout() {
                 name="streak"
                 options={{ presentation: "modal", headerShown: false }}
               />
+              <Stack.Screen
+                name="photos/memories"
+                options={{ presentation: "modal", headerShown: false }}
+              />
             </Stack>
           </RelationshipProvider>
         </QueryProvider>

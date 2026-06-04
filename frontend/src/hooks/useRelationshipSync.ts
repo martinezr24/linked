@@ -12,6 +12,14 @@ const SYNC_ACTIONS: Record<string, (readonly unknown[])[]> = {
   SYNC_CHECKINS: [queryKeys.checkIns, queryKeys.streak, queryKeys.widgetSummary],
   SYNC_LISTS: [queryKeys.list("trip"), queryKeys.list("reunion")],
   SYNC_ASYNC_NOTES: [queryKeys.asyncNotes],
+  SYNC_PHOTOS: [
+    queryKeys.photoToday,
+    queryKeys.photoStreak,
+    queryKeys.photoHistory(),
+    queryKeys.widgetSummary,
+  ],
+  SYNC_PRESENCE: [queryKeys.partnerPresence],
+  SYNC_GAMES: [queryKeys.triviaGame],
   RELATIONSHIP_ENDED: [],
 };
 

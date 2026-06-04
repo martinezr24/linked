@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
@@ -8,7 +9,10 @@ import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
+import { queryKeys } from "@/api/queryKeys";
 import { useRelationship } from "@/context/RelationshipContext";
+import { syncMyPresence } from "@/utils/presenceSync";
+import { getWeatherCity, setWeatherCity } from "@/utils/weatherCity";
 import { apiFetch } from "@/utils/api";
 import {
   getMyDisplayName,
@@ -44,17 +48,23 @@ function confirmUnlink(): Promise<boolean> {
 export default function SettingsScreen() {
   const theme = useTheme();
   const { deviceId, clearPaired } = useRelationship();
+  const queryClient = useQueryClient();
   const [mineName, setMineName] = useState("");
   const [partnerName, setPartnerName] = useState("");
+  const [myCity, setMyCity] = useState("");
+  const [savingPresence, setSavingPresence] = useState(false);
   const tzLabel = getDeviceTimezoneLabel();
 
   useEffect(() => {
-    Promise.all([getMyDisplayName(), getPartnerDisplayName()]).then(
-      ([mine, partner]) => {
-        setMineName(mine ?? "");
-        setPartnerName(partner ?? "");
-      },
-    );
+    Promise.all([
+      getMyDisplayName(),
+      getPartnerDisplayName(),
+      getWeatherCity(),
+    ]).then(([mine, partner, city]) => {
+      setMineName(mine ?? "");
+      setPartnerName(partner ?? "");
+      setMyCity(city ?? "");
+    });
   }, []);
 
   const inputStyle = [
@@ -133,11 +143,55 @@ export default function SettingsScreen() {
             <PrimaryButton label="Save names" onPress={saveNames} />
           </ArtifactCard>
 
+          <ArtifactCard category="Their world" title="Weather for your partner">
+            <AppText variant="body" color="secondary" style={styles.hint}>
+              We use your location when allowed, or this city, so your partner
+              sees weather in your area on Home.
+            </AppText>
+            <AppText variant="caption" color="secondary" style={styles.fieldLabel}>
+              YOUR CITY (OPTIONAL)
+            </AppText>
+            <AppTextInput
+              style={inputStyle}
+              value={myCity}
+              onChangeText={setMyCity}
+              placeholder="e.g. Austin, TX"
+              placeholderTextColor={theme.colors.text.muted}
+              autoCapitalize="words"
+            />
+            <PrimaryButton
+              label={savingPresence ? "Saving…" : "Save location"}
+              disabled={savingPresence || !deviceId}
+              onPress={async () => {
+                if (!deviceId) return;
+                setSavingPresence(true);
+                try {
+                  await setWeatherCity(myCity);
+                  await syncMyPresence(deviceId);
+                  void queryClient.invalidateQueries({
+                    queryKey: queryKeys.partnerPresence,
+                  });
+                  if (Platform.OS === "web") {
+                    window.alert("Location saved. Your partner will see your weather.");
+                  } else {
+                    Alert.alert(
+                      "Saved",
+                      "Your partner will see weather in your area on Home.",
+                    );
+                  }
+                } catch {
+                  showMutationError("Could not save your location.");
+                } finally {
+                  setSavingPresence(false);
+                }
+              }}
+            />
+          </ArtifactCard>
+
           <ArtifactCard category="Daily rhythm" title="Check-ins">
             <AppText variant="body" color="secondary">
               Check-ins reset at midnight in your device timezone ({tzLabel}).
-              Both partners must check in on the same local day to grow your
-              streak.
+              Photo streaks count when you both send a daily photo.
             </AppText>
           </ArtifactCard>
 

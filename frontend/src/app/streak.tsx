@@ -5,7 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 
 import { queryKeys } from "@/api/queryKeys";
-import { fetchStreak } from "@/api/fetchers";
+import { fetchPhotoToday } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { FlameIcon } from "@/components/ui/FlameIcon";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
@@ -35,9 +35,9 @@ export default function StreakScreen() {
   const tzLabel = getDeviceTimezoneLabel();
   const [remaining, setRemaining] = useState(msUntilMidnight());
 
-  const { data: streak } = useQuery({
-    queryKey: queryKeys.streak,
-    queryFn: () => fetchStreak(deviceId!),
+  const { data: photoToday } = useQuery({
+    queryKey: queryKeys.photoToday,
+    queryFn: () => fetchPhotoToday(deviceId!),
     enabled: Boolean(deviceId),
   });
 
@@ -46,7 +46,8 @@ export default function StreakScreen() {
     return () => clearInterval(id);
   }, []);
 
-  const count = streak?.currentStreak ?? 0;
+  const count = photoToday?.currentStreak ?? 0;
+  const bothSent = photoToday?.bothSentToday ?? false;
 
   return (
     <ScreenBackground>
@@ -76,16 +77,22 @@ export default function StreakScreen() {
 
           <WeekStreakTracker
             currentStreak={count}
-            bothCheckedInToday={streak?.bothCheckedInToday ?? false}
+            bothCheckedInToday={bothSent}
           />
 
           <AppText variant="body" color="secondary" style={styles.copy}>
-            {streak?.bothCheckedInToday
-              ? "Nice work! You and your partner both checked in today."
+            {bothSent
+              ? "Nice work! You both sent today's photo."
               : count > 0
-                ? "Keep showing up for each other — check in daily to grow your streak."
-                : "Start your streak with today's check-in on Home."}
+                ? "Send your daily photo to keep the streak alive."
+                : "Start your streak by sending today's photo on Home."}
           </AppText>
+
+          <Pressable onPress={() => router.push("/photos/memories")} style={styles.memories}>
+            <AppText variant="bodySemibold" color="accent">
+              View our photos →
+            </AppText>
+          </Pressable>
 
           <View
             style={[
@@ -97,7 +104,7 @@ export default function StreakScreen() {
             ]}
           >
             <AppText variant="caption" color="secondary" style={styles.timerLabel}>
-              NEXT CHECK-IN RESETS IN
+              NEXT PHOTO DAY RESETS IN
             </AppText>
             <AppText
               mono
@@ -111,9 +118,9 @@ export default function StreakScreen() {
             </AppText>
           </View>
 
-          {streak && streak.longestStreak > count ? (
+          {photoToday && photoToday.longestStreak > count ? (
             <AppText variant="body" color="muted" style={styles.longest}>
-              Longest streak: {streak.longestStreak} days
+              Longest streak: {photoToday.longestStreak} days
             </AppText>
           ) : null}
         </ScrollView>
@@ -148,4 +155,5 @@ const styles = StyleSheet.create({
   timerLabel: { marginBottom: 8 },
   timer: { letterSpacing: 2, marginBottom: 6 },
   longest: { marginTop: 20 },
+  memories: { marginTop: 16 },
 });

@@ -48,6 +48,17 @@ export function TabEventsIcon({ size = 24, color }: IconProps) {
   );
 }
 
+export function TabPlayIcon({ size = 24, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Path
+        d="M8 5v14l11-7L8 5z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
 export function TabSettingsIcon({ size = 24, color }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">

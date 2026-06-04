@@ -81,7 +81,10 @@ type AsyncNote struct {
 	ID           string  `json:"id"`
 	TriggerType  string  `json:"triggerType"`
 	TriggerValue *string `json:"triggerValue,omitempty"`
-	Body         string  `json:"body"`
+	LockType     string  `json:"lockType"`
+	OpensAt      *string `json:"opensAt,omitempty"`
+	Body         *string `json:"body"`
+	IsLocked     bool    `json:"isLocked"`
 	IsMine       bool    `json:"isMine"`
 	OpenedAt     *string `json:"openedAt,omitempty"`
 	CreatedAt    string  `json:"createdAt"`
@@ -607,7 +610,7 @@ func handleGoalByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
-	case http.MethodPut:
+	case http.MethodPut, http.MethodPatch:
 		var body struct {
 			Done bool `json:"done"`
 		}
@@ -1147,6 +1150,64 @@ func handleGetStreak(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(streak)
 }
 
+func asyncNoteUnlocked(lockType string, opensAt sql.NullTime, opened sql.NullTime, now time.Time) bool {
+	if opened.Valid {
+		return true
+	}
+	if lockType == "time" {
+		if !opensAt.Valid {
+			return false
+		}
+		return !now.Before(opensAt.Time)
+	}
+	// state / legacy
+	return false
+}
+
+func presentAsyncNote(
+	id, triggerType string,
+	triggerVal sql.NullString,
+	lockType string,
+	opensAt, opened, created sql.NullTime,
+	body string,
+	authorID, viewerID string,
+	now time.Time,
+) AsyncNote {
+	n := AsyncNote{
+		ID:          id,
+		TriggerType: triggerType,
+		LockType:    lockType,
+		IsMine:      authorID == viewerID,
+	}
+	if created.Valid {
+		n.CreatedAt = created.Time.UTC().Format(time.RFC3339)
+	}
+	if lockType == "" {
+		n.LockType = "state"
+	}
+	if triggerVal.Valid {
+		v := triggerVal.String
+		n.TriggerValue = &v
+	}
+	if opensAt.Valid {
+		s := opensAt.Time.UTC().Format(time.RFC3339)
+		n.OpensAt = &s
+	}
+	if opened.Valid {
+		s := opened.Time.UTC().Format(time.RFC3339)
+		n.OpenedAt = &s
+	}
+	unlocked := asyncNoteUnlocked(n.LockType, opensAt, opened, now)
+	if n.IsMine || unlocked {
+		n.Body = &body
+		n.IsLocked = false
+	} else {
+		n.Body = nil
+		n.IsLocked = true
+	}
+	return n
+}
+
 func handleAsyncNotes(w http.ResponseWriter, r *http.Request) {
 	if applyCORS(w, r) {
 		return
@@ -1169,7 +1230,8 @@ func handleAsyncNotes(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
 		rows, err := db.Query(
-			`SELECT id::text, trigger_type, trigger_value, body, author_user_id::text, opened_at, created_at
+			`SELECT id::text, trigger_type, trigger_value, lock_type, opens_at, body,
+                    author_user_id::text, opened_at, created_at
              FROM async_notes WHERE relationship_id = $1 ORDER BY created_at DESC`,
 			relationshipID,
 		)
@@ -1178,27 +1240,20 @@ func handleAsyncNotes(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		defer rows.Close()
+		now := time.Now().UTC()
 		notes := []AsyncNote{}
 		for rows.Next() {
-			var n AsyncNote
-			var authorID string
+			var id, triggerType, body, authorID string
+			var lockType string
 			var triggerVal sql.NullString
-			var opened sql.NullTime
-			var created time.Time
-			if err := rows.Scan(&n.ID, &n.TriggerType, &triggerVal, &n.Body, &authorID, &opened, &created); err != nil {
+			var opensAt, opened, created sql.NullTime
+			if err := rows.Scan(&id, &triggerType, &triggerVal, &lockType, &opensAt, &body, &authorID, &opened, &created); err != nil {
 				continue
 			}
-			if triggerVal.Valid {
-				v := triggerVal.String
-				n.TriggerValue = &v
-			}
-			n.IsMine = authorID == user.ID
-			if opened.Valid {
-				s := opened.Time.UTC().Format(time.RFC3339)
-				n.OpenedAt = &s
-			}
-			n.CreatedAt = created.UTC().Format(time.RFC3339)
-			notes = append(notes, n)
+			notes = append(notes, presentAsyncNote(
+				id, triggerType, triggerVal, lockType, opensAt, opened, created,
+				body, authorID, user.ID, now,
+			))
 		}
 		json.NewEncoder(w).Encode(notes)
 
@@ -1206,6 +1261,8 @@ func handleAsyncNotes(w http.ResponseWriter, r *http.Request) {
 		var body struct {
 			TriggerType  string  `json:"triggerType"`
 			TriggerValue *string `json:"triggerValue"`
+			LockType     string  `json:"lockType"`
+			OpensAt      *string `json:"opensAt"`
 			Body         string  `json:"body"`
 		}
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -1217,9 +1274,36 @@ func handleAsyncNotes(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "body required", http.StatusBadRequest)
 			return
 		}
+		lockType := strings.TrimSpace(body.LockType)
+		if lockType == "" {
+			lockType = "state"
+		}
+		if lockType != "state" && lockType != "time" {
+			http.Error(w, "invalid lockType", http.StatusBadRequest)
+			return
+		}
 		triggerType := strings.TrimSpace(body.TriggerType)
-		if triggerType == "" {
+		if lockType == "time" {
+			triggerType = "time"
+		} else if triggerType == "" {
 			triggerType = "anytime"
+		}
+		var opensAt interface{}
+		if lockType == "time" {
+			if body.OpensAt == nil || strings.TrimSpace(*body.OpensAt) == "" {
+				http.Error(w, "opensAt required for time lock", http.StatusBadRequest)
+				return
+			}
+			t, err := time.Parse(time.RFC3339, strings.TrimSpace(*body.OpensAt))
+			if err != nil {
+				http.Error(w, "invalid opensAt", http.StatusBadRequest)
+				return
+			}
+			if !t.After(time.Now().UTC()) {
+				http.Error(w, "opensAt must be in the future", http.StatusBadRequest)
+				return
+			}
+			opensAt = t.UTC()
 		}
 		var triggerVal interface{}
 		if triggerType == "custom" {
@@ -1235,25 +1319,26 @@ func handleAsyncNotes(w http.ResponseWriter, r *http.Request) {
 		} else if body.TriggerValue != nil && strings.TrimSpace(*body.TriggerValue) != "" {
 			triggerVal = strings.TrimSpace(*body.TriggerValue)
 		}
-		var n AsyncNote
-		var created time.Time
+		var id, noteBody string
+		var noteLockType string
 		var tv sql.NullString
+		var opensAtNull, openedNull sql.NullTime
+		var created time.Time
 		err := db.QueryRow(
-			`INSERT INTO async_notes (relationship_id, author_user_id, trigger_type, trigger_value, body)
-             VALUES ($1, $2, $3, $4, $5)
-             RETURNING id::text, trigger_type, trigger_value, body, opened_at, created_at`,
-			relationshipID, user.ID, triggerType, triggerVal, text,
-		).Scan(&n.ID, &n.TriggerType, &tv, &n.Body, &sql.NullTime{}, &created)
+			`INSERT INTO async_notes (relationship_id, author_user_id, trigger_type, trigger_value, lock_type, opens_at, body)
+             VALUES ($1, $2, $3, $4, $5, $6, $7)
+             RETURNING id::text, trigger_type, trigger_value, lock_type, opens_at, body, opened_at, created_at`,
+			relationshipID, user.ID, triggerType, triggerVal, lockType, opensAt, text,
+		).Scan(&id, &triggerType, &tv, &noteLockType, &opensAtNull, &noteBody, &openedNull, &created)
 		if err != nil {
 			http.Error(w, "db error", http.StatusInternalServerError)
 			return
 		}
-		if tv.Valid {
-			v := tv.String
-			n.TriggerValue = &v
-		}
-		n.IsMine = true
-		n.CreatedAt = created.UTC().Format(time.RFC3339)
+		n := presentAsyncNote(
+			id, triggerType, tv, noteLockType, opensAtNull, openedNull,
+			sql.NullTime{Time: created, Valid: true},
+			noteBody, user.ID, user.ID, time.Now().UTC(),
+		)
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(n)
 		broadcastServerEvent(relationshipID, "SYNC_ASYNC_NOTES", map[string]any{"relationshipId": relationshipID})
@@ -1301,17 +1386,17 @@ func handleOpenAsyncNote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var n AsyncNote
-	var authorID string
+	var id, triggerType, noteBody, authorID string
+	var lockType string
 	var triggerVal sql.NullString
-	var opened sql.NullTime
-	var created time.Time
+	var opensAt, opened, createdAt sql.NullTime
 	err = db.QueryRow(
-		`UPDATE async_notes SET opened_at = COALESCE(opened_at, NOW())
-         WHERE id::text = $1 AND relationship_id = $2 AND author_user_id != $3
-         RETURNING id::text, trigger_type, trigger_value, body, author_user_id::text, opened_at, created_at`,
+		`SELECT id::text, trigger_type, trigger_value, lock_type, opens_at, body,
+                author_user_id::text, opened_at, created_at
+         FROM async_notes
+         WHERE id::text = $1 AND relationship_id = $2 AND author_user_id != $3`,
 		noteID, relationshipID, user.ID,
-	).Scan(&n.ID, &n.TriggerType, &triggerVal, &n.Body, &authorID, &opened, &created)
+	).Scan(&id, &triggerType, &triggerVal, &lockType, &opensAt, &noteBody, &authorID, &opened, &createdAt)
 	if err == sql.ErrNoRows {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -1320,16 +1405,28 @@ func handleOpenAsyncNote(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	if triggerVal.Valid {
-		v := triggerVal.String
-		n.TriggerValue = &v
+	now := time.Now().UTC()
+	if lockType == "" {
+		lockType = "state"
 	}
-	n.IsMine = authorID == user.ID
-	if opened.Valid {
-		s := opened.Time.UTC().Format(time.RFC3339)
-		n.OpenedAt = &s
+	if lockType == "time" && !asyncNoteUnlocked(lockType, opensAt, opened, now) {
+		http.Error(w, "not yet available", http.StatusForbidden)
+		return
 	}
-	n.CreatedAt = created.UTC().Format(time.RFC3339)
+	err = db.QueryRow(
+		`UPDATE async_notes SET opened_at = COALESCE(opened_at, NOW())
+         WHERE id::text = $1 AND relationship_id = $2
+         RETURNING opened_at`,
+		noteID, relationshipID,
+	).Scan(&opened)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	n := presentAsyncNote(
+		id, triggerType, triggerVal, lockType, opensAt, opened, createdAt,
+		noteBody, authorID, user.ID, now,
+	)
 	json.NewEncoder(w).Encode(n)
 	broadcastServerEvent(relationshipID, "SYNC_ASYNC_NOTES", map[string]any{"relationshipId": relationshipID})
 }
@@ -1383,18 +1480,37 @@ func handleWidgetSummary(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	checkIns, _ := buildTodayCheckIns(user.ID, relationshipID, today)
-	summary.MineCheckedIn = checkIns.Mine != nil
-	summary.PartnerCheckedIn = checkIns.Partner != nil
-
-	streak, _ := computeConnectionStreak(relationshipID, today)
-	summary.CurrentStreak = streak.CurrentStreak
+	_, _, bothPhotos := computePhotoStreak(relationshipID, today)
+	rows, _ := db.Query(
+		`SELECT user_id::text FROM daily_photos WHERE relationship_id = $1 AND photo_date = $2::date`,
+		relationshipID, today,
+	)
+	if rows != nil {
+		defer rows.Close()
+		for rows.Next() {
+			var uid string
+			if rows.Scan(&uid) == nil {
+				if uid == user.ID {
+					summary.MineCheckedIn = true
+				} else {
+					summary.PartnerCheckedIn = true
+				}
+			}
+		}
+	}
+	_ = bothPhotos
+	current, _, _ := computePhotoStreak(relationshipID, today)
+	summary.CurrentStreak = current
 
 	json.NewEncoder(w).Encode(summary)
 }
 
 func deleteRelationshipData(tx *sql.Tx, relationshipID string) error {
 	tables := []string{
+		`DELETE FROM trivia_rounds WHERE game_id IN (SELECT id FROM trivia_games WHERE relationship_id = $1)`,
+		`DELETE FROM trivia_games WHERE relationship_id = $1`,
+		`DELETE FROM daily_photos WHERE relationship_id = $1`,
+		`DELETE FROM photo_streak_meta WHERE relationship_id = $1`,
 		`DELETE FROM async_notes WHERE relationship_id = $1`,
 		`DELETE FROM itinerary_items WHERE relationship_id = $1`,
 		`DELETE FROM weekly_goals WHERE relationship_id = $1`,
@@ -1465,6 +1581,8 @@ func handlePairingUnlink(w http.ResponseWriter, r *http.Request) {
 func main() {
 	initDB()
 	defer db.Close()
+	initMediaStore()
+	registerFeatureRoutes()
 
 	http.HandleFunc("/health", handlers.Health(db))
 	http.HandleFunc("/ws", handleConnections)

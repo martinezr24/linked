@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AppTextInput } from "@/components/AppTextInput";
@@ -19,6 +20,7 @@ import { fetchAsyncNotes } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { showMutationError } from "@/utils/errors";
+import { dateToIso, formatMMDDYYYY } from "@/utils/dates";
 import { useTheme } from "@/theme/useTheme";
 import type { AsyncNote } from "@/types";
 
@@ -30,15 +32,19 @@ const PRESET_TRIGGERS = [
 ];
 
 const CUSTOM_TRIGGER_ID = "custom";
+const LOCK_TIME = "time";
 const MAX_CUSTOM_LABEL = 80;
 
-export function triggerLabel(type: string, value?: string) {
-  if (type === CUSTOM_TRIGGER_ID && value) {
-    return `Open when ${value}`;
+export function triggerLabel(note: Pick<AsyncNote, "triggerType" | "triggerValue" | "lockType" | "opensAt">) {
+  if (note.lockType === "time" && note.opensAt) {
+    return `Opens ${formatMMDDYYYY(note.opensAt)}`;
   }
-  const found = PRESET_TRIGGERS.find((t) => t.id === type);
+  if (note.triggerType === CUSTOM_TRIGGER_ID && note.triggerValue) {
+    return `Open when ${note.triggerValue}`;
+  }
+  const found = PRESET_TRIGGERS.find((t) => t.id === note.triggerType);
   if (found) return found.label;
-  return value ?? type;
+  return note.triggerValue ?? note.triggerType;
 }
 
 export function AsyncNotesCard() {
@@ -48,6 +54,10 @@ export function AsyncNotesCard() {
   const [expanded, setExpanded] = useState(false);
   const [body, setBody] = useState("");
   const [triggerType, setTriggerType] = useState("anytime");
+  const [lockType, setLockType] = useState<"state" | "time">("state");
+  const [opensAt, setOpensAt] = useState(
+    () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+  );
   const [customLabel, setCustomLabel] = useState("");
   const [revealed, setRevealed] = useState<AsyncNote | null>(null);
   const [revealing, setRevealing] = useState(false);
@@ -58,23 +68,32 @@ export function AsyncNotesCard() {
     enabled: Boolean(deviceId),
   });
 
-  const unreceived = notes.filter((n) => !n.isMine && !n.openedAt);
+  const unreceived = notes.filter(
+    (n) => !n.isMine && !n.openedAt && (!n.isLocked || (n.lockType === "time" && n.opensAt && new Date(n.opensAt) <= new Date())),
+  );
+  const waitingLocked = notes.filter((n) => !n.isMine && n.isLocked && !n.openedAt);
   const isCustom = triggerType === CUSTOM_TRIGGER_ID;
+  const isTimeLock = lockType === "time";
   const canSend =
     body.trim().length > 0 &&
-    (!isCustom || customLabel.trim().length > 0);
+    (isTimeLock || !isCustom || customLabel.trim().length > 0);
 
   const createNote = useMutation({
     mutationFn: async () => {
       const payload: {
         triggerType: string;
         body: string;
+        lockType: "state" | "time";
         triggerValue?: string;
+        opensAt?: string;
       } = {
-        triggerType,
+        triggerType: isTimeLock ? "time" : triggerType,
+        lockType,
         body: body.trim(),
       };
-      if (isCustom) {
+      if (isTimeLock) {
+        payload.opensAt = dateToIso(opensAt);
+      } else if (isCustom) {
         payload.triggerValue = customLabel.trim().slice(0, MAX_CUSTOM_LABEL);
       }
       const res = await apiFetch("/api/async-notes", deviceId!, {
@@ -89,6 +108,7 @@ export function AsyncNotesCard() {
       setBody("");
       setCustomLabel("");
       setTriggerType("anytime");
+      setLockType("state");
       void queryClient.invalidateQueries({ queryKey: queryKeys.asyncNotes });
     },
     onError: () => showMutationError("Could not send your note. Try again."),
@@ -173,7 +193,7 @@ export function AsyncNotesCard() {
               {unreceived.map((note) => (
                 <PrimaryButton
                   key={note.id}
-                  label={triggerLabel(note.triggerType, note.triggerValue)}
+                  label={triggerLabel(note)}
                   onPress={() => openNote(note)}
                   style={styles.revealBtn}
                 />
@@ -181,6 +201,80 @@ export function AsyncNotesCard() {
             </View>
           ) : null}
 
+          {waitingLocked.length > 0 ? (
+            <View style={styles.lockedList}>
+              {waitingLocked.map((note) => (
+                <View key={note.id} style={styles.lockedRow}>
+                  <AppText variant="caption" color="muted">
+                    🔒 {triggerLabel(note)}
+                  </AppText>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          <View style={styles.lockRow}>
+            <TouchableOpacity
+              style={[
+                styles.triggerChip,
+                {
+                  borderColor: theme.colors.border.subtle,
+                  backgroundColor:
+                    lockType === "state"
+                      ? theme.colors.accent.primary
+                      : "transparent",
+                },
+              ]}
+              onPress={() => setLockType("state")}
+            >
+              <AppText
+                variant="caption"
+                style={{
+                  color:
+                    lockType === "state"
+                      ? theme.colors.text.onAccent
+                      : theme.colors.text.secondary,
+                }}
+              >
+                Open when…
+              </AppText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.triggerChip,
+                {
+                  borderColor: theme.colors.border.subtle,
+                  backgroundColor:
+                    lockType === "time"
+                      ? theme.colors.accent.primary
+                      : "transparent",
+                },
+              ]}
+              onPress={() => setLockType("time")}
+            >
+              <AppText
+                variant="caption"
+                style={{
+                  color:
+                    lockType === "time"
+                      ? theme.colors.text.onAccent
+                      : theme.colors.text.secondary,
+                }}
+              >
+                Opens on a date
+              </AppText>
+            </TouchableOpacity>
+          </View>
+
+          {isTimeLock ? (
+            <DateTimePicker
+              value={opensAt}
+              mode="date"
+              minimumDate={new Date(Date.now() + 24 * 60 * 60 * 1000)}
+              onChange={(_, d) => d && setOpensAt(d)}
+              themeVariant="dark"
+            />
+          ) : (
           <View style={styles.triggerRow}>
             {PRESET_TRIGGERS.map((t) => (
               <TouchableOpacity
@@ -234,8 +328,9 @@ export function AsyncNotesCard() {
               </AppText>
             </TouchableOpacity>
           </View>
+          )}
 
-          {isCustom ? (
+          {isCustom && !isTimeLock ? (
             <AppTextInput
               style={[
                 styles.customInput,
@@ -289,12 +384,10 @@ export function AsyncNotesCard() {
             ]}
           >
             <AppText variant="h2" style={styles.modalTitle}>
-              {revealed
-                ? triggerLabel(revealed.triggerType, revealed.triggerValue)
-                : ""}
+              {revealed ? triggerLabel(revealed) : ""}
             </AppText>
             <AppText display variant="body" style={styles.modalBody}>
-              {revealed?.body}
+              {revealed?.body ?? ""}
             </AppText>
             <PrimaryButton label="Close" onPress={() => setRevealed(null)} />
           </View>
@@ -329,6 +422,9 @@ const styles = StyleSheet.create({
   },
   inboxTitle: { marginBottom: 8 },
   revealBtn: { marginTop: 6 },
+  lockedList: { marginBottom: 12, gap: 6 },
+  lockedRow: { paddingVertical: 4 },
+  lockRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
   triggerRow: { flexWrap: "wrap", flexDirection: "row", gap: 8, marginBottom: 10 },
   triggerChip: {
     borderWidth: 1,

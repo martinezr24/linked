@@ -23,19 +23,12 @@ export function DismissKeyboardView({
   scroll = true,
   scrollProps,
 }: Props) {
-  const inner = <View style={[styles.inner, style]}>{children}</View>;
-
+  // Do not wrap in Pressable when scroll=false — it blocks nested ScrollViews.
   if (!scroll) {
-    return (
-      <Pressable
-        style={styles.flex}
-        onPress={Keyboard.dismiss}
-        accessible={false}
-      >
-        {inner}
-      </Pressable>
-    );
+    return <View style={[styles.flex, style]}>{children}</View>;
   }
+
+  const inner = <View style={[styles.inner, style]}>{children}</View>;
 
   return (
     <ScrollView
