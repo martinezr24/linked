@@ -1,21 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Keyboard,
+  Platform,
+  Pressable,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { type Href, Link, router } from "expo-router";
+import { router } from "expo-router";
 
 import { AsyncNotesCard } from "@/components/AsyncNotesCard";
+import { VisitCountdownHero } from "@/components/VisitCountdownHero";
+import { VisitEditSheet } from "@/components/VisitEditSheet";
 import { WidgetPreviewCard } from "@/components/WidgetPreviewCard";
 import { AppTextInput } from "@/components/AppTextInput";
-import { DatePickerField } from "@/components/DatePickerField";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
+import { useCoupleNames } from "@/hooks/useCoupleNames";
+import { initialFromName } from "@/utils/coupleNames";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { ConnectedHeader } from "@/components/ui/ConnectedHeader";
@@ -34,7 +42,6 @@ import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import {
   dateToIso,
-  formatLocalDateLabel,
   formatMMDDYYYY,
   getDeviceTimezoneLabel,
 } from "@/utils/dates";
@@ -76,14 +83,21 @@ function nextUpcomingEvent(events: SharedEvent[]): SharedEvent | null {
   return upcoming[0] ?? null;
 }
 
+const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 88 : 64;
+
 export default function HomeScreen() {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { deviceId } = useRelationship();
+  const scrollBottomPad = TAB_BAR_HEIGHT + insets.bottom + 24;
   const queryClient = useQueryClient();
   const [visitDraft, setVisitDraft] = useState<Date | null>(null);
+  const [visitSheetOpen, setVisitSheetOpen] = useState(false);
   const [checkInNote, setCheckInNote] = useState("");
   const [goalInput, setGoalInput] = useState("");
+  const [goalsExpanded, setGoalsExpanded] = useState(false);
   const tzLabel = getDeviceTimezoneLabel();
+  const { mineName, partnerName } = useCoupleNames();
 
   const enabled = Boolean(deviceId);
 
@@ -215,13 +229,19 @@ export default function HomeScreen() {
       void hapticSuccess();
       void queryClient.invalidateQueries({ queryKey: queryKeys.checkIns });
       void queryClient.invalidateQueries({ queryKey: queryKeys.streak });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widgetSummary });
     },
     onError: () => showMutationError("Could not send check-in."),
   });
 
   const upcoming = nextUpcomingEvent(events);
-  const openGoals = goals.filter((g) => !g.done);
   const streakCount = streak?.currentStreak ?? 0;
+  const bothCheckedInToday =
+    Boolean(checkIns?.mine) && Boolean(checkIns?.partner);
+
+  useEffect(() => {
+    if (goals.length > 0) setGoalsExpanded(true);
+  }, [goals.length]);
 
   if (loading) {
     return (
@@ -236,19 +256,26 @@ export default function HomeScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        <DismissKeyboardView>
+        <DismissKeyboardView scroll={false} style={styles.flex}>
           <ConnectedHeader
             streakCount={streakCount}
+            mineInitial={initialFromName(mineName, "M")}
+            partnerInitial={initialFromName(partnerName, "Y")}
             mineCheckedIn={Boolean(checkIns?.mine)}
             partnerCheckedIn={Boolean(checkIns?.partner)}
           />
 
           <ScrollView
+            style={styles.flex}
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={styles.scroll}
+            contentContainerStyle={[
+              styles.scroll,
+              { paddingBottom: scrollBottomPad },
+            ]}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
           >
-            {streak?.bothCheckedInToday ? (
+            {bothCheckedInToday ? (
               <View
                 style={[
                   styles.celebration,
@@ -264,38 +291,6 @@ export default function HomeScreen() {
               </View>
             ) : null}
 
-            {(upcoming || openGoals.length > 0) && (
-              <View style={styles.section}>
-                <ArtifactCard category="Featured" title="At a glance">
-                  {upcoming ? (
-                    <TouchableOpacity
-                      onPress={() =>
-                        router.push({
-                          pathname: "/visit/[eventId]",
-                          params: {
-                            eventId: upcoming.id,
-                            title: upcoming.title,
-                            eventAt: upcoming.eventAt,
-                          },
-                        })
-                      }
-                    >
-                      <AppText variant="body">
-                        Next event: {upcoming.title} (
-                        {formatMMDDYYYY(upcoming.eventAt)})
-                      </AppText>
-                    </TouchableOpacity>
-                  ) : null}
-                  {openGoals.length > 0 ? (
-                    <AppText variant="body" color="secondary" style={styles.glanceGap}>
-                      {openGoals.length} open connection goal
-                      {openGoals.length === 1 ? "" : "s"} this week
-                    </AppText>
-                  ) : null}
-                </ArtifactCard>
-              </View>
-            )}
-
             <CoupleProgressCard
               checkIns={checkIns}
               note={checkInNote}
@@ -305,18 +300,44 @@ export default function HomeScreen() {
               tzLabel={tzLabel}
             />
 
-            <ScrollView
-              horizontal
-              nestedScrollEnabled
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hScroll}
-              style={styles.hScrollWrap}
-            >
-              <View style={styles.hCard}>
+            <VisitCountdownHero
+              nextVisitAt={nextVisitAt}
+              tzLabel={tzLabel}
+              formatCountdown={formatCountdown}
+              countdownDays={countdownDays}
+              onPress={() => setVisitSheetOpen(true)}
+            />
+
+            {upcoming ? (
+              <TouchableOpacity
+                style={styles.eventPeek}
+                onPress={() =>
+                  router.push({
+                    pathname: "/visit/[eventId]",
+                    params: {
+                      eventId: upcoming.id,
+                      title: upcoming.title,
+                      eventAt: upcoming.eventAt,
+                    },
+                  })
+                }
+              >
+                <AppText variant="caption" color="secondary">
+                  UPCOMING EVENT
+                </AppText>
+                <AppText variant="bodySemibold" color="accent">
+                  {upcoming.title} · {formatMMDDYYYY(upcoming.eventAt)}
+                </AppText>
+              </TouchableOpacity>
+            ) : null}
+
+            <View style={styles.quickRow}>
+              <View style={styles.quickCard}>
                 <WidgetPreviewCard compact />
               </View>
               <TouchableOpacity
                 style={[
+                  styles.quickCard,
                   styles.miniCard,
                   {
                     backgroundColor: theme.colors.surface.card,
@@ -331,67 +352,24 @@ export default function HomeScreen() {
                 <AppText variant="h2" style={styles.miniTitle}>
                   Shared lists
                 </AppText>
-                <AppText variant="body" color="muted">
+                <AppText variant="body" color="muted" numberOfLines={2}>
                   Trip & reunion →
                 </AppText>
               </TouchableOpacity>
-            </ScrollView>
+            </View>
 
             <View style={styles.section}>
               <AsyncNotesCard />
             </View>
 
             <View style={styles.section}>
-              <ArtifactCard category="Visit" title="Next visit" stacked>
-                {nextVisitAt ? (
-                  <>
-                    <AppText display variant="displayHero" style={styles.visitDays}>
-                      {countdownDays(nextVisitAt)}
-                    </AppText>
-                    <AppText variant="caption" color="secondary" style={styles.visitLabel}>
-                      DAYS UNTIL YOU'RE TOGETHER
-                    </AppText>
-                    <AppText variant="body" style={styles.visitSub}>
-                      {formatCountdown(nextVisitAt)}
-                    </AppText>
-                    <AppText variant="label" color="muted">
-                      {formatLocalDateLabel(nextVisitAt)} · {tzLabel}
-                    </AppText>
-                  </>
-                ) : (
-                  <AppText variant="body" color="muted">
-                    Set a date to start the countdown
-                  </AppText>
-                )}
-                <DatePickerField
-                  label="Pick a visit date"
-                  value={visitDraft}
-                  onChange={setVisitDraft}
-                  minimumDate={new Date()}
-                />
-                <PrimaryButton
-                  label="Save visit date"
-                  onPress={() => visitDraft && saveVisit.mutate(visitDraft)}
-                  disabled={!visitDraft}
-                  style={styles.visitBtn}
-                />
-                {nextVisitAt ? (
-                  <PrimaryButton
-                    label="Clear visit date"
-                    variant="ghost"
-                    onPress={() => clearVisit.mutate()}
-                    style={styles.visitBtn}
-                  />
-                ) : null}
-              </ArtifactCard>
-            </View>
-
-            <View style={styles.section}>
-              <ArtifactCard
-                category="This week"
-                title="Connection goals"
-                stacked
-              >
+              <Pressable onPress={() => setGoalsExpanded((e) => !e)}>
+                <AppText variant="label" color="secondary">
+                  THIS WEEK {goalsExpanded ? "" : "(tap to expand)"}
+                </AppText>
+              </Pressable>
+              {goalsExpanded ? (
+              <ArtifactCard category="This week" title="Connection goals">
                 <View style={styles.goalInputRow}>
                   <AppTextInput
                     style={[
@@ -449,21 +427,30 @@ export default function HomeScreen() {
                   ))
                 )}
               </ArtifactCard>
-            </View>
-
-            <View style={styles.links}>
-              <Link href={"/plans" as Href}>
-                <AppText variant="bodySemibold" color="accent">
-                  Shared plans →
-                </AppText>
-              </Link>
-              <Link href={"/events" as Href}>
-                <AppText variant="bodySemibold" color="accent">
-                  Upcoming events →
-                </AppText>
-              </Link>
+              ) : null}
             </View>
           </ScrollView>
+
+          <VisitEditSheet
+            visible={visitSheetOpen}
+            onClose={() => setVisitSheetOpen(false)}
+            visitDraft={visitDraft}
+            onChangeDraft={setVisitDraft}
+            hasVisit={Boolean(nextVisitAt)}
+            saving={saveVisit.isPending}
+            onSave={() => {
+              if (visitDraft) {
+                saveVisit.mutate(visitDraft, {
+                  onSuccess: () => setVisitSheetOpen(false),
+                });
+              }
+            }}
+            onClear={() => {
+              clearVisit.mutate(undefined, {
+                onSuccess: () => setVisitSheetOpen(false),
+              });
+            }}
+          />
         </DismissKeyboardView>
       </SafeAreaView>
     </ScreenBackground>
@@ -472,8 +459,9 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  scroll: { paddingBottom: 32 },
+  scroll: { flexGrow: 1 },
   section: { paddingHorizontal: 20 },
   celebration: {
     marginHorizontal: 20,
@@ -482,25 +470,33 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
-  glanceGap: { marginTop: 8 },
-  hScrollWrap: { marginBottom: 8 },
-  hScroll: { paddingHorizontal: 20, gap: 12 },
-  hCard: { width: 200 },
+  eventPeek: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
+  quickRow: {
+    flexDirection: "row",
+    paddingHorizontal: 20,
+    gap: 12,
+    marginBottom: 8,
+    alignItems: "stretch",
+  },
+  quickCard: {
+    flex: 1,
+    minWidth: 0,
+  },
   miniCard: {
-    width: 160,
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,
     justifyContent: "center",
+    minHeight: 120,
   },
   miniTitle: { marginVertical: 8 },
-  visitDays: {
-    fontFamily: "Fraunces_700Bold",
-    marginBottom: 4,
-  },
-  visitLabel: { marginBottom: 12 },
-  visitSub: { marginBottom: 8 },
-  visitBtn: { marginTop: 12 },
   goalInputRow: { flexDirection: "row", marginBottom: 12, gap: 8 },
   goalInput: {
     flex: 1,
@@ -521,5 +517,4 @@ const styles = StyleSheet.create({
   goalCheckArea: { flex: 1, flexDirection: "row", alignItems: "center", gap: 10 },
   checkbox: { fontSize: 18 },
   goalDone: { textDecorationLine: "line-through", opacity: 0.5 },
-  links: { paddingHorizontal: 20, gap: 12, marginTop: 8 },
 });

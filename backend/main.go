@@ -1037,13 +1037,25 @@ func buildTodayCheckIns(currentUserID, relationshipID, today string) (TodayCheck
 	return resp, nil
 }
 
-func computeConnectionStreak(relationshipID string) (ConnectionStreak, error) {
+func dateStringFromCheckDate(t time.Time) string {
+	return t.Format("2006-01-02")
+}
+
+func previousDateString(dateStr string) (string, error) {
+	t, err := time.Parse("2006-01-02", dateStr)
+	if err != nil {
+		return "", err
+	}
+	return t.AddDate(0, 0, -1).Format("2006-01-02"), nil
+}
+
+func computeConnectionStreak(relationshipID, today string) (ConnectionStreak, error) {
 	rows, err := db.Query(
 		`SELECT check_date, COUNT(DISTINCT user_id) AS user_count
          FROM daily_checkins
          WHERE relationship_id = $1
          GROUP BY check_date
-         ORDER BY check_date DESC`,
+         ORDER BY check_date ASC`,
 		relationshipID,
 	)
 	if err != nil {
@@ -1051,48 +1063,54 @@ func computeConnectionStreak(relationshipID string) (ConnectionStreak, error) {
 	}
 	defer rows.Close()
 
-	type dayCount struct {
-		date  time.Time
-		count int
-	}
-	var days []dayCount
+	bothDays := make(map[string]bool)
+	var bothDates []string
 	for rows.Next() {
-		var d dayCount
-		if err := rows.Scan(&d.date, &d.count); err == nil {
-			days = append(days, d)
+		var checkDate time.Time
+		var count int
+		if err := rows.Scan(&checkDate, &count); err != nil {
+			continue
 		}
+		if count < 2 {
+			continue
+		}
+		ds := dateStringFromCheckDate(checkDate)
+		bothDays[ds] = true
+		bothDates = append(bothDates, ds)
 	}
+
+	todayBoth := bothDays[today]
 
 	current := 0
-	longest := 0
-	todayBoth := false
-	if len(days) > 0 && days[0].count >= 2 {
-		todayBoth = true
-	}
-
-	expected := time.Now().UTC()
-	for _, d := range days {
-		if d.count < 2 {
-			break
-		}
-		dayUTC := time.Date(d.date.Year(), d.date.Month(), d.date.Day(), 0, 0, 0, 0, time.UTC)
-		expUTC := time.Date(expected.Year(), expected.Month(), expected.Day(), 0, 0, 0, 0, time.UTC)
-		if !dayUTC.Equal(expUTC) {
-			break
-		}
+	expected := today
+	for bothDays[expected] {
 		current++
-		expected = expected.AddDate(0, 0, -1)
+		prev, err := previousDateString(expected)
+		if err != nil {
+			break
+		}
+		expected = prev
 	}
 
-	run := 0
-	for _, d := range days {
-		if d.count >= 2 {
-			run++
+	longest := 0
+	if len(bothDates) > 0 {
+		run := 1
+		longest = 1
+		for i := 1; i < len(bothDates); i++ {
+			prev, err1 := time.Parse("2006-01-02", bothDates[i-1])
+			curr, err2 := time.Parse("2006-01-02", bothDates[i])
+			if err1 != nil || err2 != nil {
+				run = 1
+				continue
+			}
+			if curr.Equal(prev.AddDate(0, 0, 1)) {
+				run++
+			} else {
+				run = 1
+			}
 			if run > longest {
 				longest = run
 			}
-		} else {
-			run = 0
 		}
 	}
 
@@ -1120,7 +1138,8 @@ func handleGetStreak(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	streak, err := computeConnectionStreak(relationshipID)
+	today := clientLocalDate(r)
+	streak, err := computeConnectionStreak(relationshipID, today)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
@@ -1368,7 +1387,7 @@ func handleWidgetSummary(w http.ResponseWriter, r *http.Request) {
 	summary.MineCheckedIn = checkIns.Mine != nil
 	summary.PartnerCheckedIn = checkIns.Partner != nil
 
-	streak, _ := computeConnectionStreak(relationshipID)
+	streak, _ := computeConnectionStreak(relationshipID, today)
 	summary.CurrentStreak = streak.CurrentStreak
 
 	json.NewEncoder(w).Encode(summary)

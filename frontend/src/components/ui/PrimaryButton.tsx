@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Pressable,
   StyleSheet,
+  View,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -39,7 +40,7 @@ export function PrimaryButton({
           styles.ghost,
           { borderColor: theme.colors.border.subtle },
           pressed && styles.pressed,
-          isDisabled && styles.disabled,
+          isDisabled && styles.ghostDisabled,
           style,
         ]}
       >
@@ -52,14 +53,33 @@ export function PrimaryButton({
     );
   }
 
+  if (isDisabled) {
+    return (
+      <Pressable
+        disabled
+        style={[styles.wrap, style]}
+      >
+        <View
+          style={[
+            styles.disabledSurface,
+            { backgroundColor: theme.colors.surface.cardElevated },
+          ]}
+        >
+          <AppText variant="bodySemibold" color="muted">
+            {label}
+          </AppText>
+        </View>
+      </Pressable>
+    );
+  }
+
   return (
     <Pressable
       onPress={onPress}
-      disabled={isDisabled}
+      disabled={loading}
       style={({ pressed }) => [
         styles.wrap,
         pressed && styles.pressed,
-        isDisabled && styles.disabled,
         style,
       ]}
     >
@@ -95,6 +115,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  disabledSurface: {
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.08)",
+  },
   ghost: {
     paddingVertical: 14,
     paddingHorizontal: 20,
@@ -102,6 +131,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
   },
+  ghostDisabled: { opacity: 0.45 },
   pressed: { opacity: 0.85 },
-  disabled: { opacity: 0.45 },
 });

@@ -57,8 +57,14 @@ export function WidgetPreviewCard({ compact = false }: Props) {
           inner={theme.colors.accent.flameInner}
         />
         <AppText variant="caption" color="secondary">
-          {data.currentStreak}d ·{" "}
-          {data.partnerCheckedIn ? "Partner in" : "Waiting"}
+          {data.currentStreak}d streak
+          {data.mineCheckedIn && data.partnerCheckedIn
+            ? " · Both in today"
+            : data.partnerCheckedIn
+              ? " · Partner checked in"
+              : data.mineCheckedIn
+                ? " · Waiting for partner"
+                : " · Check in today"}
         </AppText>
       </View>
       {!compact ? (
@@ -90,7 +96,7 @@ export function WidgetPreviewCard({ compact = false }: Props) {
 
   return (
     <View style={styles.wrap}>
-      <ArtifactCard category="Widget" title="At a glance" stacked>
+      <ArtifactCard category="Widget" title="At a glance">
         {content}
       </ArtifactCard>
     </View>
@@ -108,6 +114,7 @@ const styles = StyleSheet.create({
   compactLoader: { marginHorizontal: 0, padding: 16 },
   compact: {
     flex: 1,
+    width: "100%",
     borderRadius: 16,
     borderWidth: 1,
     padding: 16,

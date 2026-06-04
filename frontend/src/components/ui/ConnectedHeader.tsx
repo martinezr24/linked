@@ -50,8 +50,8 @@ function AvatarCircle({
 
 export function ConnectedHeader({
   streakCount,
-  mineInitial = "Me",
-  partnerInitial = "You",
+  mineInitial = "M",
+  partnerInitial = "Y",
   partnerCheckedIn,
   mineCheckedIn,
 }: Props) {

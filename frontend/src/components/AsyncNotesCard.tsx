@@ -123,7 +123,7 @@ export function AsyncNotesCard() {
   }
 
   return (
-    <ArtifactCard category="Open when" stacked>
+    <ArtifactCard category="Open when">
       <Pressable
         style={styles.headerRow}
         onPress={() => setExpanded((e) => !e)}
@@ -144,7 +144,9 @@ export function AsyncNotesCard() {
               </AppText>
             </View>
           ) : null}
-          <AppText color="muted">{expanded ? "▼" : "▶"}</AppText>
+          <AppText color="muted" style={styles.chevron}>
+            {expanded ? "▼" : "✉"}
+          </AppText>
         </View>
       </Pressable>
 
@@ -311,6 +313,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  chevron: { fontSize: 16 },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 4,

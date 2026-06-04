@@ -63,44 +63,65 @@ export function CoupleProgressCard({
   };
 
   return (
-    <Animated.View
-      style={[styles.outer, { transform: [{ scale }] }]}
-    >
+    <Animated.View style={[styles.outer, { transform: [{ scale }] }]}>
       <ArtifactCard category="Daily check-in" featured stacked>
-        <AppText display variant="h2" style={styles.prompt}>
-          {prompt}
-        </AppText>
-
-        {!mineDone ? (
-          <>
-            <PromptShuffleButton
-              onPress={() => setPrompt(pickRandomPrompt())}
-            />
-            <AppTextInput
-              style={[
-                styles.input,
-                {
-                  backgroundColor: theme.colors.surface.input,
-                  borderColor: theme.colors.border.subtle,
-                  color: theme.colors.text.primary,
-                },
-              ]}
-              value={note}
-              onChangeText={onChangeNote}
-              placeholder="Optional note for your partner"
-              placeholderTextColor={theme.colors.text.muted}
-            />
-            <PrimaryButton
-              label="Send check-in"
-              onPress={handleSend}
-              loading={sending}
-            />
-          </>
+        {bothDone ? (
+          <View style={styles.doneBlock}>
+            <AppText variant="h2" style={styles.doneTitle}>
+              You're both here today
+            </AppText>
+            {checkIns?.mine?.note ? (
+              <AppText variant="body" color="secondary">
+                You: “{checkIns.mine.note}”
+              </AppText>
+            ) : null}
+            {checkIns?.partner?.note ? (
+              <AppText variant="bodySemibold" style={styles.partnerNote}>
+                Partner: “{checkIns.partner.note}”
+              </AppText>
+            ) : checkIns?.partner ? (
+              <AppText variant="body" color="secondary">
+                Your partner checked in — no note today.
+              </AppText>
+            ) : null}
+          </View>
         ) : (
-          <AppText variant="bodySemibold" color="success">
-            You checked in today
-            {checkIns?.mine?.note ? `: “${checkIns.mine.note}”` : ""}
-          </AppText>
+          <>
+            <AppText display variant="h2" style={styles.prompt}>
+              {prompt}
+            </AppText>
+            {!mineDone ? (
+              <>
+                <PromptShuffleButton
+                  onPress={() => setPrompt(pickRandomPrompt())}
+                />
+                <AppTextInput
+                  style={[
+                    styles.input,
+                    {
+                      backgroundColor: theme.colors.surface.input,
+                      borderColor: theme.colors.border.subtle,
+                      color: theme.colors.text.primary,
+                    },
+                  ]}
+                  value={note}
+                  onChangeText={onChangeNote}
+                  placeholder="Optional note for your partner"
+                  placeholderTextColor={theme.colors.text.muted}
+                />
+                <PrimaryButton
+                  label="Send check-in"
+                  onPress={handleSend}
+                  loading={sending}
+                />
+              </>
+            ) : (
+              <AppText variant="bodySemibold" color="success">
+                You checked in today
+                {checkIns?.mine?.note ? `: “${checkIns.mine.note}”` : ""}
+              </AppText>
+            )}
+          </>
         )}
 
         <View style={styles.progressTrack}>
@@ -116,7 +137,7 @@ export function CoupleProgressCard({
         </View>
         <AppText variant="caption" color="secondary" style={styles.status}>
           {bothDone
-            ? "100% complete — you're both here today"
+            ? "100% complete"
             : partnerDone
               ? "Partner checked in — your turn"
               : mineDone
@@ -138,6 +159,9 @@ const styles = StyleSheet.create({
     fontFamily: "Fraunces_600SemiBold",
     lineHeight: 28,
   },
+  doneBlock: { marginBottom: 8 },
+  doneTitle: { marginBottom: 10, fontFamily: "DMSans_700Bold" },
+  partnerNote: { marginTop: 8, fontFamily: "Fraunces_600SemiBold", lineHeight: 24 },
   input: {
     borderWidth: 1,
     borderRadius: 10,
