@@ -28,14 +28,15 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_users_relationship_max_two
     ON users (relationship_id, id)
     WHERE relationship_id IS NOT NULL;
 
--- Shared lists (trip itinerary + reunion bucket list)
+-- Shared lists (reunion bucket list + per-event visit plans)
 CREATE TABLE IF NOT EXISTS itinerary_items (
     id TEXT PRIMARY KEY,
     text TEXT NOT NULL,
     note TEXT,
-    list_type TEXT NOT NULL DEFAULT 'trip',
+    list_type TEXT NOT NULL DEFAULT 'reunion',
     relationship_id UUID REFERENCES relationships(id) ON DELETE CASCADE,
-    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CHECK (list_type IN ('reunion', 'visit'))
 );
 
 CREATE INDEX IF NOT EXISTS idx_itinerary_items_relationship
@@ -65,7 +66,7 @@ ALTER TABLE itinerary_items
     ADD COLUMN IF NOT EXISTS relationship_id UUID REFERENCES relationships(id) ON DELETE CASCADE;
 
 ALTER TABLE itinerary_items
-    ADD COLUMN IF NOT EXISTS list_type TEXT NOT NULL DEFAULT 'trip';
+    ADD COLUMN IF NOT EXISTS list_type TEXT NOT NULL DEFAULT 'reunion';
 
 ALTER TABLE itinerary_items
     ADD COLUMN IF NOT EXISTS note TEXT;
@@ -86,18 +87,28 @@ ALTER TABLE weekly_goals
 CREATE INDEX IF NOT EXISTS idx_weekly_goals_relationship_week
     ON weekly_goals (relationship_id, week_start);
 
--- Shared upcoming events (calendar v0)
+-- Shared upcoming events (shared calendar)
 CREATE TABLE IF NOT EXISTS shared_events (
     id TEXT PRIMARY KEY,
     relationship_id UUID NOT NULL REFERENCES relationships(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     event_at TIMESTAMPTZ NOT NULL,
+    start_at TIMESTAMPTZ NOT NULL,
+    end_at TIMESTAMPTZ NOT NULL,
+    all_day BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    description TEXT,
+    recurrence_rule TEXT,
+    color TEXT,
     owner_label TEXT,
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_shared_events_relationship
-    ON shared_events (relationship_id, event_at);
+    ON shared_events (relationship_id, start_at);
+
+CREATE INDEX IF NOT EXISTS idx_shared_events_range
+    ON shared_events (relationship_id, start_at, end_at);
 
 ALTER TABLE itinerary_items
     ADD COLUMN IF NOT EXISTS event_id TEXT REFERENCES shared_events(id) ON DELETE CASCADE;

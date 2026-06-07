@@ -34,10 +34,17 @@ type WeeklyGoal struct {
 }
 
 type SharedEvent struct {
-	ID         string  `json:"id"`
-	Title      string  `json:"title"`
-	EventAt    string  `json:"eventAt"`
-	OwnerLabel *string `json:"ownerLabel,omitempty"`
+	ID             string  `json:"id"`
+	Title          string  `json:"title"`
+	EventAt        string  `json:"eventAt"`
+	StartAt        string  `json:"startAt"`
+	EndAt          string  `json:"endAt"`
+	AllDay         bool    `json:"allDay"`
+	CreatedBy      *string `json:"createdBy,omitempty"`
+	Description    *string `json:"description,omitempty"`
+	RecurrenceRule *string `json:"recurrenceRule,omitempty"`
+	Color          *string `json:"color,omitempty"`
+	OwnerLabel     *string `json:"ownerLabel,omitempty"`
 }
 
 type User struct {
@@ -47,20 +54,14 @@ type User struct {
 	DisplayName    *string
 }
 
-type ConnectionStreak struct {
-	CurrentStreak int  `json:"currentStreak"`
-	LongestStreak int  `json:"longestStreak"`
-	BothCheckedIn bool `json:"bothCheckedInToday"`
-}
-
 type AsyncNote struct {
-	ID          string  `json:"id"`
-	TriggerType string  `json:"triggerType"`
+	ID           string  `json:"id"`
+	TriggerType  string  `json:"triggerType"`
 	TriggerValue *string `json:"triggerValue,omitempty"`
-	Body        string  `json:"body"`
-	IsMine      bool    `json:"isMine"`
-	OpenedAt    *string `json:"openedAt,omitempty"`
-	CreatedAt   string  `json:"createdAt"`
+	Body         string  `json:"body"`
+	IsMine       bool    `json:"isMine"`
+	OpenedAt     *string `json:"openedAt,omitempty"`
+	CreatedAt    string  `json:"createdAt"`
 }
 
 type WidgetSummary struct {

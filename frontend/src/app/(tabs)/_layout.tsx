@@ -88,8 +88,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="events"
         options={{
-          title: "Events",
-          tabBarLabel: "Events",
+          title: "Calendar",
+          tabBarLabel: "Calendar",
           tabBarIcon: ({ focused }) => (
             <TabEventsIcon
               color={focused ? colors.text.primary : colors.text.muted}

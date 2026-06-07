@@ -77,10 +77,12 @@ export default function StreakScreen() {
 
           <WeekStreakTracker
             currentStreak={count}
-            bothCheckedInToday={bothSent}
+            bothCompletedToday={bothSent}
           />
 
           <AppText variant="body" color="secondary" style={styles.copy}>
+            Send a photo together every day to keep your streak.
+            {" "}
             {bothSent
               ? "Nice work! You both sent today's photo."
               : count > 0

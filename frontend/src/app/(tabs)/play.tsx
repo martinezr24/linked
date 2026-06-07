@@ -13,9 +13,12 @@ import { queryKeys } from "@/api/queryKeys";
 import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
+import { CoupleProgressCard } from "@/components/ui/CoupleProgressCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
+import { useDailyCheckIn } from "@/hooks/useDailyCheckIn";
 import { useRelationship } from "@/context/RelationshipContext";
+import { getDeviceTimezoneLabel } from "@/utils/dates";
 import { apiFetch } from "@/utils/api";
 import { showMutationError } from "@/utils/errors";
 import { useTheme } from "@/theme/useTheme";
@@ -41,6 +44,15 @@ export default function PlayScreen() {
   const theme = useTheme();
   const { deviceId } = useRelationship();
   const queryClient = useQueryClient();
+  const tzLabel = getDeviceTimezoneLabel();
+  const {
+    checkIns,
+    note,
+    setNote,
+    sendCheckIn,
+    sending,
+    isLoading: checkInLoading,
+  } = useDailyCheckIn();
   const [prompt, setPrompt] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState(0);
@@ -132,8 +144,19 @@ export default function PlayScreen() {
             Play
           </AppText>
           <AppText variant="body" color="secondary" style={styles.sub}>
-            Low-pressure trivia — take turns writing questions for each other.
+            Quick connection rituals and trivia.
           </AppText>
+
+          {!checkInLoading ? (
+            <CoupleProgressCard
+              checkIns={checkIns}
+              note={note}
+              onChangeNote={setNote}
+              onSend={sendCheckIn}
+              sending={sending}
+              tzLabel={tzLabel}
+            />
+          ) : null}
 
           {isLoading ? (
             <ActivityIndicator color={theme.colors.accent.primary} />

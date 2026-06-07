@@ -188,10 +188,17 @@ export default function SettingsScreen() {
             />
           </ArtifactCard>
 
+          <ArtifactCard category="Daily rhythm" title="Photo streak">
+            <AppText variant="body" color="secondary">
+              Both partners must send a daily photo to grow your streak. Resets
+              at midnight in your device timezone ({tzLabel}).
+            </AppText>
+          </ArtifactCard>
+
           <ArtifactCard category="Daily rhythm" title="Check-ins">
             <AppText variant="body" color="secondary">
-              Check-ins reset at midnight in your device timezone ({tzLabel}).
-              Photo streaks count when you both send a daily photo.
+              Optional connection prompts live in Play. They do not affect your
+              photo streak.
             </AppText>
           </ArtifactCard>
 

@@ -9,7 +9,7 @@ const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
 type Props = {
   currentStreak: number;
-  bothCheckedInToday: boolean;
+  bothCompletedToday: boolean;
 };
 
 /** Approximates week progress from streak count until history API exists. */
@@ -29,9 +29,9 @@ function buildWeekState(currentStreak: number, bothToday: boolean): boolean[] {
   return completed;
 }
 
-export function WeekStreakTracker({ currentStreak, bothCheckedInToday }: Props) {
+export function WeekStreakTracker({ currentStreak, bothCompletedToday }: Props) {
   const theme = useTheme();
-  const week = buildWeekState(currentStreak, bothCheckedInToday);
+  const week = buildWeekState(currentStreak, bothCompletedToday);
   const completedIndices = week
     .map((done, i) => (done ? i : -1))
     .filter((i) => i >= 0);

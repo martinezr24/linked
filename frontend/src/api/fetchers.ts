@@ -1,11 +1,9 @@
 import { apiFetch } from "@/utils/api";
 import type {
   AsyncNote,
-  ConnectionStreak,
   ListItem,
   PartnerPresence,
   PhotoDayGroup,
-  PhotoStreak,
   PhotoToday,
   SharedEvent,
   TodayCheckIns,
@@ -26,29 +24,50 @@ export async function fetchGoals(deviceId: string) {
   return Array.isArray(data) ? data : [];
 }
 
-export async function fetchEvents(deviceId: string) {
-  const res = await apiFetch("/api/events", deviceId);
+export async function fetchEvents(
+  deviceId: string,
+  range?: { start: string; end: string },
+) {
+  const q = range
+    ? `?start=${encodeURIComponent(range.start)}&end=${encodeURIComponent(range.end)}`
+    : "";
+  const res = await apiFetch(`/api/events${q}`, deviceId);
   if (!res.ok) throw new Error("Failed to load events");
   const data: SharedEvent[] = await res.json();
   return Array.isArray(data) ? data : [];
+}
+
+export async function createEvent(deviceId: string, ev: SharedEvent) {
+  const res = await apiFetch("/api/events", deviceId, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ev),
+  });
+  if (!res.ok) throw new Error("Failed to add event");
+  return res.json() as Promise<SharedEvent>;
+}
+
+export async function updateEvent(deviceId: string, ev: SharedEvent) {
+  const res = await apiFetch(`/api/events/${encodeURIComponent(ev.id)}`, deviceId, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(ev),
+  });
+  if (!res.ok) throw new Error("Failed to update event");
+  return res.json() as Promise<SharedEvent>;
+}
+
+export async function deleteEvent(deviceId: string, id: string) {
+  const res = await apiFetch(`/api/events/${encodeURIComponent(id)}`, deviceId, {
+    method: "DELETE",
+  });
+  if (!res.ok) throw new Error("Failed to delete event");
 }
 
 export async function fetchCheckIns(deviceId: string) {
   const res = await apiFetch("/api/checkins/today", deviceId);
   if (!res.ok) throw new Error("Failed to load check-ins");
   return res.json() as Promise<TodayCheckIns>;
-}
-
-export async function fetchStreak(deviceId: string) {
-  const res = await apiFetch("/api/checkins/streak", deviceId);
-  if (!res.ok) throw new Error("Failed to load streak");
-  return res.json() as Promise<ConnectionStreak>;
-}
-
-export async function fetchPhotoStreak(deviceId: string) {
-  const res = await apiFetch("/api/photos/streak", deviceId);
-  if (!res.ok) throw new Error("Failed to load photo streak");
-  return res.json() as Promise<PhotoStreak>;
 }
 
 export async function fetchPhotoToday(deviceId: string) {

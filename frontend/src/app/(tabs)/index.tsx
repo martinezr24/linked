@@ -1,9 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  Keyboard,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   TouchableOpacity,
@@ -30,12 +28,9 @@ import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { TreatsModal } from "@/components/treats/TreatsModal";
 import { ConnectedHeader } from "@/components/ui/ConnectedHeader";
 import { TreatButton } from "@/components/ui/TreatButton";
-import { CoupleProgressCard } from "@/components/ui/CoupleProgressCard";
-import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
 import {
-  fetchCheckIns,
   fetchEvents,
   fetchGoals,
   fetchRelationship,
@@ -49,7 +44,6 @@ import {
   getDeviceTimezoneLabel,
 } from "@/utils/dates";
 import { showMutationError } from "@/utils/errors";
-import { hapticSuccess } from "@/utils/haptics";
 import { useTheme } from "@/theme/useTheme";
 import type { SharedEvent } from "@/types";
 
@@ -78,10 +72,11 @@ function countdownDays(targetIso: string): string {
 function nextUpcomingEvent(events: SharedEvent[]): SharedEvent | null {
   const now = Date.now();
   const upcoming = events
-    .filter((e) => new Date(e.eventAt).getTime() >= now)
+    .filter((e) => new Date(e.startAt || e.eventAt).getTime() >= now)
     .sort(
       (a, b) =>
-        new Date(a.eventAt).getTime() - new Date(b.eventAt).getTime(),
+        new Date(a.startAt || a.eventAt).getTime() -
+        new Date(b.startAt || b.eventAt).getTime(),
     );
   return upcoming[0] ?? null;
 }
@@ -96,7 +91,6 @@ export default function HomeScreen() {
   const queryClient = useQueryClient();
   const [visitDraft, setVisitDraft] = useState<Date | null>(null);
   const [visitSheetOpen, setVisitSheetOpen] = useState(false);
-  const [checkInNote, setCheckInNote] = useState("");
   const [goalsExpanded, setGoalsExpanded] = useState(false);
   const [treatsOpen, setTreatsOpen] = useState(false);
   const tzLabel = getDeviceTimezoneLabel();
@@ -122,13 +116,7 @@ export default function HomeScreen() {
     enabled,
   });
 
-  const { data: checkIns, isLoading: checkInsLoading } = useQuery({
-    queryKey: queryKeys.checkIns,
-    queryFn: () => fetchCheckIns(deviceId!),
-    enabled,
-  });
-
-  const { data: photoToday } = useQuery({
+  const { data: photoToday, isLoading: photoLoading } = useQuery({
     queryKey: queryKeys.photoToday,
     queryFn: () => fetchPhotoToday(deviceId!),
     enabled,
@@ -136,7 +124,7 @@ export default function HomeScreen() {
 
   const nextVisitAt = relationship?.nextVisitAt ?? null;
   const loading =
-    relLoading || goalsLoading || eventsLoading || checkInsLoading;
+    relLoading || goalsLoading || eventsLoading || photoLoading;
 
   const invalidateRelationship = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.relationship });
@@ -175,29 +163,9 @@ export default function HomeScreen() {
     onError: () => showMutationError("Could not clear visit date."),
   });
 
-  const sendCheckIn = useMutation({
-    mutationFn: async (note: string) => {
-      const res = await apiFetch("/api/checkins/today", deviceId!, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note: note || undefined }),
-      });
-      if (!res.ok) throw new Error("Failed to check in");
-    },
-    onSuccess: () => {
-      setCheckInNote("");
-      void hapticSuccess();
-      void queryClient.invalidateQueries({ queryKey: queryKeys.checkIns });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.streak });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.widgetSummary });
-    },
-    onError: () => showMutationError("Could not send check-in."),
-  });
-
   const upcoming = nextUpcomingEvent(events);
   const streakCount = photoToday?.currentStreak ?? 0;
-  const bothCheckedInToday =
-    Boolean(checkIns?.mine) && Boolean(checkIns?.partner);
+  const bothSentPhotoToday = photoToday?.bothSentToday ?? false;
 
   useEffect(() => {
     if (goals.length > 0) setGoalsExpanded(true);
@@ -221,8 +189,8 @@ export default function HomeScreen() {
             streakCount={streakCount}
             mineInitial={initialFromName(mineName, "M")}
             partnerInitial={initialFromName(partnerName, "Y")}
-            mineCheckedIn={Boolean(checkIns?.mine)}
-            partnerCheckedIn={Boolean(checkIns?.partner)}
+            minePhotoSent={Boolean(photoToday?.mine)}
+            partnerPhotoSent={Boolean(photoToday?.partner)}
             headerRight={
               <TreatButton onPress={() => setTreatsOpen(true)} />
             }
@@ -243,7 +211,7 @@ export default function HomeScreen() {
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
           >
-            {bothCheckedInToday ? (
+            {bothSentPhotoToday ? (
               <View
                 style={[
                   styles.celebration,
@@ -254,23 +222,14 @@ export default function HomeScreen() {
                 ]}
               >
                 <AppText variant="bodySemibold" color="accent">
-                  Both checked in today — your connection is strong.
+                  Both sent today's photo — streak secured!
                 </AppText>
               </View>
             ) : null}
 
-            <PartnerPresenceCard />
-
             <DailyPhotoCard />
 
-            <CoupleProgressCard
-              checkIns={checkIns}
-              note={checkInNote}
-              onChangeNote={setCheckInNote}
-              onSend={() => sendCheckIn.mutate(checkInNote.trim())}
-              sending={sendCheckIn.isPending}
-              tzLabel={tzLabel}
-            />
+            <PartnerPresenceCard />
 
             <VisitCountdownHero
               nextVisitAt={nextVisitAt}
@@ -289,7 +248,7 @@ export default function HomeScreen() {
                     params: {
                       eventId: upcoming.id,
                       title: upcoming.title,
-                      eventAt: upcoming.eventAt,
+                      eventAt: upcoming.startAt || upcoming.eventAt,
                     },
                   })
                 }
@@ -298,7 +257,7 @@ export default function HomeScreen() {
                   UPCOMING EVENT
                 </AppText>
                 <AppText variant="bodySemibold" color="accent">
-                  {upcoming.title} · {formatMMDDYYYY(upcoming.eventAt)}
+                  {upcoming.title} · {formatMMDDYYYY(upcoming.startAt || upcoming.eventAt)}
                 </AppText>
               </TouchableOpacity>
             ) : null}
@@ -325,7 +284,7 @@ export default function HomeScreen() {
                   Shared lists
                 </AppText>
                 <AppText variant="body" color="muted" numberOfLines={2}>
-                  Trip & reunion →
+                  Together ideas →
                 </AppText>
               </TouchableOpacity>
             </View>

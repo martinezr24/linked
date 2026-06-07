@@ -1,4 +1,4 @@
-export type ListType = "trip" | "reunion" | "visit";
+export type ListType = "reunion" | "visit";
 
 export type ListItem = {
   id: string;
@@ -19,6 +19,13 @@ export type SharedEvent = {
   id: string;
   title: string;
   eventAt: string;
+  startAt: string;
+  endAt: string;
+  allDay: boolean;
+  createdBy?: string;
+  description?: string;
+  recurrenceRule?: string;
+  color?: string;
   ownerLabel?: string;
 };
 
@@ -33,18 +40,6 @@ export type CheckIn = {
 export type TodayCheckIns = {
   mine: CheckIn | null;
   partner: CheckIn | null;
-};
-
-export type ConnectionStreak = {
-  currentStreak: number;
-  longestStreak: number;
-  bothCheckedInToday: boolean;
-};
-
-export type PhotoStreak = {
-  currentStreak: number;
-  longestStreak: number;
-  bothSentToday: boolean;
 };
 
 export type DailyPhoto = {

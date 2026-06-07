@@ -36,7 +36,6 @@ export function DailyPhotoCard() {
     onSuccess: () => {
       setCaption(pickRandomCaption());
       void queryClient.invalidateQueries({ queryKey: queryKeys.photoToday });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.photoStreak });
       void queryClient.invalidateQueries({ queryKey: queryKeys.widgetSummary });
       void queryClient.invalidateQueries({ queryKey: queryKeys.photoHistory() });
     },

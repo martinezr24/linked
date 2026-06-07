@@ -11,8 +11,8 @@ type Props = {
   streakCount: number;
   mineInitial?: string;
   partnerInitial?: string;
-  partnerCheckedIn?: boolean;
-  mineCheckedIn?: boolean;
+  partnerPhotoSent?: boolean;
+  minePhotoSent?: boolean;
   headerRight?: ReactNode;
 };
 
@@ -54,8 +54,8 @@ export function ConnectedHeader({
   streakCount,
   mineInitial = "M",
   partnerInitial = "Y",
-  partnerCheckedIn,
-  mineCheckedIn,
+  partnerPhotoSent,
+  minePhotoSent,
   headerRight,
 }: Props) {
   return (
@@ -65,13 +65,13 @@ export function ConnectedHeader({
         <View style={styles.avatars}>
           <AvatarCircle
             initial={mineInitial.slice(0, 1).toUpperCase()}
-            checkedIn={mineCheckedIn}
+            checkedIn={minePhotoSent}
             variant="mine"
           />
           <ConnectionLink length={36} showBow />
           <AvatarCircle
             initial={partnerInitial.slice(0, 1).toUpperCase()}
-            checkedIn={partnerCheckedIn}
+            checkedIn={partnerPhotoSent}
             variant="partner"
           />
         </View>

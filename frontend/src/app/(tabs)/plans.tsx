@@ -20,14 +20,8 @@ export default function PlansScreen() {
               Plans
             </AppText>
             <AppText variant="body" color="secondary" style={styles.subtitle}>
-              Ideas for your next trip and things to do when you're together.
+              A shared bucket list for your next reunion.
             </AppText>
-
-            <SharedListSection
-              listType="trip"
-              title="Trip itinerary"
-              placeholder="Add a trip plan..."
-            />
 
             <SharedListSection
               listType="reunion"

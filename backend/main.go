@@ -65,16 +65,17 @@ type WeeklyGoal struct {
 }
 
 type SharedEvent struct {
-	ID         string  `json:"id"`
-	Title      string  `json:"title"`
-	EventAt    string  `json:"eventAt"`
-	OwnerLabel *string `json:"ownerLabel,omitempty"`
-}
-
-type ConnectionStreak struct {
-	CurrentStreak      int  `json:"currentStreak"`
-	LongestStreak      int  `json:"longestStreak"`
-	BothCheckedInToday bool `json:"bothCheckedInToday"`
+	ID             string  `json:"id"`
+	Title          string  `json:"title"`
+	EventAt        string  `json:"eventAt"`
+	StartAt        string  `json:"startAt"`
+	EndAt          string  `json:"endAt"`
+	AllDay         bool    `json:"allDay"`
+	CreatedBy      *string `json:"createdBy,omitempty"`
+	Description    *string `json:"description,omitempty"`
+	RecurrenceRule *string `json:"recurrenceRule,omitempty"`
+	Color          *string `json:"color,omitempty"`
+	OwnerLabel     *string `json:"ownerLabel,omitempty"`
 }
 
 type AsyncNote struct {
@@ -226,14 +227,14 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func normalizeListType(listType string) string {
+func normalizeListType(listType string) (string, bool) {
 	switch listType {
 	case "reunion":
-		return "reunion"
+		return "reunion", true
 	case "visit":
-		return "visit"
+		return "visit", true
 	default:
-		return "trip"
+		return "", false
 	}
 }
 
@@ -317,7 +318,11 @@ func handleGetList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	listType := normalizeListType(r.URL.Query().Get("type"))
+	listType, ok := normalizeListType(r.URL.Query().Get("type"))
+	if !ok {
+		http.Error(w, "invalid list type", http.StatusBadRequest)
+		return
+	}
 	eventID := r.URL.Query().Get("eventId")
 	if listType == "visit" && eventID == "" {
 		http.Error(w, "eventId required for visit list", http.StatusBadRequest)
@@ -332,7 +337,10 @@ func handleGetList(w http.ResponseWriter, r *http.Request) {
 }
 
 func insertListItem(relationshipID string, item ListItem) error {
-	listType := normalizeListType(item.ListType)
+	listType, ok := normalizeListType(item.ListType)
+	if !ok {
+		return fmt.Errorf("invalid list type")
+	}
 	var note interface{}
 	if item.Note != nil {
 		note = *item.Note
@@ -351,7 +359,11 @@ func insertListItem(relationshipID string, item ListItem) error {
 }
 
 func deleteListItem(relationshipID, itemID, listType string, eventID *string) error {
-	listType = normalizeListType(listType)
+	normalized, ok := normalizeListType(listType)
+	if !ok {
+		return fmt.Errorf("invalid list type")
+	}
+	listType = normalized
 	if listType == "visit" && eventID != nil {
 		_, err := db.Exec(
 			`DELETE FROM itinerary_items WHERE id = $1 AND relationship_id = $2 AND list_type = $3 AND event_id = $4`,
@@ -397,7 +409,11 @@ func handlePostListItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "id and text required", http.StatusBadRequest)
 		return
 	}
-	listType := normalizeListType(item.ListType)
+	listType, ok := normalizeListType(item.ListType)
+	if !ok {
+		http.Error(w, "invalid list type", http.StatusBadRequest)
+		return
+	}
 	if listType == "visit" && (item.EventID == nil || *item.EventID == "") {
 		http.Error(w, "eventId required for visit list", http.StatusBadRequest)
 		return
@@ -442,7 +458,11 @@ func handleDeleteListItem(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing item id", http.StatusBadRequest)
 		return
 	}
-	listType := normalizeListType(r.URL.Query().Get("type"))
+	listType, okType := normalizeListType(r.URL.Query().Get("type"))
+	if !okType {
+		http.Error(w, "invalid list type", http.StatusBadRequest)
+		return
+	}
 	var eventID *string
 	if e := r.URL.Query().Get("eventId"); e != "" {
 		eventID = &e
@@ -472,15 +492,6 @@ func handleListItems(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-}
-
-func handleGetItinerary(w http.ResponseWriter, r *http.Request) {
-	q := r.URL.Query()
-	if q.Get("type") == "" {
-		q.Set("type", "trip")
-	}
-	r.URL.RawQuery = q.Encode()
-	handleGetList(w, r)
 }
 
 func listCurrentWeeklyGoals(relationshipID string) ([]WeeklyGoal, error) {
@@ -742,6 +753,138 @@ func handlePutRelationshipVisit(w http.ResponseWriter, r *http.Request) {
 	broadcastServerEvent(relationshipID, "SYNC_RELATIONSHIP", map[string]any{"relationshipId": relationshipID})
 }
 
+const sharedEventSelect = `id, title, start_at, end_at, all_day, created_by::text, description, recurrence_rule, color, owner_label, event_at`
+
+func finishSharedEvent(ev *SharedEvent, startAt, endAt time.Time, allDay bool, createdBy, description, recurrenceRule, color, owner sql.NullString) {
+	ev.StartAt = startAt.UTC().Format(time.RFC3339)
+	ev.EndAt = endAt.UTC().Format(time.RFC3339)
+	ev.EventAt = ev.StartAt
+	ev.AllDay = allDay
+	if createdBy.Valid {
+		s := createdBy.String
+		ev.CreatedBy = &s
+	}
+	if description.Valid {
+		s := description.String
+		ev.Description = &s
+	}
+	if recurrenceRule.Valid {
+		s := recurrenceRule.String
+		ev.RecurrenceRule = &s
+	}
+	if color.Valid {
+		s := color.String
+		ev.Color = &s
+	}
+	if owner.Valid {
+		s := owner.String
+		ev.OwnerLabel = &s
+	}
+}
+
+func scanSharedEventRow(rows *sql.Rows) (SharedEvent, error) {
+	var ev SharedEvent
+	var startAt, endAt, legacyAt time.Time
+	var allDay bool
+	var createdBy, description, recurrenceRule, color, owner sql.NullString
+	if err := rows.Scan(
+		&ev.ID, &ev.Title, &startAt, &endAt, &allDay,
+		&createdBy, &description, &recurrenceRule, &color, &owner, &legacyAt,
+	); err != nil {
+		return ev, err
+	}
+	if startAt.IsZero() && !legacyAt.IsZero() {
+		startAt = legacyAt
+	}
+	if endAt.IsZero() {
+		endAt = startAt
+	}
+	finishSharedEvent(&ev, startAt, endAt, allDay, createdBy, description, recurrenceRule, color, owner)
+	return ev, nil
+}
+
+func querySharedEvent(relationshipID, eventID string) (SharedEvent, error) {
+	var ev SharedEvent
+	var startAt, endAt, legacyAt time.Time
+	var allDay bool
+	var createdBy, description, recurrenceRule, color, owner sql.NullString
+	err := db.QueryRow(
+		`SELECT `+sharedEventSelect+` FROM shared_events WHERE id = $1 AND relationship_id = $2`,
+		eventID, relationshipID,
+	).Scan(
+		&ev.ID, &ev.Title, &startAt, &endAt, &allDay,
+		&createdBy, &description, &recurrenceRule, &color, &owner, &legacyAt,
+	)
+	if err != nil {
+		return ev, err
+	}
+	if startAt.IsZero() && !legacyAt.IsZero() {
+		startAt = legacyAt
+	}
+	if endAt.IsZero() {
+		endAt = startAt
+	}
+	finishSharedEvent(&ev, startAt, endAt, allDay, createdBy, description, recurrenceRule, color, owner)
+	return ev, nil
+}
+
+func parseDateParam(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, fmt.Errorf("empty date")
+	}
+	if t, err := time.Parse("2006-01-02", s); err == nil {
+		return t.UTC(), nil
+	}
+	return time.Parse(time.RFC3339, s)
+}
+
+func eventRangeFromRequest(r *http.Request) (time.Time, time.Time, bool, error) {
+	startParam := strings.TrimSpace(r.URL.Query().Get("start"))
+	endParam := strings.TrimSpace(r.URL.Query().Get("end"))
+	if startParam != "" && endParam != "" {
+		start, err := parseDateParam(startParam)
+		if err != nil {
+			return time.Time{}, time.Time{}, false, err
+		}
+		endDay, err := parseDateParam(endParam)
+		if err != nil {
+			return time.Time{}, time.Time{}, false, err
+		}
+		end := endDay.Add(24*time.Hour - time.Nanosecond)
+		return start, end, true, nil
+	}
+	return time.Time{}, time.Time{}, false, nil
+}
+
+func resolveEventTimes(ev SharedEvent) (time.Time, time.Time, bool, error) {
+	startRaw := strings.TrimSpace(ev.StartAt)
+	if startRaw == "" {
+		startRaw = strings.TrimSpace(ev.EventAt)
+	}
+	if startRaw == "" {
+		return time.Time{}, time.Time{}, false, fmt.Errorf("startAt required")
+	}
+	start, err := time.Parse(time.RFC3339, startRaw)
+	if err != nil {
+		return time.Time{}, time.Time{}, false, fmt.Errorf("invalid startAt")
+	}
+	endRaw := strings.TrimSpace(ev.EndAt)
+	var end time.Time
+	if endRaw == "" {
+		end = start
+	} else {
+		end, err = time.Parse(time.RFC3339, endRaw)
+		if err != nil {
+			return time.Time{}, time.Time{}, false, fmt.Errorf("invalid endAt")
+		}
+	}
+	if end.Before(start) {
+		return time.Time{}, time.Time{}, false, fmt.Errorf("endAt before startAt")
+	}
+	return start, end, ev.AllDay, nil
+}
+
 func handleGetEvents(w http.ResponseWriter, r *http.Request) {
 	if applyCORS(w, r) {
 		return
@@ -760,11 +903,27 @@ func handleGetEvents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rows, err := db.Query(
-		`SELECT id, title, event_at, owner_label FROM shared_events
-         WHERE relationship_id = $1 ORDER BY event_at ASC`,
-		relationshipID,
-	)
+	rangeStart, rangeEnd, hasRange, err := eventRangeFromRequest(r)
+	if err != nil {
+		http.Error(w, "invalid date range", http.StatusBadRequest)
+		return
+	}
+
+	var rows *sql.Rows
+	if hasRange {
+		rows, err = db.Query(
+			`SELECT `+sharedEventSelect+` FROM shared_events
+             WHERE relationship_id = $1 AND start_at <= $3 AND end_at >= $2
+             ORDER BY start_at ASC`,
+			relationshipID, rangeStart, rangeEnd,
+		)
+	} else {
+		rows, err = db.Query(
+			`SELECT `+sharedEventSelect+` FROM shared_events
+             WHERE relationship_id = $1 ORDER BY start_at ASC`,
+			relationshipID,
+		)
+	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -773,15 +932,8 @@ func handleGetEvents(w http.ResponseWriter, r *http.Request) {
 
 	events := []SharedEvent{}
 	for rows.Next() {
-		var ev SharedEvent
-		var at time.Time
-		var owner sql.NullString
-		if err := rows.Scan(&ev.ID, &ev.Title, &at, &owner); err == nil {
-			ev.EventAt = at.UTC().Format(time.RFC3339)
-			if owner.Valid {
-				o := owner.String
-				ev.OwnerLabel = &o
-			}
+		ev, scanErr := scanSharedEventRow(rows)
+		if scanErr == nil {
 			events = append(events, ev)
 		}
 	}
@@ -800,41 +952,69 @@ func handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	relationshipID, err := getRelationshipIDForDevice(deviceID)
-	if err != nil {
-		if errors.Is(err, errNotPaired) {
+	user, err := getOrCreateUser(deviceID)
+	if err != nil || user.RelationshipID == nil {
+		if err == nil {
 			http.Error(w, "not paired", http.StatusForbidden)
 			return
 		}
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
+	relationshipID := *user.RelationshipID
 
 	var ev SharedEvent
 	if err := json.NewDecoder(r.Body).Decode(&ev); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
 		return
 	}
-	t, err := time.Parse(time.RFC3339, ev.EventAt)
-	if err != nil {
-		http.Error(w, "invalid eventAt", http.StatusBadRequest)
+	if strings.TrimSpace(ev.Title) == "" || strings.TrimSpace(ev.ID) == "" {
+		http.Error(w, "id and title required", http.StatusBadRequest)
 		return
 	}
-	var owner interface{}
+	start, end, allDay, err := resolveEventTimes(ev)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var owner, description, recurrenceRule, color interface{}
 	if ev.OwnerLabel != nil {
 		owner = *ev.OwnerLabel
 	}
+	if ev.Description != nil {
+		description = *ev.Description
+	}
+	if ev.RecurrenceRule != nil {
+		recurrenceRule = *ev.RecurrenceRule
+	}
+	if ev.Color != nil {
+		color = *ev.Color
+	}
 	_, err = db.Exec(
-		`INSERT INTO shared_events (id, relationship_id, title, event_at, owner_label)
-         VALUES ($1, $2, $3, $4, $5)`,
-		ev.ID, relationshipID, ev.Title, t, owner,
+		`INSERT INTO shared_events (
+            id, relationship_id, title, event_at, start_at, end_at, all_day,
+            created_by, description, recurrence_rule, color, owner_label
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+		ev.ID, relationshipID, ev.Title, start, start, end, allDay,
+		user.ID, description, recurrenceRule, color, owner,
 	)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(ev)
+	created, err := querySharedEvent(relationshipID, ev.ID)
+	if err != nil {
+		w.WriteHeader(http.StatusCreated)
+		ev.StartAt = start.UTC().Format(time.RFC3339)
+		ev.EndAt = end.UTC().Format(time.RFC3339)
+		ev.EventAt = ev.StartAt
+		ev.AllDay = allDay
+		ev.CreatedBy = &user.ID
+		json.NewEncoder(w).Encode(ev)
+	} else {
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(created)
+	}
 	broadcastServerEvent(relationshipID, "SYNC_EVENTS", map[string]any{"relationshipId": relationshipID})
 }
 
@@ -882,11 +1062,134 @@ func handleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleEventByID(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodDelete {
+	switch r.Method {
+	case http.MethodDelete:
 		handleDeleteEvent(w, r)
+	case http.MethodPatch:
+		handlePatchEvent(w, r)
+	default:
+		handleGetEvent(w, r)
+	}
+}
+
+func handlePatchEvent(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
 		return
 	}
-	handleGetEvent(w, r)
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+	relationshipID, err := getRelationshipIDForDevice(deviceID)
+	if err != nil {
+		if errors.Is(err, errNotPaired) {
+			http.Error(w, "not paired", http.StatusForbidden)
+			return
+		}
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	eventID := strings.TrimPrefix(r.URL.Path, "/api/events/")
+	if eventID == "" || strings.Contains(eventID, "/") {
+		http.Error(w, "missing event id", http.StatusBadRequest)
+		return
+	}
+
+	existing, err := querySharedEvent(relationshipID, eventID)
+	if err == sql.ErrNoRows {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	var patch SharedEvent
+	if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	if strings.TrimSpace(patch.Title) != "" {
+		existing.Title = strings.TrimSpace(patch.Title)
+	}
+	if patch.StartAt != "" || patch.EventAt != "" {
+		patch.ID = existing.ID
+		patch.Title = existing.Title
+		if patch.EndAt == "" {
+			patch.EndAt = existing.EndAt
+		}
+		if !patch.AllDay {
+			patch.AllDay = existing.AllDay
+		}
+		start, end, allDay, timeErr := resolveEventTimes(patch)
+		if timeErr != nil {
+			http.Error(w, timeErr.Error(), http.StatusBadRequest)
+			return
+		}
+		existing.StartAt = start.UTC().Format(time.RFC3339)
+		existing.EndAt = end.UTC().Format(time.RFC3339)
+		existing.EventAt = existing.StartAt
+		existing.AllDay = allDay
+	} else if patch.EndAt != "" {
+		end, timeErr := time.Parse(time.RFC3339, patch.EndAt)
+		if timeErr != nil {
+			http.Error(w, "invalid endAt", http.StatusBadRequest)
+			return
+		}
+		start, _, _, _ := resolveEventTimes(existing)
+		if end.Before(start) {
+			http.Error(w, "endAt before startAt", http.StatusBadRequest)
+			return
+		}
+		existing.EndAt = end.UTC().Format(time.RFC3339)
+	}
+	if patch.OwnerLabel != nil {
+		existing.OwnerLabel = patch.OwnerLabel
+	}
+	if patch.Description != nil {
+		existing.Description = patch.Description
+	}
+	if patch.RecurrenceRule != nil {
+		existing.RecurrenceRule = patch.RecurrenceRule
+	}
+	if patch.Color != nil {
+		existing.Color = patch.Color
+	}
+
+	start, end, allDay, err := resolveEventTimes(existing)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	var owner, description, recurrenceRule, color interface{}
+	if existing.OwnerLabel != nil {
+		owner = *existing.OwnerLabel
+	}
+	if existing.Description != nil {
+		description = *existing.Description
+	}
+	if existing.RecurrenceRule != nil {
+		recurrenceRule = *existing.RecurrenceRule
+	}
+	if existing.Color != nil {
+		color = *existing.Color
+	}
+	_, err = db.Exec(
+		`UPDATE shared_events SET title = $1, event_at = $2, start_at = $3, end_at = $4,
+            all_day = $5, description = $6, recurrence_rule = $7, color = $8, owner_label = $9
+         WHERE id = $10 AND relationship_id = $11`,
+		existing.Title, start, start, end, allDay,
+		description, recurrenceRule, color, owner, eventID, relationshipID,
+	)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	updated, _ := querySharedEvent(relationshipID, eventID)
+	json.NewEncoder(w).Encode(updated)
+	broadcastServerEvent(relationshipID, "SYNC_EVENTS", map[string]any{"relationshipId": relationshipID})
 }
 
 func handleGetEvent(w http.ResponseWriter, r *http.Request) {
@@ -913,14 +1216,7 @@ func handleGetEvent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var ev SharedEvent
-	var at time.Time
-	var owner sql.NullString
-	err = db.QueryRow(
-		`SELECT id, title, event_at, owner_label FROM shared_events
-         WHERE id = $1 AND relationship_id = $2`,
-		eventID, relationshipID,
-	).Scan(&ev.ID, &ev.Title, &at, &owner)
+	ev, err := querySharedEvent(relationshipID, eventID)
 	if err == sql.ErrNoRows {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
@@ -928,11 +1224,6 @@ func handleGetEvent(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
-	}
-	ev.EventAt = at.UTC().Format(time.RFC3339)
-	if owner.Valid {
-		o := owner.String
-		ev.OwnerLabel = &o
 	}
 	json.NewEncoder(w).Encode(ev)
 }
@@ -1050,104 +1341,6 @@ func previousDateString(dateStr string) (string, error) {
 		return "", err
 	}
 	return t.AddDate(0, 0, -1).Format("2006-01-02"), nil
-}
-
-func computeConnectionStreak(relationshipID, today string) (ConnectionStreak, error) {
-	rows, err := db.Query(
-		`SELECT check_date, COUNT(DISTINCT user_id) AS user_count
-         FROM daily_checkins
-         WHERE relationship_id = $1
-         GROUP BY check_date
-         ORDER BY check_date ASC`,
-		relationshipID,
-	)
-	if err != nil {
-		return ConnectionStreak{}, err
-	}
-	defer rows.Close()
-
-	bothDays := make(map[string]bool)
-	var bothDates []string
-	for rows.Next() {
-		var checkDate time.Time
-		var count int
-		if err := rows.Scan(&checkDate, &count); err != nil {
-			continue
-		}
-		if count < 2 {
-			continue
-		}
-		ds := dateStringFromCheckDate(checkDate)
-		bothDays[ds] = true
-		bothDates = append(bothDates, ds)
-	}
-
-	todayBoth := bothDays[today]
-
-	current := 0
-	expected := today
-	for bothDays[expected] {
-		current++
-		prev, err := previousDateString(expected)
-		if err != nil {
-			break
-		}
-		expected = prev
-	}
-
-	longest := 0
-	if len(bothDates) > 0 {
-		run := 1
-		longest = 1
-		for i := 1; i < len(bothDates); i++ {
-			prev, err1 := time.Parse("2006-01-02", bothDates[i-1])
-			curr, err2 := time.Parse("2006-01-02", bothDates[i])
-			if err1 != nil || err2 != nil {
-				run = 1
-				continue
-			}
-			if curr.Equal(prev.AddDate(0, 0, 1)) {
-				run++
-			} else {
-				run = 1
-			}
-			if run > longest {
-				longest = run
-			}
-		}
-	}
-
-	return ConnectionStreak{
-		CurrentStreak:      current,
-		LongestStreak:      longest,
-		BothCheckedInToday: todayBoth,
-	}, nil
-}
-
-func handleGetStreak(w http.ResponseWriter, r *http.Request) {
-	if applyCORS(w, r) {
-		return
-	}
-	deviceID, ok := requireDeviceID(w, r)
-	if !ok {
-		return
-	}
-	relationshipID, err := getRelationshipIDForDevice(deviceID)
-	if err != nil {
-		if errors.Is(err, errNotPaired) {
-			http.Error(w, "not paired", http.StatusForbidden)
-			return
-		}
-		http.Error(w, "db error", http.StatusInternalServerError)
-		return
-	}
-	today := clientLocalDate(r)
-	streak, err := computeConnectionStreak(relationshipID, today)
-	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(streak)
 }
 
 func asyncNoteUnlocked(lockType string, opensAt sql.NullTime, opened sql.NullTime, now time.Time) bool {
@@ -1464,9 +1657,9 @@ func handleWidgetSummary(w http.ResponseWriter, r *http.Request) {
 	var evTitle sql.NullString
 	var evAt sql.NullTime
 	err = db.QueryRow(
-		`SELECT title, event_at FROM shared_events
-         WHERE relationship_id = $1 AND event_at >= NOW()
-         ORDER BY event_at ASC LIMIT 1`,
+		`SELECT title, start_at FROM shared_events
+         WHERE relationship_id = $1 AND start_at >= NOW()
+         ORDER BY start_at ASC LIMIT 1`,
 		relationshipID,
 	).Scan(&evTitle, &evAt)
 	if err == nil {
@@ -1586,7 +1779,6 @@ func main() {
 
 	http.HandleFunc("/health", handlers.Health(db))
 	http.HandleFunc("/ws", handleConnections)
-	http.HandleFunc("/api/itinerary", handleGetItinerary)
 	http.HandleFunc("/api/lists", handleGetList)
 	http.HandleFunc("/api/lists/items", handleListItems)
 	http.HandleFunc("/api/lists/items/", handleListItems)
@@ -1609,7 +1801,6 @@ func main() {
 	})
 	http.HandleFunc("/api/events/", handleEventByID)
 	http.HandleFunc("/api/checkins/today", handleCheckInsToday)
-	http.HandleFunc("/api/checkins/streak", handleGetStreak)
 	http.HandleFunc("/api/async-notes", handleAsyncNotes)
 	http.HandleFunc("/api/async-notes/", handleAsyncNoteByID)
 	http.HandleFunc("/api/widget/summary", handleWidgetSummary)
