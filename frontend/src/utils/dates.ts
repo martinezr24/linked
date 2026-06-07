@@ -12,6 +12,74 @@ export function dateToIso(date: Date): string {
   return d.toISOString();
 }
 
+/** Preserve full local time — use for timed events. */
+export function dateTimeToIso(date: Date): string {
+  return date.toISOString();
+}
+
+/** YYYY-MM-DD in the device local calendar (for daily check-in boundaries). */
+export function localDateString(date = new Date()): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/** Calendar date from a UTC-encoded all-day timestamp (YYYY-MM-DD at UTC noon). */
+export function utcCalendarDateString(iso: string): string {
+  const d = new Date(iso);
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(d.getUTCDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+export function allDayIsoFromLocalDate(date: Date): string {
+  return `${localDateString(date)}T12:00:00.000Z`;
+}
+
+/** All-day: encode local calendar dates as UTC noon on each day (timezone-safe). */
+export function allDayRangeIso(start: Date, end: Date) {
+  return {
+    startAt: allDayIsoFromLocalDate(start),
+    endAt: allDayIsoFromLocalDate(end),
+  };
+}
+
+export function isoToAllDayDate(iso: string): Date {
+  const [y, m, d] = utcCalendarDateString(iso).split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+export function eventCalendarStartDay(
+  ev: {
+    allDay?: boolean;
+    startAt?: string;
+    eventAt: string;
+  },
+  timeZone?: string,
+): string {
+  const iso = eventStartIso(ev);
+  if (ev.allDay) return utcCalendarDateString(iso);
+  if (timeZone) return calendarDateInTimezone(iso, timeZone);
+  return localDateString(new Date(iso));
+}
+
+export function eventCalendarEndDay(
+  ev: {
+    allDay?: boolean;
+    endAt?: string;
+    startAt?: string;
+    eventAt: string;
+  },
+  timeZone?: string,
+): string {
+  const iso = eventEndIso(ev);
+  if (ev.allDay) return utcCalendarDateString(iso);
+  if (timeZone) return calendarDateInTimezone(iso, timeZone);
+  return localDateString(new Date(iso));
+}
+
 /** Format as MM-DD-YYYY for display. */
 export function formatMMDDYYYY(iso: string): string {
   const d = new Date(iso);
@@ -26,6 +94,22 @@ export function isoToDate(iso: string): Date {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate());
 }
 
+/** Strip time — use when editing all-day event dates. */
+export function toLocalCalendarDate(date: Date): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+export function isEndBeforeStart(
+  start: Date,
+  end: Date,
+  allDay: boolean,
+): boolean {
+  if (allDay) {
+    return localDateString(start) > localDateString(end);
+  }
+  return end.getTime() < start.getTime();
+}
+
 /** e.g. "Mon, Jun 1, 2026" in device local timezone */
 export function formatLocalDateLabel(iso: string): string {
   const d = new Date(iso);
@@ -38,19 +122,58 @@ export function formatLocalDateLabel(iso: string): string {
 }
 
 export function getDeviceTimezoneLabel(): string {
+  return getDeviceIANATimezone();
+}
+
+export function getDeviceIANATimezone(): string {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "local time";
+    return Intl.DateTimeFormat().resolvedOptions().timeZone ?? "UTC";
   } catch {
-    return "local time";
+    return "UTC";
   }
 }
 
-/** YYYY-MM-DD in the device local calendar (for daily check-in boundaries). */
-export function localDateString(date = new Date()): string {
-  const yyyy = date.getFullYear();
-  const mm = String(date.getMonth() + 1).padStart(2, "0");
-  const dd = String(date.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+/** YYYY-MM-DD for an instant in a specific IANA timezone. */
+export function calendarDateInTimezone(iso: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(iso));
+}
+
+export function todayInTimezone(timeZone: string): string {
+  return calendarDateInTimezone(new Date().toISOString(), timeZone);
+}
+
+export function formatTimezoneShort(timeZone: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat(undefined, {
+      timeZone,
+      timeZoneName: "shortOffset",
+    }).formatToParts(new Date());
+    const offset = parts.find((p) => p.type === "timeZoneName")?.value;
+    const city = timeZone.split("/").pop()?.replace(/_/g, " ") ?? timeZone;
+    return offset ? `${city} (${offset})` : city;
+  } catch {
+    return timeZone;
+  }
+}
+
+export function formatDateLabelInTimezone(
+  day: string,
+  timeZone: string,
+): string {
+  const [y, m, d] = day.split("-").map(Number);
+  const utcNoon = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  return utcNoon.toLocaleDateString(undefined, {
+    timeZone,
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 export function monthRange(date: Date): { start: string; end: string } {
@@ -72,23 +195,69 @@ export function eventEndIso(ev: {
 }
 
 export function eventOnDay(
-  ev: { startAt?: string; endAt?: string; eventAt: string },
+  ev: { allDay?: boolean; startAt?: string; endAt?: string; eventAt: string },
   day: string,
+  timeZone?: string,
 ): boolean {
-  const startDay = localDateString(new Date(eventStartIso(ev)));
-  const endDay = localDateString(new Date(eventEndIso(ev)));
+  const startDay = eventCalendarStartDay(ev, timeZone);
+  const endDay = eventCalendarEndDay(ev, timeZone);
   return day >= startDay && day <= endDay;
 }
 
-export function eventsForDay<T extends { startAt?: string; endAt?: string; eventAt: string }>(
+export function eventsForDay<
+  T extends { allDay?: boolean; startAt?: string; endAt?: string; eventAt: string },
+>(
   events: T[],
   day: string,
+  timeZone?: string,
 ): T[] {
-  return events.filter((ev) => eventOnDay(ev, day));
+  return events.filter((ev) => eventOnDay(ev, day, timeZone));
+}
+
+export function formatEventTime(
+  ev: {
+    allDay?: boolean;
+    startAt?: string;
+    endAt?: string;
+    eventAt: string;
+  },
+  timeZone?: string,
+): string {
+  if (ev.allDay) return "All day";
+  const opts: Intl.DateTimeFormatOptions = {
+    hour: "numeric",
+    minute: "2-digit",
+    ...(timeZone ? { timeZone } : {}),
+  };
+  const fmt = (iso: string) => new Date(iso).toLocaleTimeString(undefined, opts);
+  const start = fmt(eventStartIso(ev));
+  const end = fmt(eventEndIso(ev));
+  return start === end ? start : `${start} – ${end}`;
+}
+
+export function formatDateTimeLabel(date: Date): string {
+  return date.toLocaleString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+export function isoToDateTime(iso: string): Date {
+  return new Date(iso);
 }
 
 export function toMarkedDates(
-  events: { id: string; startAt?: string; endAt?: string; eventAt: string; color?: string }[],
+  events: {
+    id: string;
+    allDay?: boolean;
+    startAt?: string;
+    endAt?: string;
+    eventAt: string;
+    color?: string;
+  }[],
   dotColor: string,
 ): Record<string, { marked?: boolean; dotColor?: string; dots?: { key: string; color: string }[] }> {
   const marked: Record<
@@ -97,11 +266,13 @@ export function toMarkedDates(
   > = {};
 
   for (const ev of events) {
-    const start = new Date(eventStartIso(ev));
-    const end = new Date(eventEndIso(ev));
+    const startDay = eventCalendarStartDay(ev);
+    const endDay = eventCalendarEndDay(ev);
     const color = ev.color || dotColor;
-    const cursor = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    const last = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    const [sy, sm, sd] = startDay.split("-").map(Number);
+    const [ey, em, ed] = endDay.split("-").map(Number);
+    const cursor = new Date(sy, sm - 1, sd);
+    const last = new Date(ey, em - 1, ed);
 
     while (cursor <= last) {
       const key = localDateString(cursor);

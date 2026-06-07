@@ -1,17 +1,20 @@
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
-  ScrollView,
   StyleSheet,
+  Text,
+  TouchableOpacity,
   View,
 } from "react-native";
+import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DateData } from "react-native-calendars";
 
-import { DayAgendaList } from "@/components/calendar/DayAgendaList";
+import { CalendarTimezonePicker } from "@/components/calendar/CalendarTimezonePicker";
+import { DayAgendaSheet } from "@/components/calendar/DayAgendaSheet";
 import { EventFormSheet } from "@/components/calendar/EventFormSheet";
-import { SharedCalendar } from "@/components/calendar/SharedCalendar";
+import { OwnerFilterChips } from "@/components/calendar/OwnerFilterChips";
+import { PillMonthGrid } from "@/components/calendar/PillMonthGrid";
 import { AppText } from "@/components/ui/AppText";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
@@ -21,25 +24,28 @@ import {
   fetchEvents,
   updateEvent,
 } from "@/api/fetchers";
+import { useCalendarTimezone } from "@/hooks/useCalendarTimezone";
 import { useRelationship } from "@/context/RelationshipContext";
-import {
-  eventsForDay,
-  localDateString,
-  monthRange,
-} from "@/utils/dates";
+import { eventsForDay, todayInTimezone, monthRange } from "@/utils/dates";
 import { showMutationError } from "@/utils/errors";
 import { generateId } from "@/utils/id";
 import { useTheme } from "@/theme/useTheme";
-import type { SharedEvent } from "@/types";
+import type { EventOwnerType, SharedEvent } from "@/types";
 
 export default function EventsScreen() {
   const theme = useTheme();
   const { deviceId } = useRelationship();
   const queryClient = useQueryClient();
   const [visibleMonth, setVisibleMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(localDateString());
+  const [agendaDay, setAgendaDay] = useState<string | null>(null);
+  const [ownerFilter, setOwnerFilter] = useState<EventOwnerType | "all">("all");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [createDate, setCreateDate] = useState<string | undefined>();
   const [editing, setEditing] = useState<SharedEvent | null>(null);
+
+  const calendarTz = useCalendarTimezone();
+  const { activeTimezone, activeLabel, ready: tzReady } = calendarTz;
+  const tabBarHeight = useBottomTabBarHeight();
 
   const range = useMemo(() => monthRange(visibleMonth), [visibleMonth]);
 
@@ -62,6 +68,7 @@ export default function EventsScreen() {
     onSuccess: () => {
       setSheetOpen(false);
       setEditing(null);
+      setCreateDate(undefined);
       invalidateEvents();
     },
     onError: () => showMutationError("Could not save event."),
@@ -69,23 +76,35 @@ export default function EventsScreen() {
 
   const removeEvent = useMutation({
     mutationFn: (id: string) => deleteEvent(deviceId!, id),
-    onSuccess: invalidateEvents,
+    onSuccess: () => {
+      setSheetOpen(false);
+      setEditing(null);
+      setAgendaDay(null);
+      invalidateEvents();
+    },
     onError: () => showMutationError("Could not delete event."),
   });
 
-  const dayEvents = eventsForDay(events, selectedDate);
-
-  const openCreate = () => {
+  const openCreate = (day?: string) => {
     setEditing(null);
+    setCreateDate(day ?? agendaDay ?? todayInTimezone(activeTimezone));
     setSheetOpen(true);
   };
 
   const openEdit = (event: SharedEvent) => {
+    setAgendaDay(null);
     setEditing(event);
+    setCreateDate(undefined);
     setSheetOpen(true);
   };
 
-  if (isLoading) {
+  const agendaEvents = useMemo(
+    () =>
+      agendaDay ? eventsForDay(events, agendaDay, activeTimezone) : [],
+    [events, agendaDay, activeTimezone],
+  );
+
+  if (isLoading || !tzReady) {
     return (
       <ScreenBackground>
         <SafeAreaView style={[styles.safe, styles.centered]}>
@@ -98,47 +117,81 @@ export default function EventsScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
+        <View style={styles.header}>
           <AppText variant="h1" style={styles.title}>
             Calendar
           </AppText>
-          <AppText variant="body" color="secondary" style={styles.subtitle}>
+          <AppText variant="body" color="secondary">
             Shared dates you both should know about.
           </AppText>
-
-          <SharedCalendar
-            selectedDate={selectedDate}
-            visibleMonth={visibleMonth}
-            events={events}
-            onSelectDate={(day: DateData) => setSelectedDate(day.dateString)}
-            onMonthChange={(month: DateData) => {
-              setVisibleMonth(new Date(month.year, month.month - 1, 1));
-            }}
+          <OwnerFilterChips value={ownerFilter} onChange={setOwnerFilter} />
+          <CalendarTimezonePicker
+            mode={calendarTz.mode}
+            customTz={calendarTz.customTz}
+            partnerTz={calendarTz.partnerTz}
+            activeLabel={calendarTz.activeLabel}
+            partnerUnavailable={calendarTz.partnerUnavailable}
+            onModeChange={calendarTz.setMode}
+            onCustomTzChange={calendarTz.setCustomTz}
           />
+        </View>
 
-          <DayAgendaList
-            day={selectedDate}
-            events={dayEvents}
-            onAdd={openCreate}
-            onEdit={openEdit}
-            onDelete={(id) => removeEvent.mutate(id)}
-          />
-        </ScrollView>
+        <PillMonthGrid
+          visibleMonth={visibleMonth}
+          events={events}
+          ownerFilter={ownerFilter}
+          timeZone={activeTimezone}
+          selectedDay={agendaDay}
+          onMonthChange={setVisibleMonth}
+          onDayPress={setAgendaDay}
+          onEventPress={openEdit}
+        />
+
+        <TouchableOpacity
+          style={[
+            styles.fab,
+            {
+              backgroundColor: theme.colors.accent.primary,
+              bottom: tabBarHeight + 12,
+            },
+          ]}
+          onPress={() => openCreate()}
+          activeOpacity={0.85}
+          accessibilityLabel="Add event"
+          accessibilityRole="button"
+        >
+          <Text style={styles.fabIcon}>+</Text>
+        </TouchableOpacity>
+
+        <DayAgendaSheet
+          visible={agendaDay !== null}
+          day={agendaDay ?? todayInTimezone(activeTimezone)}
+          events={agendaEvents}
+          timeZone={activeTimezone}
+          timezoneLabel={activeLabel}
+          onClose={() => setAgendaDay(null)}
+          onAdd={() => {
+            const day = agendaDay ?? todayInTimezone(activeTimezone);
+            setAgendaDay(null);
+            openCreate(day);
+          }}
+          onEdit={openEdit}
+          onDelete={(id) => removeEvent.mutate(id)}
+        />
 
         <EventFormSheet
           visible={sheetOpen}
           initial={editing}
-          defaultDate={selectedDate}
+          defaultDate={createDate}
           onClose={() => {
             setSheetOpen(false);
             setEditing(null);
+            setCreateDate(undefined);
           }}
           onSave={(ev) => saveEvent.mutate(ev)}
+          onDelete={(id) => removeEvent.mutate(id)}
           saving={saveEvent.isPending}
+          deleting={removeEvent.isPending}
         />
       </SafeAreaView>
     </ScreenBackground>
@@ -148,7 +201,32 @@ export default function EventsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  scroll: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 100 },
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 8,
+  },
   title: { marginBottom: 4, fontFamily: "DMSans_700Bold" },
-  subtitle: { marginBottom: 16 },
+  fab: {
+    position: "absolute",
+    right: 20,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 6,
+    zIndex: 10,
+  },
+  fabIcon: {
+    color: "#FFFFFF",
+    fontSize: 32,
+    lineHeight: 34,
+    fontFamily: "DMSans_400Regular",
+    marginTop: -2,
+  },
 });

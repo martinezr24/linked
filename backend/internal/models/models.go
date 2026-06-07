@@ -45,6 +45,7 @@ type SharedEvent struct {
 	RecurrenceRule *string `json:"recurrenceRule,omitempty"`
 	Color          *string `json:"color,omitempty"`
 	OwnerLabel     *string `json:"ownerLabel,omitempty"`
+	OwnerType      string  `json:"ownerType,omitempty"`
 }
 
 type User struct {

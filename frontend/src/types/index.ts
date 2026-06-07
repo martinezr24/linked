@@ -15,6 +15,11 @@ export type WeeklyGoal = {
   done: boolean;
 };
 
+export type EventOwnerType = "self" | "partner" | "shared";
+
+/** Which timezone lens to use when viewing timed calendar events. */
+export type CalendarTimezoneMode = "device" | "partner" | "custom";
+
 export type SharedEvent = {
   id: string;
   title: string;
@@ -26,6 +31,7 @@ export type SharedEvent = {
   description?: string;
   recurrenceRule?: string;
   color?: string;
+  ownerType?: EventOwnerType;
   ownerLabel?: string;
 };
 

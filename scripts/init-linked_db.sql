@@ -101,6 +101,8 @@ CREATE TABLE IF NOT EXISTS shared_events (
     recurrence_rule TEXT,
     color TEXT,
     owner_label TEXT,
+    owner_type TEXT NOT NULL DEFAULT 'shared'
+        CHECK (owner_type IN ('self', 'partner', 'shared')),
     created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 

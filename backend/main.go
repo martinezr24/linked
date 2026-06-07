@@ -76,6 +76,7 @@ type SharedEvent struct {
 	RecurrenceRule *string `json:"recurrenceRule,omitempty"`
 	Color          *string `json:"color,omitempty"`
 	OwnerLabel     *string `json:"ownerLabel,omitempty"`
+	OwnerType      string  `json:"ownerType,omitempty"`
 }
 
 type AsyncNote struct {
@@ -753,9 +754,18 @@ func handlePutRelationshipVisit(w http.ResponseWriter, r *http.Request) {
 	broadcastServerEvent(relationshipID, "SYNC_RELATIONSHIP", map[string]any{"relationshipId": relationshipID})
 }
 
-const sharedEventSelect = `id, title, start_at, end_at, all_day, created_by::text, description, recurrence_rule, color, owner_label, event_at`
+const sharedEventSelect = `id, title, start_at, end_at, all_day, created_by::text, description, recurrence_rule, color, owner_label, owner_type, event_at`
 
-func finishSharedEvent(ev *SharedEvent, startAt, endAt time.Time, allDay bool, createdBy, description, recurrenceRule, color, owner sql.NullString) {
+func normalizeOwnerType(raw string) string {
+	switch strings.TrimSpace(strings.ToLower(raw)) {
+	case "self", "partner", "shared":
+		return strings.TrimSpace(strings.ToLower(raw))
+	default:
+		return "shared"
+	}
+}
+
+func finishSharedEvent(ev *SharedEvent, startAt, endAt time.Time, allDay bool, createdBy, description, recurrenceRule, color, owner, ownerType sql.NullString) {
 	ev.StartAt = startAt.UTC().Format(time.RFC3339)
 	ev.EndAt = endAt.UTC().Format(time.RFC3339)
 	ev.EventAt = ev.StartAt
@@ -780,16 +790,21 @@ func finishSharedEvent(ev *SharedEvent, startAt, endAt time.Time, allDay bool, c
 		s := owner.String
 		ev.OwnerLabel = &s
 	}
+	if ownerType.Valid {
+		ev.OwnerType = normalizeOwnerType(ownerType.String)
+	} else {
+		ev.OwnerType = "shared"
+	}
 }
 
 func scanSharedEventRow(rows *sql.Rows) (SharedEvent, error) {
 	var ev SharedEvent
 	var startAt, endAt, legacyAt time.Time
 	var allDay bool
-	var createdBy, description, recurrenceRule, color, owner sql.NullString
+	var createdBy, description, recurrenceRule, color, owner, ownerType sql.NullString
 	if err := rows.Scan(
 		&ev.ID, &ev.Title, &startAt, &endAt, &allDay,
-		&createdBy, &description, &recurrenceRule, &color, &owner, &legacyAt,
+		&createdBy, &description, &recurrenceRule, &color, &owner, &ownerType, &legacyAt,
 	); err != nil {
 		return ev, err
 	}
@@ -799,7 +814,7 @@ func scanSharedEventRow(rows *sql.Rows) (SharedEvent, error) {
 	if endAt.IsZero() {
 		endAt = startAt
 	}
-	finishSharedEvent(&ev, startAt, endAt, allDay, createdBy, description, recurrenceRule, color, owner)
+	finishSharedEvent(&ev, startAt, endAt, allDay, createdBy, description, recurrenceRule, color, owner, ownerType)
 	return ev, nil
 }
 
@@ -807,13 +822,13 @@ func querySharedEvent(relationshipID, eventID string) (SharedEvent, error) {
 	var ev SharedEvent
 	var startAt, endAt, legacyAt time.Time
 	var allDay bool
-	var createdBy, description, recurrenceRule, color, owner sql.NullString
+	var createdBy, description, recurrenceRule, color, owner, ownerType sql.NullString
 	err := db.QueryRow(
 		`SELECT `+sharedEventSelect+` FROM shared_events WHERE id = $1 AND relationship_id = $2`,
 		eventID, relationshipID,
 	).Scan(
 		&ev.ID, &ev.Title, &startAt, &endAt, &allDay,
-		&createdBy, &description, &recurrenceRule, &color, &owner, &legacyAt,
+		&createdBy, &description, &recurrenceRule, &color, &owner, &ownerType, &legacyAt,
 	)
 	if err != nil {
 		return ev, err
@@ -824,7 +839,7 @@ func querySharedEvent(relationshipID, eventID string) (SharedEvent, error) {
 	if endAt.IsZero() {
 		endAt = startAt
 	}
-	finishSharedEvent(&ev, startAt, endAt, allDay, createdBy, description, recurrenceRule, color, owner)
+	finishSharedEvent(&ev, startAt, endAt, allDay, createdBy, description, recurrenceRule, color, owner, ownerType)
 	return ev, nil
 }
 
@@ -881,6 +896,12 @@ func resolveEventTimes(ev SharedEvent) (time.Time, time.Time, bool, error) {
 	}
 	if end.Before(start) {
 		return time.Time{}, time.Time{}, false, fmt.Errorf("endAt before startAt")
+	}
+	if ev.AllDay {
+		su := start.UTC()
+		eu := end.UTC()
+		start = time.Date(su.Year(), su.Month(), su.Day(), 12, 0, 0, 0, time.UTC)
+		end = time.Date(eu.Year(), eu.Month(), eu.Day(), 12, 0, 0, 0, time.UTC)
 	}
 	return start, end, ev.AllDay, nil
 }
@@ -990,13 +1011,14 @@ func handlePostEvent(w http.ResponseWriter, r *http.Request) {
 	if ev.Color != nil {
 		color = *ev.Color
 	}
+	ownerType := normalizeOwnerType(ev.OwnerType)
 	_, err = db.Exec(
 		`INSERT INTO shared_events (
             id, relationship_id, title, event_at, start_at, end_at, all_day,
-            created_by, description, recurrence_rule, color, owner_label
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            created_by, description, recurrence_rule, color, owner_label, owner_type
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
 		ev.ID, relationshipID, ev.Title, start, start, end, allDay,
-		user.ID, description, recurrenceRule, color, owner,
+		user.ID, description, recurrenceRule, color, owner, ownerType,
 	)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
@@ -1010,6 +1032,7 @@ func handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		ev.EventAt = ev.StartAt
 		ev.AllDay = allDay
 		ev.CreatedBy = &user.ID
+		ev.OwnerType = ownerType
 		json.NewEncoder(w).Encode(ev)
 	} else {
 		w.WriteHeader(http.StatusCreated)
@@ -1115,13 +1138,8 @@ func handlePatchEvent(w http.ResponseWriter, r *http.Request) {
 		existing.Title = strings.TrimSpace(patch.Title)
 	}
 	if patch.StartAt != "" || patch.EventAt != "" {
-		patch.ID = existing.ID
-		patch.Title = existing.Title
 		if patch.EndAt == "" {
 			patch.EndAt = existing.EndAt
-		}
-		if !patch.AllDay {
-			patch.AllDay = existing.AllDay
 		}
 		start, end, allDay, timeErr := resolveEventTimes(patch)
 		if timeErr != nil {
@@ -1147,6 +1165,9 @@ func handlePatchEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	if patch.OwnerLabel != nil {
 		existing.OwnerLabel = patch.OwnerLabel
+	}
+	if patch.OwnerType != "" {
+		existing.OwnerType = normalizeOwnerType(patch.OwnerType)
 	}
 	if patch.Description != nil {
 		existing.Description = patch.Description
@@ -1176,12 +1197,13 @@ func handlePatchEvent(w http.ResponseWriter, r *http.Request) {
 	if existing.Color != nil {
 		color = *existing.Color
 	}
+	ownerType := normalizeOwnerType(existing.OwnerType)
 	_, err = db.Exec(
 		`UPDATE shared_events SET title = $1, event_at = $2, start_at = $3, end_at = $4,
-            all_day = $5, description = $6, recurrence_rule = $7, color = $8, owner_label = $9
-         WHERE id = $10 AND relationship_id = $11`,
+            all_day = $5, description = $6, recurrence_rule = $7, color = $8, owner_label = $9, owner_type = $10
+         WHERE id = $11 AND relationship_id = $12`,
 		existing.Title, start, start, end, allDay,
-		description, recurrenceRule, color, owner, eventID, relationshipID,
+		description, recurrenceRule, color, owner, ownerType, eventID, relationshipID,
 	)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)

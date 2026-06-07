@@ -36,6 +36,11 @@ export const colors = {
     mine: "#5C2A3A",
     partner: "#3A2A5C",
   },
+  event: {
+    self: { bg: "#C44B6E", text: "#FFFFFF" },
+    partner: { bg: "#5B7FD4", text: "#FFFFFF" },
+    shared: { bg: "#8B6FA8", text: "#FFFFFF" },
+  },
 } as const;
 
 export const spacing = {
