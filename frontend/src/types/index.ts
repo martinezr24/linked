@@ -78,6 +78,55 @@ export type PartnerPresence = {
   localTime: string;
   weatherSummary?: string;
   temperatureF?: number;
+  displayName?: string;
+  profilePictureUrl?: string;
+  batteryPercent?: number;
+  statusMessage?: string;
+  statusUpdatedAt?: string;
+};
+
+export type UserProfile = {
+  displayName?: string;
+  profilePictureUrl?: string;
+  calendarColor: string;
+  statusMessage?: string;
+};
+
+export type ProfileResponse = {
+  mine: UserProfile;
+  partner?: UserProfile;
+};
+
+export type PhotoPostResponse = {
+  id: string;
+  photoDate: string;
+  caption?: string;
+  imageUrl: string;
+  isMine: boolean;
+  createdAt: string;
+  currentStreak: number;
+  longestStreak: number;
+  bothSentToday: boolean;
+};
+
+export type GridGame = {
+  id: string;
+  gameType: string;
+  status: string;
+  boardState: Connect4BoardState;
+  currentTurnUserId?: string;
+  winnerUserId?: string;
+  playerXUserId: string;
+  playerOUserId?: string;
+  isMyTurn: boolean;
+  myPlayerNumber: number;
+};
+
+export type Connect4BoardState = {
+  rows: number;
+  cols: number;
+  cells: number[][];
+  moves: number[];
 };
 
 export type AsyncNote = {

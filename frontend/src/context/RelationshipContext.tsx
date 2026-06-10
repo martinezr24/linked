@@ -26,6 +26,7 @@ type RelationshipContextValue = {
   setPaired: (relationshipId: string) => Promise<void>;
   clearPaired: () => Promise<void>;
   subscribe: (handler: (msg: WsMessage) => void) => () => void;
+  sendWs: (action: string, payload: Record<string, unknown>) => void;
 };
 
 const RelationshipContext = createContext<RelationshipContextValue | null>(null);
@@ -69,6 +70,13 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
   const subscribe = useCallback((handler: (msg: WsMessage) => void) => {
     subscribersRef.current.add(handler);
     return () => subscribersRef.current.delete(handler);
+  }, []);
+
+  const sendWs = useCallback((action: string, payload: Record<string, unknown>) => {
+    const ws = socketRef.current;
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ action, payload }));
+    }
   }, []);
 
   const handlePartnerUnlinked = useCallback(async () => {
@@ -142,6 +150,7 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
     setPaired,
     clearPaired,
     subscribe,
+    sendWs,
   };
 
   return (

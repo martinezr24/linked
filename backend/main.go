@@ -205,6 +205,12 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	user, err := getOrCreateUser(deviceID)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
 	ws, err := upgrader.Upgrade(w, r, nil)
 	if err != nil {
 		log.Printf("WebSocket upgrade failed: %v", err)
@@ -214,6 +220,9 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 	hub.Register(ws, relationshipID)
 
 	defer func() {
+		if gameManager != nil {
+			gameManager.Leave(ws)
+		}
 		hub.Unregister(ws)
 		ws.Close()
 	}()
@@ -223,8 +232,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			break
 		}
-		// Client WS messages are legacy notify-only; durable writes go through REST.
-		processIncomingPayload(message, relationshipID)
+		processIncomingPayload(message, relationshipID, user.ID, ws)
 	}
 }
 
@@ -239,13 +247,21 @@ func normalizeListType(listType string) (string, bool) {
 	}
 }
 
-func processIncomingPayload(rawMessage []byte, relationshipID string) {
+func processIncomingPayload(rawMessage []byte, relationshipID, userID string, conn *websocket.Conn) {
 	var envelope MessageEnvelope
 	if err := json.Unmarshal(rawMessage, &envelope); err != nil {
 		return
 	}
 
 	switch envelope.Action {
+	case "GAME_JOIN":
+		if gameManager != nil {
+			gameManager.HandleWSJoin(conn, relationshipID, userID, envelope.Payload)
+		}
+	case "GAME_MOVE":
+		if gameManager != nil {
+			gameManager.HandleWSMove(conn, relationshipID, userID, envelope.Payload)
+		}
 	case "ADD_ITEM", "DELETE_ITEM", "SET_NEXT_VISIT",
 		"ADD_WEEKLY_GOAL", "UPDATE_WEEKLY_GOAL", "DELETE_WEEKLY_GOAL",
 		"ADD_EVENT", "DELETE_EVENT", "CHECK_IN":
@@ -1797,7 +1813,9 @@ func main() {
 	initDB()
 	defer db.Close()
 	initMediaStore()
+	initGameManager()
 	registerFeatureRoutes()
+	registerGridGameRoutes()
 
 	http.HandleFunc("/health", handlers.Health(db))
 	http.HandleFunc("/ws", handleConnections)

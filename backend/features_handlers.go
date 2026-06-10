@@ -34,11 +34,16 @@ func initMediaStore() {
 }
 
 type PartnerPresence struct {
-	Timezone      string  `json:"timezone"`
-	WeatherCity   *string `json:"weatherCity,omitempty"`
-	LocalTime     string  `json:"localTime"`
-	WeatherSummary *string `json:"weatherSummary,omitempty"`
-	TemperatureF  *int    `json:"temperatureF,omitempty"`
+	Timezone          string  `json:"timezone"`
+	WeatherCity       *string `json:"weatherCity,omitempty"`
+	LocalTime         string  `json:"localTime"`
+	WeatherSummary    *string `json:"weatherSummary,omitempty"`
+	TemperatureF      *int    `json:"temperatureF,omitempty"`
+	DisplayName       *string `json:"displayName,omitempty"`
+	ProfilePictureUrl *string `json:"profilePictureUrl,omitempty"`
+	BatteryPercent    *int    `json:"batteryPercent,omitempty"`
+	StatusMessage     *string `json:"statusMessage,omitempty"`
+	StatusUpdatedAt   *string `json:"statusUpdatedAt,omitempty"`
 }
 
 type DailyPhotoDTO struct {
@@ -50,12 +55,19 @@ type DailyPhotoDTO struct {
 	CreatedAt string  `json:"createdAt"`
 }
 
+type PhotoPostResponse struct {
+	DailyPhotoDTO
+	CurrentStreak int  `json:"currentStreak"`
+	LongestStreak int  `json:"longestStreak"`
+	BothSentToday bool `json:"bothSentToday"`
+}
+
 type PhotoTodayResponse struct {
-	Mine           *DailyPhotoDTO `json:"mine"`
-	Partner        *DailyPhotoDTO `json:"partner"`
-	CurrentStreak  int            `json:"currentStreak"`
-	LongestStreak  int            `json:"longestStreak"`
-	BothSentToday  bool           `json:"bothSentToday"`
+	Mine          *DailyPhotoDTO `json:"mine"`
+	Partner       *DailyPhotoDTO `json:"partner"`
+	CurrentStreak int            `json:"currentStreak"`
+	LongestStreak int            `json:"longestStreak"`
+	BothSentToday bool           `json:"bothSentToday"`
 }
 
 type PhotoDayGroup struct {
@@ -82,10 +94,12 @@ func handlePutProfilePresence(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		Timezone    string   `json:"timezone"`
-		WeatherCity *string  `json:"weatherCity"`
-		WeatherLat  *float64 `json:"weatherLat"`
-		WeatherLon  *float64 `json:"weatherLon"`
+		Timezone       string   `json:"timezone"`
+		WeatherCity    *string  `json:"weatherCity"`
+		WeatherLat     *float64 `json:"weatherLat"`
+		WeatherLon     *float64 `json:"weatherLon"`
+		BatteryPercent *int     `json:"batteryPercent"`
+		StatusMessage  *string  `json:"statusMessage"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -102,10 +116,27 @@ func handlePutProfilePresence(w http.ResponseWriter, r *http.Request) {
 			lat, lon = &gLat, &gLon
 		}
 	}
+	battery := body.BatteryPercent
+	if battery != nil && (*battery < 0 || *battery > 100) {
+		http.Error(w, "invalid batteryPercent", http.StatusBadRequest)
+		return
+	}
+	statusMsg := body.StatusMessage
+	if statusMsg != nil {
+		s := strings.TrimSpace(*statusMsg)
+		if len(s) > 80 {
+			s = s[:80]
+		}
+		statusMsg = &s
+	}
 	_, err = db.Exec(
-		`UPDATE users SET timezone = $1, weather_city = $2, weather_lat = $3, weather_lon = $4, last_presence_at = NOW()
-         WHERE id = $5`,
-		tz, body.WeatherCity, lat, lon, user.ID,
+		`UPDATE users SET timezone = $1, weather_city = $2, weather_lat = $3, weather_lon = $4,
+         battery_percent = $5,
+         status_message = COALESCE($6, status_message),
+         status_updated_at = CASE WHEN $6 IS NOT NULL THEN NOW() ELSE status_updated_at END,
+         last_presence_at = NOW()
+         WHERE id = $7`,
+		tz, body.WeatherCity, lat, lon, battery, statusMsg, user.ID,
 	)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
@@ -136,11 +167,17 @@ func handleGetPartnerPresence(w http.ResponseWriter, r *http.Request) {
 	var partnerID string
 	var tz sql.NullString
 	var city sql.NullString
+	var displayName sql.NullString
+	var pictureKey sql.NullString
+	var battery sql.NullInt64
+	var statusMsg sql.NullString
+	var statusUpdated sql.NullTime
 	err = db.QueryRow(
-		`SELECT id::text, timezone, weather_city FROM users
-         WHERE relationship_id = $1 AND id != $2 LIMIT 1`,
+		`SELECT id::text, timezone, weather_city, display_name, profile_picture_url,
+                battery_percent, status_message, status_updated_at
+         FROM users WHERE relationship_id = $1 AND id != $2 LIMIT 1`,
 		*user.RelationshipID, user.ID,
-	).Scan(&partnerID, &tz, &city)
+	).Scan(&partnerID, &tz, &city, &displayName, &pictureKey, &battery, &statusMsg, &statusUpdated)
 	if err != nil {
 		http.Error(w, "partner not found", http.StatusNotFound)
 		return
@@ -152,6 +189,27 @@ func handleGetPartnerPresence(w http.ResponseWriter, r *http.Request) {
 	if city.Valid {
 		c := city.String
 		resp.WeatherCity = &c
+	}
+	if displayName.Valid && strings.TrimSpace(displayName.String) != "" {
+		n := strings.TrimSpace(displayName.String)
+		resp.DisplayName = &n
+	}
+	if pictureKey.Valid && pictureKey.String != "" && mediaStore != nil {
+		if url, err := mediaStore.SignGet(context.Background(), pictureKey.String, 15*time.Minute); err == nil {
+			resp.ProfilePictureUrl = &url
+		}
+	}
+	if battery.Valid {
+		b := int(battery.Int64)
+		resp.BatteryPercent = &b
+	}
+	if statusMsg.Valid && strings.TrimSpace(statusMsg.String) != "" {
+		s := strings.TrimSpace(statusMsg.String)
+		resp.StatusMessage = &s
+	}
+	if statusUpdated.Valid {
+		t := statusUpdated.Time.UTC().Format(time.RFC3339)
+		resp.StatusUpdatedAt = &t
 	}
 	if summary, temp := fetchPartnerWeather(partnerID); summary != "" {
 		resp.WeatherSummary = &summary
@@ -451,7 +509,7 @@ func handlePhotosFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	key := r.URL.Query().Get("key")
-	if key == "" || !strings.HasPrefix(key, "photos/"+relationshipID+"/") {
+	if key == "" || (!strings.HasPrefix(key, "photos/"+relationshipID+"/") && !strings.HasPrefix(key, "avatars/"+relationshipID+"/")) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
@@ -464,7 +522,11 @@ func handlePhotosFile(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	w.Header().Set("Content-Type", "image/jpeg")
+	ct := "image/jpeg"
+	if strings.HasSuffix(strings.ToLower(key), ".png") {
+		ct = "image/png"
+	}
+	w.Header().Set("Content-Type", ct)
 	w.Write(data)
 }
 
@@ -579,8 +641,15 @@ func handlePhotosPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
 	}
+	current, longest, both := computePhotoStreak(*user.RelationshipID, photoDate)
+	resp := PhotoPostResponse{
+		DailyPhotoDTO: dto,
+		CurrentStreak: current,
+		LongestStreak: longest,
+		BothSentToday: both,
+	}
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(dto)
+	json.NewEncoder(w).Encode(resp)
 	broadcastServerEvent(*user.RelationshipID, "SYNC_PHOTOS", map[string]any{})
 }
 
@@ -901,6 +970,7 @@ func handleTriviaAnswer(w http.ResponseWriter, r *http.Request) {
 }
 
 func registerFeatureRoutes() {
+	registerProfileRoutes()
 	http.HandleFunc("/api/profile/presence", handlePutProfilePresence)
 	http.HandleFunc("/api/partner/presence", handleGetPartnerPresence)
 	http.HandleFunc("/api/photos/presign", handlePhotosPresign)

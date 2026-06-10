@@ -16,12 +16,14 @@ import { router } from "expo-router";
 
 import { AsyncNotesCard } from "@/components/AsyncNotesCard";
 import { DailyPhotoCard } from "@/components/photos/DailyPhotoCard";
+import { MyStatusCard } from "@/components/presence/MyStatusCard";
 import { PartnerPresenceCard } from "@/components/presence/PartnerPresenceCard";
 import { VisitCountdownHero } from "@/components/VisitCountdownHero";
 import { VisitEditSheet } from "@/components/VisitEditSheet";
 import { WidgetPreviewCard } from "@/components/WidgetPreviewCard";
 import { WeeklyGoalsCard } from "@/components/goals/WeeklyGoalsCard";
 import { useCoupleNames } from "@/hooks/useCoupleNames";
+import { useProfile } from "@/hooks/useProfile";
 import { initialFromName } from "@/utils/coupleNames";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
@@ -95,6 +97,7 @@ export default function HomeScreen() {
   const [treatsOpen, setTreatsOpen] = useState(false);
   const tzLabel = getDeviceTimezoneLabel();
   const { mineName, partnerName } = useCoupleNames();
+  const { mineAvatarUrl, partnerAvatarUrl, mineColor, partnerColor } = useProfile();
 
   const enabled = Boolean(deviceId);
 
@@ -189,6 +192,10 @@ export default function HomeScreen() {
             streakCount={streakCount}
             mineInitial={initialFromName(mineName, "M")}
             partnerInitial={initialFromName(partnerName, "Y")}
+            mineAvatarUrl={mineAvatarUrl}
+            partnerAvatarUrl={partnerAvatarUrl}
+            mineColor={mineColor}
+            partnerColor={partnerColor}
             minePhotoSent={Boolean(photoToday?.mine)}
             partnerPhotoSent={Boolean(photoToday?.partner)}
             headerRight={
@@ -228,6 +235,8 @@ export default function HomeScreen() {
             ) : null}
 
             <DailyPhotoCard />
+
+            <MyStatusCard />
 
             <PartnerPresenceCard />
 

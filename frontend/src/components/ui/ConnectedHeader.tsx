@@ -3,6 +3,7 @@ import { StyleSheet, View } from "react-native";
 
 import { AppMark } from "./AppMark";
 import { AppText } from "./AppText";
+import { AvatarImage } from "./AvatarImage";
 import { ConnectionLink } from "./ConnectionLink";
 import { StreakPill } from "./StreakPill";
 import { useTheme } from "@/theme/useTheme";
@@ -11,6 +12,10 @@ type Props = {
   streakCount: number;
   mineInitial?: string;
   partnerInitial?: string;
+  mineAvatarUrl?: string;
+  partnerAvatarUrl?: string;
+  mineColor?: string;
+  partnerColor?: string;
   partnerPhotoSent?: boolean;
   minePhotoSent?: boolean;
   headerRight?: ReactNode;
@@ -18,24 +23,25 @@ type Props = {
 
 function AvatarCircle({
   initial,
+  avatarUrl,
+  bgColor,
   checkedIn,
-  variant,
 }: {
   initial: string;
+  avatarUrl?: string;
+  bgColor: string;
   checkedIn?: boolean;
-  variant: "mine" | "partner";
 }) {
   const theme = useTheme();
-  const bg =
-    variant === "mine"
-      ? theme.colors.avatar.mine
-      : theme.colors.avatar.partner;
 
   return (
-    <View style={[styles.avatar, { backgroundColor: bg }]}>
-      <AppText variant="bodySemibold" style={styles.avatarText}>
-        {initial}
-      </AppText>
+    <View style={styles.avatarWrap}>
+      <AvatarImage
+        url={avatarUrl}
+        initial={initial}
+        fallbackColor={bgColor}
+        size={40}
+      />
       {checkedIn ? (
         <View
           style={[
@@ -54,10 +60,16 @@ export function ConnectedHeader({
   streakCount,
   mineInitial = "M",
   partnerInitial = "Y",
+  mineAvatarUrl,
+  partnerAvatarUrl,
+  mineColor,
+  partnerColor,
   partnerPhotoSent,
   minePhotoSent,
   headerRight,
 }: Props) {
+  const theme = useTheme();
+
   return (
     <View style={styles.row}>
       <AppMark size={32} />
@@ -65,14 +77,16 @@ export function ConnectedHeader({
         <View style={styles.avatars}>
           <AvatarCircle
             initial={mineInitial.slice(0, 1).toUpperCase()}
+            avatarUrl={mineAvatarUrl}
+            bgColor={mineColor ?? theme.colors.avatar.mine}
             checkedIn={minePhotoSent}
-            variant="mine"
           />
           <ConnectionLink length={36} showBow />
           <AvatarCircle
             initial={partnerInitial.slice(0, 1).toUpperCase()}
+            avatarUrl={partnerAvatarUrl}
+            bgColor={partnerColor ?? theme.colors.avatar.partner}
             checkedIn={partnerPhotoSent}
-            variant="partner"
           />
         </View>
       </View>
@@ -95,14 +109,7 @@ const styles = StyleSheet.create({
   },
   center: { flex: 1, alignItems: "center", marginHorizontal: 8 },
   avatars: { flexDirection: "row", alignItems: "center", gap: 4 },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  avatarText: { fontFamily: "DMSans_700Bold" },
+  avatarWrap: { position: "relative" },
   checkBadge: {
     position: "absolute",
     bottom: -2,

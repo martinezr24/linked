@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, View } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
 
 import { AppText } from "@/components/ui/AppText";
+import { useProfile } from "@/hooks/useProfile";
 import { useTheme } from "@/theme/useTheme";
 import { eventColorFor } from "@/utils/eventColors";
 import type { SharedEvent } from "@/types";
@@ -26,8 +26,10 @@ export function EventPill({
   onPress,
 }: Props) {
   const theme = useTheme();
+  const { mineColor, partnerColor } = useProfile();
+  const profileColors = { mineColor, partnerColor };
   const ownerType = event.ownerType ?? "shared";
-  const colors = eventColorFor(ownerType, theme);
+  const colors = eventColorFor(ownerType, theme, profileColors);
 
   const borderRadius = {
     borderTopLeftRadius: isSegmentStart ? 9 : 2,
@@ -35,16 +37,6 @@ export function EventPill({
     borderTopRightRadius: isSegmentEnd ? 9 : 2,
     borderBottomRightRadius: isSegmentEnd ? 9 : 2,
   };
-
-  const content = (
-    <AppText
-      variant="caption"
-      numberOfLines={1}
-      style={[styles.label, { color: colors.text }]}
-    >
-      {isSegmentStart ? event.title : " "}
-    </AppText>
-  );
 
   return (
     <Pressable
@@ -59,23 +51,20 @@ export function EventPill({
         },
       ]}
     >
-      {ownerType === "shared" ? (
-        <LinearGradient
-          colors={[theme.colors.event.self.bg, theme.colors.event.partner.bg]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={[StyleSheet.absoluteFill, borderRadius]}
-        />
-      ) : (
-        <View
-          style={[
-            StyleSheet.absoluteFill,
-            { backgroundColor: colors.bg },
-            borderRadius,
-          ]}
-        />
-      )}
-      {content}
+      <View
+        style={[
+          StyleSheet.absoluteFill,
+          { backgroundColor: colors.bg },
+          borderRadius,
+        ]}
+      />
+      <AppText
+        variant="caption"
+        numberOfLines={1}
+        style={[styles.label, { color: colors.text }]}
+      >
+        {isSegmentStart ? event.title : " "}
+      </AppText>
     </Pressable>
   );
 }

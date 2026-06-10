@@ -7,9 +7,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { router, type Href } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
+import { fetchGridGame } from "@/api/fetchers";
 import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
@@ -64,6 +66,12 @@ export default function PlayScreen() {
       if (!res.ok) throw new Error("Failed to load game");
       return res.json() as Promise<TriviaGame | null>;
     },
+    enabled: Boolean(deviceId),
+  });
+
+  const { data: connect4Game } = useQuery({
+    queryKey: queryKeys.gridGame("connect4"),
+    queryFn: () => fetchGridGame(deviceId!, "connect4"),
     enabled: Boolean(deviceId),
   });
 
@@ -157,6 +165,21 @@ export default function PlayScreen() {
               tzLabel={tzLabel}
             />
           ) : null}
+
+          <ArtifactCard category="Real-time games" title="Connect 4">
+            <AppText variant="body" color="secondary" style={styles.sub}>
+              Drop discs and connect four in a row — moves sync instantly.
+            </AppText>
+            {connect4Game && connect4Game.status !== "finished" ? (
+              <AppText variant="bodySemibold" color="accent" style={styles.sub}>
+                Active game — {connect4Game.status === "waiting" ? "waiting to start" : "in progress"}
+              </AppText>
+            ) : null}
+            <PrimaryButton
+              label={connect4Game && connect4Game.status !== "finished" ? "Continue Connect 4" : "Play Connect 4"}
+              onPress={() => router.push("/games/connect4" as Href)}
+            />
+          </ArtifactCard>
 
           {isLoading ? (
             <ActivityIndicator color={theme.colors.accent.primary} />

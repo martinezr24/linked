@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 
@@ -32,8 +33,13 @@ function formatTimer(ms: number): string {
 export default function StreakScreen() {
   const theme = useTheme();
   const { deviceId } = useRelationship();
+  const { celebrate, streak: streakParam } = useLocalSearchParams<{
+    celebrate?: string;
+    streak?: string;
+  }>();
   const tzLabel = getDeviceTimezoneLabel();
   const [remaining, setRemaining] = useState(msUntilMidnight());
+  const isCelebration = celebrate === "1";
 
   const { data: photoToday } = useQuery({
     queryKey: queryKeys.photoToday,
@@ -46,7 +52,9 @@ export default function StreakScreen() {
     return () => clearInterval(id);
   }, []);
 
-  const count = photoToday?.currentStreak ?? 0;
+  const count = streakParam
+    ? Number(streakParam)
+    : (photoToday?.currentStreak ?? 0);
   const bothSent = photoToday?.bothSentToday ?? false;
 
   return (
@@ -72,8 +80,38 @@ export default function StreakScreen() {
             {count}
           </AppText>
           <AppText variant="h2" style={styles.heroLabel}>
-            Day Streak
+            {isCelebration ? "Streak Secured!" : "Day Streak"}
           </AppText>
+
+          {isCelebration ? (
+            <View
+              style={[
+                styles.celebrationBanner,
+                {
+                  backgroundColor: "rgba(74,222,128,0.15)",
+                  borderColor: theme.colors.accent.success,
+                },
+              ]}
+            >
+              <AppText variant="bodySemibold" style={{ color: theme.colors.accent.success }}>
+                You both sent today&apos;s photo — nice work!
+              </AppText>
+            </View>
+          ) : (
+            <View
+              style={[
+                styles.celebrationBanner,
+                {
+                  backgroundColor: "rgba(230,57,70,0.12)",
+                  borderColor: theme.colors.border.emphasis,
+                },
+              ]}
+            >
+              <AppText variant="bodySemibold" color="accent">
+                Photo sent! Keep the streak going.
+              </AppText>
+            </View>
+          )}
 
           <WeekStreakTracker
             currentStreak={count}
@@ -145,6 +183,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   heroLabel: { textAlign: "center", marginBottom: 8 },
+  celebrationBanner: {
+    marginTop: 8,
+    marginBottom: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    width: "100%",
+    alignItems: "center",
+  },
   copy: { textAlign: "center", marginTop: 8, paddingHorizontal: 12 },
   timerBox: {
     marginTop: 28,

@@ -18,7 +18,10 @@ const SYNC_ACTIONS: Record<string, (readonly unknown[])[]> = {
     queryKeys.widgetSummary,
   ],
   SYNC_PRESENCE: [queryKeys.partnerPresence],
-  SYNC_GAMES: [queryKeys.triviaGame],
+  SYNC_PROFILE: [queryKeys.profile, queryKeys.partnerPresence],
+  SYNC_GAMES: [queryKeys.triviaGame, queryKeys.gridGame("connect4")],
+  GAME_STATE: [queryKeys.gridGame("connect4")],
+  GAME_OVER: [queryKeys.gridGame("connect4")],
   RELATIONSHIP_ENDED: [],
 };
 

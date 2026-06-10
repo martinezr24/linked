@@ -26,6 +26,10 @@ export default function RootLayout() {
                 name="photos/memories"
                 options={{ presentation: "modal", headerShown: false }}
               />
+              <Stack.Screen
+                name="games/connect4"
+                options={{ headerShown: false }}
+              />
             </Stack>
           </RelationshipProvider>
         </QueryProvider>

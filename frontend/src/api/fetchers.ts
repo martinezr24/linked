@@ -1,12 +1,16 @@
 import { apiFetch } from "@/utils/api";
 import type {
   AsyncNote,
+  GridGame,
   ListItem,
   PartnerPresence,
   PhotoDayGroup,
+  PhotoPostResponse,
   PhotoToday,
+  ProfileResponse,
   SharedEvent,
   TodayCheckIns,
+  UserProfile,
   WeeklyGoal,
   WidgetSummary,
 } from "@/types";
@@ -91,6 +95,73 @@ export async function fetchPartnerPresence(deviceId: string) {
   if (!res.ok) throw new Error("Failed to load partner presence");
   return res.json() as Promise<PartnerPresence>;
 }
+
+export async function fetchProfile(deviceId: string) {
+  const res = await apiFetch("/api/profile", deviceId);
+  if (!res.ok) throw new Error("Failed to load profile");
+  return res.json() as Promise<ProfileResponse>;
+}
+
+export async function updateProfile(
+  deviceId: string,
+  body: {
+    displayName?: string;
+    calendarColor?: string;
+    statusMessage?: string;
+  },
+) {
+  const res = await apiFetch("/api/profile", deviceId, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error("Failed to update profile");
+  return res.json() as Promise<UserProfile>;
+}
+
+export async function fetchGridGame(deviceId: string, gameType = "connect4") {
+  const res = await apiFetch(
+    `/api/games/grid/active?type=${encodeURIComponent(gameType)}`,
+    deviceId,
+  );
+  if (!res.ok) throw new Error("Failed to load game");
+  const data = await res.json();
+  return (data as GridGame | null) ?? null;
+}
+
+export async function createGridGame(deviceId: string, gameType = "connect4") {
+  const res = await apiFetch("/api/games/grid", deviceId, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ gameType }),
+  });
+  if (!res.ok) throw new Error("Failed to create game");
+  return res.json() as Promise<GridGame>;
+}
+
+export async function joinGridGame(deviceId: string, gameId: string) {
+  const res = await apiFetch(`/api/games/grid/${gameId}/join`, deviceId, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to join game");
+  return res.json() as Promise<GridGame>;
+}
+
+export async function moveGridGame(
+  deviceId: string,
+  gameId: string,
+  move: { column: number },
+) {
+  const res = await apiFetch(`/api/games/grid/${gameId}/move`, deviceId, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ move }),
+  });
+  if (!res.ok) throw new Error("Failed to move");
+  return res.json() as Promise<GridGame>;
+}
+
+export type { PhotoPostResponse };
 
 export async function fetchAsyncNotes(deviceId: string) {
   const res = await apiFetch("/api/async-notes", deviceId);

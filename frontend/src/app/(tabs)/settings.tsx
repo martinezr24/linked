@@ -1,25 +1,20 @@
 import { useEffect, useState } from "react";
-import { Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Platform, ScrollView, StyleSheet } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
-import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { ProfileSettingsCard } from "@/components/profile/ProfileSettingsCard";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
 import { useRelationship } from "@/context/RelationshipContext";
 import { syncMyPresence } from "@/utils/presenceSync";
 import { getWeatherCity, setWeatherCity } from "@/utils/weatherCity";
 import { apiFetch } from "@/utils/api";
-import {
-  getMyDisplayName,
-  getPartnerDisplayName,
-  setMyDisplayName,
-  setPartnerDisplayName,
-} from "@/utils/coupleNames";
+import { AppTextInput } from "@/components/AppTextInput";
 import { getDeviceTimezoneLabel } from "@/utils/dates";
 import { showMutationError } from "@/utils/errors";
 import { useTheme } from "@/theme/useTheme";
@@ -49,22 +44,12 @@ export default function SettingsScreen() {
   const theme = useTheme();
   const { deviceId, clearPaired } = useRelationship();
   const queryClient = useQueryClient();
-  const [mineName, setMineName] = useState("");
-  const [partnerName, setPartnerName] = useState("");
   const [myCity, setMyCity] = useState("");
   const [savingPresence, setSavingPresence] = useState(false);
   const tzLabel = getDeviceTimezoneLabel();
 
   useEffect(() => {
-    Promise.all([
-      getMyDisplayName(),
-      getPartnerDisplayName(),
-      getWeatherCity(),
-    ]).then(([mine, partner, city]) => {
-      setMineName(mine ?? "");
-      setPartnerName(partner ?? "");
-      setMyCity(city ?? "");
-    });
+    getWeatherCity().then((city) => setMyCity(city ?? ""));
   }, []);
 
   const inputStyle = [
@@ -75,16 +60,6 @@ export default function SettingsScreen() {
       color: theme.colors.text.primary,
     },
   ];
-
-  const saveNames = async () => {
-    await setMyDisplayName(mineName);
-    await setPartnerDisplayName(partnerName);
-    if (Platform.OS === "web") {
-      window.alert("Names saved.");
-    } else {
-      Alert.alert("Saved", "Your header will show these initials.");
-    }
-  };
 
   const handleUnlink = async () => {
     const confirmed = await confirmUnlink();
@@ -115,33 +90,7 @@ export default function SettingsScreen() {
             Settings
           </AppText>
 
-          <ArtifactCard category="Profile" title="Display names">
-            <AppText variant="body" color="secondary" style={styles.hint}>
-              Shown on your Home header. Partner name is how you label them on
-              your device.
-            </AppText>
-            <AppText variant="caption" color="secondary" style={styles.fieldLabel}>
-              YOUR NAME
-            </AppText>
-            <AppTextInput
-              style={inputStyle}
-              value={mineName}
-              onChangeText={setMineName}
-              placeholder="e.g. Gio"
-              placeholderTextColor={theme.colors.text.muted}
-            />
-            <AppText variant="caption" color="secondary" style={styles.fieldLabel}>
-              PARTNER'S NAME
-            </AppText>
-            <AppTextInput
-              style={inputStyle}
-              value={partnerName}
-              onChangeText={setPartnerName}
-              placeholder="e.g. Zenith"
-              placeholderTextColor={theme.colors.text.muted}
-            />
-            <PrimaryButton label="Save names" onPress={saveNames} />
-          </ArtifactCard>
+          <ProfileSettingsCard />
 
           <ArtifactCard category="Their world" title="Weather for your partner">
             <AppText variant="body" color="secondary" style={styles.hint}>

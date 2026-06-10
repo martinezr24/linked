@@ -30,14 +30,19 @@ export function DailyPhotoCard() {
   });
 
   const sendPhoto = useMutation({
-    mutationFn: async (uri: string) => {
-      await uploadDailyPhoto(deviceId!, uri, caption);
-    },
-    onSuccess: () => {
+    mutationFn: async (uri: string) => uploadDailyPhoto(deviceId!, uri, caption),
+    onSuccess: (result) => {
       setCaption(pickRandomCaption());
       void queryClient.invalidateQueries({ queryKey: queryKeys.photoToday });
       void queryClient.invalidateQueries({ queryKey: queryKeys.widgetSummary });
       void queryClient.invalidateQueries({ queryKey: queryKeys.photoHistory() });
+      router.push({
+        pathname: "/streak",
+        params: {
+          celebrate: result.bothSentToday ? "1" : "0",
+          streak: String(result.currentStreak),
+        },
+      });
     },
     onError: () => showMutationError("Could not send your photo."),
   });

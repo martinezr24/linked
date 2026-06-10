@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
 import { useCoupleNames } from "@/hooks/useCoupleNames";
+import { useProfile } from "@/hooks/useProfile";
 import { useTheme } from "@/theme/useTheme";
 import { eventColorFor, ownerFilterLabel } from "@/utils/eventColors";
 import type { EventOwnerType } from "@/types";
@@ -16,6 +17,8 @@ const OPTIONS: EventOwnerType[] = ["self", "partner", "shared"];
 export function EventOwnerPicker({ value, onChange }: Props) {
   const theme = useTheme();
   const { mineName, partnerName } = useCoupleNames();
+  const { mineColor, partnerColor } = useProfile();
+  const profileColors = { mineColor, partnerColor };
 
   return (
     <View style={styles.wrap}>
@@ -25,7 +28,7 @@ export function EventOwnerPicker({ value, onChange }: Props) {
       <View style={styles.row}>
         {OPTIONS.map((option) => {
           const selected = value === option;
-          const colors = eventColorFor(option, theme);
+          const colors = eventColorFor(option, theme, profileColors);
 
           return (
             <Pressable

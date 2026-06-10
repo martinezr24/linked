@@ -12,6 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/ui/AppText";
 import { useCoupleNames } from "@/hooks/useCoupleNames";
+import { useProfile } from "@/hooks/useProfile";
 import { useTheme } from "@/theme/useTheme";
 import {
   eventStartIso,
@@ -46,6 +47,8 @@ export function DayAgendaSheet({
 }: Props) {
   const theme = useTheme();
   const { mineName, partnerName } = useCoupleNames();
+  const { mineColor, partnerColor } = useProfile();
+  const profileColors = { mineColor, partnerColor };
   const label = formatDateLabelInTimezone(day, timeZone);
 
   const sorted = [...events].sort(
@@ -91,7 +94,8 @@ export function DayAgendaSheet({
                 </AppText>
               ) : (
                 sorted.map((item) => {
-                  const ownerColors = eventColorFor(item.ownerType, theme);
+                  const ownerType = item.ownerType ?? "shared";
+                  const ownerColors = eventColorFor(ownerType, theme, profileColors);
                   return (
                     <View
                       key={item.id}

@@ -1,21 +1,14 @@
 import { getApiBase } from "@/constants/api";
 import { apiFetch } from "@/utils/api";
-import { localDateString } from "@/utils/dates";
-import type { PhotoPostResponse } from "@/types";
 
-export async function uploadDailyPhoto(
+export async function uploadProfileAvatar(
   deviceId: string,
   imageUri: string,
-  caption?: string,
-): Promise<PhotoPostResponse> {
-  const photoDate = localDateString();
-  const presignRes = await apiFetch("/api/photos/presign", deviceId, {
+): Promise<void> {
+  const presignRes = await apiFetch("/api/profile/avatar/presign", deviceId, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contentType: "image/jpeg",
-      photoDate,
-    }),
+    body: JSON.stringify({ contentType: "image/jpeg" }),
   });
   if (!presignRes.ok) throw new Error("Could not prepare upload");
   const { uploadUrl, objectKey } = (await presignRes.json()) as {
@@ -35,15 +28,10 @@ export async function uploadDailyPhoto(
   });
   if (!putRes.ok) throw new Error("Upload failed");
 
-  const postRes = await apiFetch("/api/photos", deviceId, {
-    method: "POST",
+  const saveRes = await apiFetch("/api/profile/avatar", deviceId, {
+    method: "PUT",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      objectKey,
-      caption: caption?.trim() || undefined,
-      photoDate,
-    }),
+    body: JSON.stringify({ objectKey }),
   });
-  if (!postRes.ok) throw new Error("Could not save photo");
-  return postRes.json() as Promise<PhotoPostResponse>;
+  if (!saveRes.ok) throw new Error("Could not save avatar");
 }

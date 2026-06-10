@@ -2,6 +2,7 @@ import { ScrollView, Pressable, StyleSheet } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
 import { useCoupleNames } from "@/hooks/useCoupleNames";
+import { useProfile } from "@/hooks/useProfile";
 import { useTheme } from "@/theme/useTheme";
 import { eventColorFor, ownerFilterLabel } from "@/utils/eventColors";
 import type { EventOwnerType } from "@/types";
@@ -21,6 +22,8 @@ const FILTERS: (EventOwnerType | "all")[] = [
 export function OwnerFilterChips({ value, onChange }: Props) {
   const theme = useTheme();
   const { mineName, partnerName } = useCoupleNames();
+  const { mineColor, partnerColor } = useProfile();
+  const profileColors = { mineColor, partnerColor };
 
   return (
     <ScrollView
@@ -33,7 +36,7 @@ export function OwnerFilterChips({ value, onChange }: Props) {
         const chipColors =
           filter === "all"
             ? { bg: theme.colors.surface.input, text: theme.colors.text.primary }
-            : eventColorFor(filter, theme);
+            : eventColorFor(filter, theme, profileColors);
 
         return (
           <Pressable

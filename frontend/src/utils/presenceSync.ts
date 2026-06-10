@@ -1,11 +1,15 @@
-import * as Location from "expo-location";
+import * as Battery from "expo-battery";
 
 import { apiFetch } from "@/utils/api";
 import { getDeviceTimezoneLabel } from "@/utils/dates";
 import { getWeatherCity } from "@/utils/weatherCity";
+import * as Location from "expo-location";
 
-/** Push timezone + location so your partner can see local time and weather. */
-export async function syncMyPresence(deviceId: string): Promise<void> {
+/** Push timezone, location, battery, and status so your partner can see them. */
+export async function syncMyPresence(
+  deviceId: string,
+  statusMessage?: string,
+): Promise<void> {
   const timezone = getDeviceTimezoneLabel();
   const weatherCity = (await getWeatherCity()) ?? undefined;
 
@@ -25,6 +29,16 @@ export async function syncMyPresence(deviceId: string): Promise<void> {
     // Location unavailable — city fallback may still work
   }
 
+  let batteryPercent: number | undefined;
+  try {
+    const level = await Battery.getBatteryLevelAsync();
+    if (level >= 0) {
+      batteryPercent = Math.round(level * 100);
+    }
+  } catch {
+    // Battery API unavailable on some platforms
+  }
+
   await apiFetch("/api/profile/presence", deviceId, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
@@ -33,6 +47,8 @@ export async function syncMyPresence(deviceId: string): Promise<void> {
       weatherCity,
       weatherLat,
       weatherLon,
+      batteryPercent,
+      statusMessage: statusMessage?.trim() || undefined,
     }),
   });
 }
