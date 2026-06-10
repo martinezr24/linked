@@ -69,7 +69,7 @@ export function ProfileSettingsCard() {
     <ArtifactCard category="Profile" title="Your profile">
       <AppText variant="body" color="secondary" style={styles.hint}>
         Your nickname, avatar, and calendar color sync with your partner.
-        Update your status anytime from Home.
+        Update your status anytime from Us.
         {partner?.displayName ? ` Partner: ${partner.displayName}.` : ""}
       </AppText>
 

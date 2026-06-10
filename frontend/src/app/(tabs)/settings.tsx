@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Alert, Platform, ScrollView, StyleSheet } from "react-native";
+import { Alert, Platform, ScrollView, StyleSheet, View } from "react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -8,6 +8,7 @@ import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ProfileSettingsCard } from "@/components/profile/ProfileSettingsCard";
+import { WidgetPreviewCard } from "@/components/WidgetPreviewCard";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
 import { useRelationship } from "@/context/RelationshipContext";
@@ -144,9 +145,13 @@ export default function SettingsScreen() {
             </AppText>
           </ArtifactCard>
 
+          <View style={styles.widgetWrap}>
+            <WidgetPreviewCard />
+          </View>
+
           <ArtifactCard category="Daily rhythm" title="Check-ins">
             <AppText variant="body" color="secondary">
-              Optional connection prompts live in Play. They do not affect your
+              Optional connection prompts live in Us. They do not affect your
               photo streak.
             </AppText>
           </ArtifactCard>
@@ -171,6 +176,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontFamily: "DMSans_700Bold",
   },
+  widgetWrap: { marginHorizontal: -20, marginBottom: 8 },
   hint: { marginBottom: 12, lineHeight: 22 },
   fieldLabel: { marginBottom: 6, marginTop: 8 },
   input: {

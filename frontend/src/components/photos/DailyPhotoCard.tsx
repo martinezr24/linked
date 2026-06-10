@@ -151,7 +151,7 @@ export function DailyPhotoCard() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginHorizontal: 20, marginBottom: 12 },
+  wrap: { marginHorizontal: 20, marginBottom: 16 },
   loader: { padding: 24, alignItems: "center" },
   hint: { marginBottom: 12 },
   previewRow: {

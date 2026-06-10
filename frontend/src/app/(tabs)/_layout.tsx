@@ -76,8 +76,8 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="play"
         options={{
-          title: "Play",
-          tabBarLabel: "Play",
+          title: "Us",
+          tabBarLabel: "Us",
           tabBarIcon: ({ focused }) => (
             <TabPlayIcon
               color={focused ? colors.text.primary : colors.text.muted}

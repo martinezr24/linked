@@ -185,7 +185,7 @@ export function PartnerPresenceCard() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginHorizontal: 20, marginBottom: 12 },
+  wrap: { marginHorizontal: 20, marginBottom: 16 },
   loader: { padding: 16, alignItems: "center" },
   category: { marginBottom: 8 },
   nameRow: {

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   ScrollView,
@@ -11,7 +11,10 @@ import { router, type Href } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
-import { fetchGridGame } from "@/api/fetchers";
+import { fetchGoals, fetchGridGame } from "@/api/fetchers";
+import { AsyncNotesCard } from "@/components/AsyncNotesCard";
+import { WeeklyGoalsCard } from "@/components/goals/WeeklyGoalsCard";
+import { MyStatusCard } from "@/components/presence/MyStatusCard";
 import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
@@ -58,6 +61,17 @@ export default function PlayScreen() {
   const [prompt, setPrompt] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState(0);
+  const [goalsExpanded, setGoalsExpanded] = useState(false);
+
+  const { data: goals = [] } = useQuery({
+    queryKey: queryKeys.goals,
+    queryFn: () => fetchGoals(deviceId!),
+    enabled: Boolean(deviceId),
+  });
+
+  useEffect(() => {
+    if (goals.length > 0) setGoalsExpanded(true);
+  }, [goals.length]);
 
   const { data: game, isLoading } = useQuery({
     queryKey: queryKeys.triviaGame,
@@ -149,11 +163,13 @@ export default function PlayScreen() {
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <ScrollView contentContainerStyle={styles.scroll}>
           <AppText variant="h1" style={styles.title}>
-            Play
+            Us
           </AppText>
           <AppText variant="body" color="secondary" style={styles.sub}>
-            Quick connection rituals and trivia.
+            Rituals, notes, and games that keep you close.
           </AppText>
+
+          <MyStatusCard />
 
           {!checkInLoading ? (
             <CoupleProgressCard
@@ -165,6 +181,18 @@ export default function PlayScreen() {
               tzLabel={tzLabel}
             />
           ) : null}
+
+          <AsyncNotesCard />
+
+          <WeeklyGoalsCard
+            goals={goals}
+            expanded={goalsExpanded}
+            onToggleExpanded={() => setGoalsExpanded((e) => !e)}
+          />
+
+          <AppText variant="label" color="secondary" style={styles.sectionLabel}>
+            GAMES
+          </AppText>
 
           <ArtifactCard category="Real-time games" title="Connect 4">
             <AppText variant="body" color="secondary" style={styles.sub}>
@@ -295,6 +323,7 @@ const styles = StyleSheet.create({
   scroll: { padding: 20, paddingBottom: 100 },
   title: { marginBottom: 8 },
   sub: { marginBottom: 20 },
+  sectionLabel: { marginTop: 8, marginBottom: 12 },
   input: {
     borderWidth: 1,
     borderRadius: 8,
