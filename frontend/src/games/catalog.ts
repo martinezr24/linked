@@ -88,3 +88,15 @@ export function resolveResult(ctx: GameResultContext): string {
   const meta = getGameMeta(ctx.game.gameType);
   return meta?.getResult ? meta.getResult(ctx) : defaultResult(ctx);
 }
+
+export type GameOutcome = "win" | "lose" | "draw";
+
+export function resolveOutcome(game: GridGame): GameOutcome {
+  if (!game.winnerUserId) return "draw";
+  const iWon =
+    (game.myPlayerNumber === 1 && game.winnerUserId === game.playerXUserId) ||
+    (game.myPlayerNumber === 2 &&
+      !!game.playerOUserId &&
+      game.winnerUserId === game.playerOUserId);
+  return iWon ? "win" : "lose";
+}

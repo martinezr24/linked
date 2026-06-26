@@ -36,8 +36,13 @@ export function useGridGame(gameType: string) {
       ) {
         void queryClient.invalidateQueries({ queryKey: key });
       }
+      if (msg.action === "GAME_OVER") {
+        void queryClient.invalidateQueries({
+          queryKey: queryKeys.gridStats(gameType),
+        });
+      }
     });
-  }, [subscribe, queryClient, key]);
+  }, [subscribe, queryClient, key, gameType]);
 
   const startGame = useMutation({
     mutationFn: () => createGridGame(deviceId!, gameType),
@@ -63,12 +68,18 @@ export function useGridGame(gameType: string) {
   const makeMove = useCallback(
     (move: unknown) => {
       if (!game?.id || !game.isMyTurn) return;
-      sendWs("GAME_MOVE", { gameId: game.id, move });
-      void moveGridGame(deviceId!, game.id, move).then((updated) => {
-        queryClient.setQueryData(key, updated);
-      });
+      // Send over HTTP only. The server broadcasts GAME_STATE to the partner,
+      // who refetches. Sending over WS as well would apply the move twice.
+      moveGridGame(deviceId!, game.id, move)
+        .then((updated) => {
+          queryClient.setQueryData(key, updated);
+        })
+        .catch(() => {
+          // Resync from the server on any failure.
+          void queryClient.invalidateQueries({ queryKey: key });
+        });
     },
-    [deviceId, game, queryClient, sendWs, key],
+    [deviceId, game, queryClient, key],
   );
 
   return {

@@ -82,6 +82,39 @@ func handleGridGamesCreate(w http.ResponseWriter, r *http.Request) {
 	gameManager.BroadcastGameState(*user.RelationshipID, dto.ID, user.ID)
 }
 
+func handleGridGameStats(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) || r.Method != http.MethodGet {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+	user, err := getOrCreateUser(deviceID)
+	if err != nil || user.RelationshipID == nil {
+		http.Error(w, "not paired", http.StatusForbidden)
+		return
+	}
+	gameType := r.URL.Query().Get("type")
+	if gameType == "" {
+		gameType = games.Connect4Type
+	}
+	var partnerID string
+	_ = db.QueryRow(
+		`SELECT id::text FROM users WHERE relationship_id = $1 AND id != $2 LIMIT 1`,
+		*user.RelationshipID, user.ID,
+	).Scan(&partnerID)
+	stats, err := gameManager.GameStats(*user.RelationshipID, user.ID, partnerID, gameType)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(stats)
+}
+
 func handleGridGameByID(w http.ResponseWriter, r *http.Request) {
 	if applyCORS(w, r) {
 		return
@@ -151,6 +184,7 @@ func handleGridGameByID(w http.ResponseWriter, r *http.Request) {
 
 func registerGridGameRoutes() {
 	http.HandleFunc("/api/games/grid/active", handleGridGamesActive)
+	http.HandleFunc("/api/games/grid/stats", handleGridGameStats)
 	http.HandleFunc("/api/games/grid", func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/games/grid" || r.URL.Path == "/api/games/grid/" {
 			handleGridGamesCreate(w, r)

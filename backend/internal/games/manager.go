@@ -178,6 +178,9 @@ func (m *Manager) HandleMove(relationshipID, gameID, userID string, move json.Ra
 	}
 	m.BroadcastGameState(relationshipID, gameID, userID)
 	if newStatus == "finished" {
+		if playerO.Valid && playerO.String != "" {
+			m.recordResult(relationshipID, gameType.String, playerX.String, playerO.String, winnerUserID, draw)
+		}
 		payload := map[string]any{"gameId": gameID}
 		if winnerUserID != nil {
 			payload["winnerUserId"] = *winnerUserID
@@ -188,6 +191,74 @@ func (m *Manager) HandleMove(relationshipID, gameID, userID string, move json.Ra
 		m.broadcast(relationshipID, "GAME_OVER", payload)
 	}
 	return nil
+}
+
+// recordResult updates the all-time win/loss/draw record for both players.
+func (m *Manager) recordResult(relationshipID, gameType, playerX, playerO string, winner *string, draw bool) {
+	bump := func(userID string, w, l, d int) {
+		_, _ = m.db.Exec(
+			`INSERT INTO game_stats (relationship_id, user_id, game_type, wins, losses, draws)
+             VALUES ($1, $2, $3, $4, $5, $6)
+             ON CONFLICT (relationship_id, user_id, game_type)
+             DO UPDATE SET wins = game_stats.wins + $4,
+                           losses = game_stats.losses + $5,
+                           draws = game_stats.draws + $6,
+                           updated_at = NOW()`,
+			relationshipID, userID, gameType, w, l, d,
+		)
+	}
+	if draw {
+		bump(playerX, 0, 0, 1)
+		bump(playerO, 0, 0, 1)
+		return
+	}
+	if winner == nil {
+		return
+	}
+	loser := playerX
+	if *winner == playerX {
+		loser = playerO
+	}
+	bump(*winner, 1, 0, 0)
+	bump(loser, 0, 1, 0)
+}
+
+// GameStat is a single player's record for a game type.
+type GameStat struct {
+	Wins   int `json:"wins"`
+	Losses int `json:"losses"`
+	Draws  int `json:"draws"`
+}
+
+// GameStats returns the requesting user's record and their partner's record for
+// a game type. Missing rows are treated as all-zero.
+func (m *Manager) GameStats(relationshipID, userID, partnerID, gameType string) (map[string]GameStat, error) {
+	out := map[string]GameStat{
+		"me":      {},
+		"partner": {},
+	}
+	rows, err := m.db.Query(
+		`SELECT user_id::text, wins, losses, draws FROM game_stats
+         WHERE relationship_id::text = $1 AND game_type = $2`,
+		relationshipID, gameType,
+	)
+	if err != nil {
+		return out, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var uid string
+		var s GameStat
+		if err := rows.Scan(&uid, &s.Wins, &s.Losses, &s.Draws); err != nil {
+			return out, err
+		}
+		if uid == userID {
+			out["me"] = s
+		} else if uid == partnerID {
+			out["partner"] = s
+		}
+	}
+	return out, nil
 }
 
 func (m *Manager) CreateGame(relationshipID, userID, gameType string) (GridGameDTO, error) {
@@ -212,7 +283,7 @@ func (m *Manager) CreateGame(relationshipID, userID, gameType string) (GridGameD
 	var gameID string
 	err = m.db.QueryRow(
 		`INSERT INTO grid_games (relationship_id, game_type, status, board_state, player_x_user_id, current_turn_user_id)
-         VALUES ($1, $2, 'waiting', $3, $4, $4) RETURNING id::text`,
+         VALUES ($1, $2, 'active', $3, $4, $4) RETURNING id::text`,
 		relationshipID, gameType, state, userID,
 	).Scan(&gameID)
 	if err != nil {
@@ -239,10 +310,14 @@ func (m *Manager) JoinGame(relationshipID, gameID, userID string) (GridGameDTO, 
 		if playerX.String == userID {
 			return m.LoadGame(gameID, userID)
 		}
+		// Joiner becomes player O. If the creator has already taken their turn
+		// (current_turn is NULL = waiting for opponent), it becomes the joiner's
+		// turn; otherwise the creator still has the first move.
 		_, err = m.db.Exec(
-			`UPDATE grid_games SET player_o_user_id = $1, status = 'active', current_turn_user_id = $2, updated_at = NOW()
-             WHERE id::text = $3 AND status = 'waiting'`,
-			userID, playerX.String, gameID,
+			`UPDATE grid_games SET player_o_user_id = $1, status = 'active',
+             current_turn_user_id = COALESCE(current_turn_user_id, $1), updated_at = NOW()
+             WHERE id::text = $2 AND status IN ('waiting','active')`,
+			userID, gameID,
 		)
 		if err != nil {
 			return GridGameDTO{}, err

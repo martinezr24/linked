@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
+import Svg, { Circle, Line } from "react-native-svg";
 
-import { AppText } from "@/components/ui/AppText";
 import { registerGameRenderer } from "@/games/registry";
 import { useProfile } from "@/hooks/useProfile";
 import type { TicTacToeBoardState } from "@/types";
@@ -14,6 +14,49 @@ type Props = {
 };
 
 const CELL = 96;
+const MARK = 52;
+
+function XMark({ color }: { color: string }) {
+  const pad = (CELL - MARK) / 2 + 6;
+  const end = CELL - pad;
+  return (
+    <Svg width={CELL} height={CELL}>
+      <Line
+        x1={pad}
+        y1={pad}
+        x2={end}
+        y2={end}
+        stroke={color}
+        strokeWidth={9}
+        strokeLinecap="round"
+      />
+      <Line
+        x1={end}
+        y1={pad}
+        x2={pad}
+        y2={end}
+        stroke={color}
+        strokeWidth={9}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
+function OMark({ color }: { color: string }) {
+  return (
+    <Svg width={CELL} height={CELL}>
+      <Circle
+        cx={CELL / 2}
+        cy={CELL / 2}
+        r={MARK / 2 - 4}
+        stroke={color}
+        strokeWidth={9}
+        fill="none"
+      />
+    </Svg>
+  );
+}
 
 export function TicTacToeBoard({
   state,
@@ -28,11 +71,8 @@ export function TicTacToeBoard({
   const mark = (cell: number) => {
     if (cell === 0) return null;
     const mine = cell === myPlayerNumber;
-    return (
-      <AppText style={[styles.mark, { color: mine ? mineColor : partnerColor }]}>
-        {cell === 1 ? "✕" : "○"}
-      </AppText>
-    );
+    const color = mine ? mineColor : partnerColor;
+    return cell === 1 ? <XMark color={color} /> : <OMark color={color} />;
   };
 
   return (
@@ -70,5 +110,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "rgba(255,255,255,0.12)",
   },
-  mark: { fontSize: 52, fontWeight: "800" },
 });

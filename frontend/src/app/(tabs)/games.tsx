@@ -4,11 +4,12 @@ import { router, type Href } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
-import { fetchGridGame, fetchPhotoToday } from "@/api/fetchers";
+import { fetchGridGame, fetchGridStats, fetchPhotoToday } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { StreakPill } from "@/components/ui/StreakPill";
 import { GAMES, type GameMeta } from "@/games/catalog";
+import { useProfile } from "@/hooks/useProfile";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { useTheme } from "@/theme/useTheme";
@@ -41,7 +42,15 @@ function StatusBadge({ status }: { status: Status }) {
   );
 }
 
-function GameCard({ meta, status }: { meta: GameMeta; status: Status }) {
+function GameCard({
+  meta,
+  status,
+  record,
+}: {
+  meta: GameMeta;
+  status: Status;
+  record?: string;
+}) {
   const theme = useTheme();
   return (
     <Pressable
@@ -68,6 +77,11 @@ function GameCard({ meta, status }: { meta: GameMeta; status: Status }) {
         <AppText variant="body" color="secondary" style={styles.cardSub}>
           {meta.subtitle}
         </AppText>
+        {record ? (
+          <AppText variant="caption" color="muted" style={styles.record}>
+            {record}
+          </AppText>
+        ) : null}
       </View>
       <StatusBadge status={status} />
     </Pressable>
@@ -76,21 +90,44 @@ function GameCard({ meta, status }: { meta: GameMeta; status: Status }) {
 
 function GridGameCard({ meta }: { meta: GameMeta }) {
   const { deviceId } = useRelationship();
+  const { partnerName } = useProfile();
+  const partner = partnerName?.trim() || "Partner";
   const { data: game } = useQuery({
     queryKey: queryKeys.gridGame(meta.type),
     queryFn: () => fetchGridGame(deviceId!, meta.type),
     enabled: Boolean(deviceId),
   });
+  const { data: stats } = useQuery({
+    queryKey: queryKeys.gridStats(meta.type),
+    queryFn: () => fetchGridStats(deviceId!, meta.type),
+    enabled: Boolean(deviceId),
+  });
 
   let status: Status = { label: "Play", active: false };
   if (game && game.status === "active") {
-    status = game.isMyTurn
-      ? { label: "Your turn", active: true }
-      : { label: "In play", active: false };
+    const partnerStartedNew =
+      game.myPlayerNumber === 0 && !game.playerOUserId;
+    if (partnerStartedNew) {
+      status = { label: "New game!", active: true };
+    } else {
+      status = game.isMyTurn
+        ? { label: "Your turn", active: true }
+        : { label: "In play", active: false };
+    }
   } else if (game && game.status === "waiting") {
-    status = { label: "Waiting", active: game.myPlayerNumber === 0 };
+    status = { label: "New game!", active: game.myPlayerNumber === 0 };
   }
-  return <GameCard meta={meta} status={status} />;
+
+  let record: string | undefined;
+  if (
+    stats &&
+    meta.type !== "wordguess" &&
+    stats.me.wins + stats.partner.wins + stats.me.draws > 0
+  ) {
+    record = `You ${stats.me.wins} – ${stats.partner.wins} ${partner}`;
+  }
+
+  return <GameCard meta={meta} status={status} record={record} />;
 }
 
 function TriviaGameCard({ meta }: { meta: GameMeta }) {
@@ -186,6 +223,7 @@ const styles = StyleSheet.create({
   emoji: { fontSize: 26 },
   cardBody: { flex: 1 },
   cardSub: { marginTop: 2 },
+  record: { marginTop: 4 },
   badge: {
     paddingHorizontal: 10,
     paddingVertical: 6,

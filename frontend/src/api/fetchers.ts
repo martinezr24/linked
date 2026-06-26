@@ -129,6 +129,25 @@ export async function fetchGridGame(deviceId: string, gameType = "connect4") {
   return (data as GridGame | null) ?? null;
 }
 
+export type GameStat = { wins: number; losses: number; draws: number };
+export type GridStats = { me: GameStat; partner: GameStat };
+
+export async function fetchGridStats(
+  deviceId: string,
+  gameType = "connect4",
+): Promise<GridStats> {
+  const res = await apiFetch(
+    `/api/games/grid/stats?type=${encodeURIComponent(gameType)}`,
+    deviceId,
+  );
+  if (!res.ok) throw new Error("Failed to load stats");
+  const data = await res.json();
+  return {
+    me: data?.me ?? { wins: 0, losses: 0, draws: 0 },
+    partner: data?.partner ?? { wins: 0, losses: 0, draws: 0 },
+  };
+}
+
 export async function createGridGame(deviceId: string, gameType = "connect4") {
   const res = await apiFetch("/api/games/grid", deviceId, {
     method: "POST",

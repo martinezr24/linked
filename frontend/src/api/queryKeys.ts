@@ -13,6 +13,7 @@ export const queryKeys = {
   profile: ["profile"] as const,
   triviaGame: ["triviaGame"] as const,
   gridGame: (gameType: string) => ["gridGame", gameType] as const,
+  gridStats: (gameType: string) => ["gridStats", gameType] as const,
   list: (listType: string, eventId?: string) =>
     ["list", listType, eventId ?? ""] as const,
 };

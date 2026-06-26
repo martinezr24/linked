@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
@@ -17,6 +17,14 @@ import { useDailyCheckIn } from "@/hooks/useDailyCheckIn";
 import { useRelationship } from "@/context/RelationshipContext";
 import { getDeviceTimezoneLabel } from "@/utils/dates";
 
+function SectionLabel({ children }: { children: string }) {
+  return (
+    <AppText variant="label" color="secondary" style={styles.sectionLabel}>
+      {children}
+    </AppText>
+  );
+}
+
 export default function PlayScreen() {
   const { deviceId } = useRelationship();
   const tzLabel = getDeviceTimezoneLabel();
@@ -28,17 +36,13 @@ export default function PlayScreen() {
     sending,
     isLoading: checkInLoading,
   } = useDailyCheckIn();
-  const [goalsExpanded, setGoalsExpanded] = useState(false);
+  const [goalsExpanded, setGoalsExpanded] = useState(true);
 
   const { data: goals = [] } = useQuery({
     queryKey: queryKeys.goals,
     queryFn: () => fetchGoals(deviceId!),
     enabled: Boolean(deviceId),
   });
-
-  useEffect(() => {
-    if (goals.length > 0) setGoalsExpanded(true);
-  }, [goals.length]);
 
   return (
     <ScreenBackground>
@@ -56,34 +60,32 @@ export default function PlayScreen() {
               Rituals, notes, and plans that keep you close.
             </AppText>
 
-            <MyStatusCard />
+            <SectionLabel>TODAY</SectionLabel>
+            <View style={styles.group}>
+              <MyStatusCard />
+              {!checkInLoading ? (
+                <CoupleProgressCard
+                  checkIns={checkIns}
+                  note={note}
+                  onChangeNote={setNote}
+                  onSend={sendCheckIn}
+                  sending={sending}
+                  tzLabel={tzLabel}
+                />
+              ) : null}
+            </View>
 
-            {!checkInLoading ? (
-              <CoupleProgressCard
-                checkIns={checkIns}
-                note={note}
-                onChangeNote={setNote}
-                onSend={sendCheckIn}
-                sending={sending}
-                tzLabel={tzLabel}
+            <SectionLabel>TOGETHER</SectionLabel>
+            <View style={styles.group}>
+              <AsyncNotesCard />
+              <WeeklyGoalsCard
+                goals={goals}
+                expanded={goalsExpanded}
+                onToggleExpanded={() => setGoalsExpanded((e) => !e)}
               />
-            ) : null}
+            </View>
 
-            <AsyncNotesCard />
-
-            <WeeklyGoalsCard
-              goals={goals}
-              expanded={goalsExpanded}
-              onToggleExpanded={() => setGoalsExpanded((e) => !e)}
-            />
-
-            <AppText
-              variant="label"
-              color="secondary"
-              style={styles.sectionLabel}
-            >
-              PLANS
-            </AppText>
+            <SectionLabel>PLANS</SectionLabel>
             <View style={styles.bleed}>
               <SharedListSection
                 listType="reunion"
@@ -103,7 +105,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { padding: 20, paddingBottom: 100 },
   title: { marginBottom: 8 },
-  sub: { marginBottom: 20 },
-  sectionLabel: { marginTop: 8, marginBottom: 12 },
+  sub: { marginBottom: 4 },
+  sectionLabel: { marginTop: 24, marginBottom: 12 },
+  group: { gap: 16 },
   bleed: { marginHorizontal: -20 },
 });
+
