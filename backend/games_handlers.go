@@ -112,6 +112,15 @@ func handleGridGameByID(w http.ResponseWriter, r *http.Request) {
 		broadcastServerEvent(*user.RelationshipID, "SYNC_GAMES", map[string]any{})
 		return
 	}
+	if len(parts) >= 2 && parts[1] == "end" && r.Method == http.MethodPost {
+		if err := gameManager.EndGame(*user.RelationshipID, gameID, user.ID); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{"ok": true})
+		broadcastServerEvent(*user.RelationshipID, "SYNC_GAMES", map[string]any{})
+		return
+	}
 	if len(parts) >= 2 && parts[1] == "move" && r.Method == http.MethodPost {
 		var body struct {
 			Move json.RawMessage `json:"move"`

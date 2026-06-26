@@ -109,6 +109,11 @@ func (m *Manager) LoadGame(gameID, viewerID string) (GridGameDTO, error) {
 	} else if playerO.Valid && viewerID == playerO.String {
 		dto.MyPlayerNumber = 2
 	}
+	if viewer, ok := registry[gameType].(StateViewer); ok {
+		if redacted, vErr := viewer.ViewState(boardState, dto.MyPlayerNumber); vErr == nil {
+			dto.BoardState = redacted
+		}
+	}
 	return dto, nil
 }
 
@@ -146,6 +151,14 @@ func (m *Manager) HandleMove(relationshipID, gameID, userID string, move json.Ra
 		winnerUserID = winner
 	} else if draw {
 		newStatus = "finished"
+	} else if decider, ok := engine.(TurnDecider); ok {
+		next, dErr := decider.NextActor(newState, userID, playerX.String, playerO.String)
+		if dErr != nil {
+			return dErr
+		}
+		if next != "" {
+			nextTurn = &next
+		}
 	} else {
 		if userID == playerX.String && playerO.Valid {
 			t := playerO.String
@@ -262,6 +275,25 @@ func (m *Manager) GetActiveGame(relationshipID, userID, gameType string) (*GridG
 		return nil, err
 	}
 	return &dto, nil
+}
+
+// EndGame marks an active or waiting game as finished without a winner, so a
+// fresh game can be started. Either player in the relationship may end it.
+func (m *Manager) EndGame(relationshipID, gameID, userID string) error {
+	res, err := m.db.Exec(
+		`UPDATE grid_games SET status = 'finished', current_turn_user_id = NULL, updated_at = NOW()
+         WHERE id::text = $1 AND relationship_id::text = $2 AND status IN ('waiting','active')`,
+		gameID, relationshipID,
+	)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return errors.New("game not found")
+	}
+	m.BroadcastGameState(relationshipID, gameID, userID)
+	m.broadcast(relationshipID, "GAME_OVER", map[string]any{"gameId": gameID, "ended": true})
+	return nil
 }
 
 func (m *Manager) HandleWSJoin(conn *websocket.Conn, relationshipID, userID string, payload json.RawMessage) {

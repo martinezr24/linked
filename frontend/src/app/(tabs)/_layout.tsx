@@ -4,8 +4,8 @@ import { BlurView } from "expo-blur";
 
 import {
   TabEventsIcon,
+  TabGamesIcon,
   TabHomeIcon,
-  TabPlansIcon,
   TabPlayIcon,
   TabSettingsIcon,
 } from "@/components/ui/TabIcons";
@@ -55,15 +55,7 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="plans"
-        options={{
-          title: "Plans",
-          tabBarLabel: "Plans",
-          tabBarIcon: ({ focused }) => (
-            <TabPlansIcon
-              color={focused ? colors.text.primary : colors.text.muted}
-            />
-          ),
-        }}
+        options={{ href: null }}
       />
       <Tabs.Screen
         name="trip"
@@ -80,6 +72,18 @@ export default function TabsLayout() {
           tabBarLabel: "Us",
           tabBarIcon: ({ focused }) => (
             <TabPlayIcon
+              color={focused ? colors.text.primary : colors.text.muted}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="games"
+        options={{
+          title: "Games",
+          tabBarLabel: "Games",
+          tabBarIcon: ({ focused }) => (
+            <TabGamesIcon
               color={focused ? colors.text.primary : colors.text.muted}
             />
           ),

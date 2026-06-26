@@ -59,6 +59,35 @@ export function TabPlayIcon({ size = 24, color }: IconProps) {
   );
 }
 
+export function TabGamesIcon({ size = 24, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24">
+      <Rect
+        x={2.5}
+        y={7}
+        width={19}
+        height={10}
+        rx={5}
+        fill="none"
+        stroke={color}
+        strokeWidth={1.8}
+      />
+      <Path
+        d="M7 10v4M5 12h4"
+        stroke={color}
+        strokeWidth={1.8}
+        strokeLinecap="round"
+      />
+      <Path
+        d="M15.5 11.5h.01M18 13.5h.01"
+        stroke={color}
+        strokeWidth={2.2}
+        strokeLinecap="round"
+      />
+    </Svg>
+  );
+}
+
 export function TabSettingsIcon({ size = 24, color }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">

@@ -150,7 +150,7 @@ export async function joinGridGame(deviceId: string, gameId: string) {
 export async function moveGridGame(
   deviceId: string,
   gameId: string,
-  move: { column: number },
+  move: unknown,
 ) {
   const res = await apiFetch(`/api/games/grid/${gameId}/move`, deviceId, {
     method: "POST",
@@ -159,6 +159,14 @@ export async function moveGridGame(
   });
   if (!res.ok) throw new Error("Failed to move");
   return res.json() as Promise<GridGame>;
+}
+
+export async function endGridGame(deviceId: string, gameId: string) {
+  const res = await apiFetch(`/api/games/grid/${gameId}/end`, deviceId, {
+    method: "POST",
+  });
+  if (!res.ok) throw new Error("Failed to end game");
+  return res.json() as Promise<{ ok: boolean }>;
 }
 
 export type { PhotoPostResponse };

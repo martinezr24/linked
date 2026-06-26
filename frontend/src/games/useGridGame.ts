@@ -4,22 +4,21 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/api/queryKeys";
 import {
   createGridGame,
+  endGridGame,
   fetchGridGame,
   joinGridGame,
   moveGridGame,
 } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
-import type { Connect4BoardState, GridGame } from "@/types";
 
-const GAME_TYPE = "connect4";
-
-export function useGridGame() {
+export function useGridGame(gameType: string) {
   const { deviceId, subscribe, sendWs } = useRelationship();
   const queryClient = useQueryClient();
+  const key = queryKeys.gridGame(gameType);
 
   const { data: game, isLoading } = useQuery({
-    queryKey: queryKeys.gridGame(GAME_TYPE),
-    queryFn: () => fetchGridGame(deviceId!, GAME_TYPE),
+    queryKey: key,
+    queryFn: () => fetchGridGame(deviceId!, gameType),
     enabled: Boolean(deviceId),
   });
 
@@ -30,18 +29,20 @@ export function useGridGame() {
 
   useEffect(() => {
     return subscribe((msg) => {
-      if (msg.action === "GAME_STATE" || msg.action === "GAME_OVER") {
-        void queryClient.invalidateQueries({
-          queryKey: queryKeys.gridGame(GAME_TYPE),
-        });
+      if (
+        msg.action === "GAME_STATE" ||
+        msg.action === "GAME_OVER" ||
+        msg.action === "SYNC_GAMES"
+      ) {
+        void queryClient.invalidateQueries({ queryKey: key });
       }
     });
-  }, [subscribe, queryClient]);
+  }, [subscribe, queryClient, key]);
 
   const startGame = useMutation({
-    mutationFn: () => createGridGame(deviceId!, GAME_TYPE),
+    mutationFn: () => createGridGame(deviceId!, gameType),
     onSuccess: (created) => {
-      queryClient.setQueryData(queryKeys.gridGame(GAME_TYPE), created);
+      queryClient.setQueryData(key, created);
       sendWs("GAME_JOIN", { gameId: created.id });
     },
   });
@@ -49,30 +50,33 @@ export function useGridGame() {
   const joinGame = useMutation({
     mutationFn: (gameId: string) => joinGridGame(deviceId!, gameId),
     onSuccess: (joined) => {
-      queryClient.setQueryData(queryKeys.gridGame(GAME_TYPE), joined);
+      queryClient.setQueryData(key, joined);
       sendWs("GAME_JOIN", { gameId: joined.id });
     },
   });
 
+  const endGame = useMutation({
+    mutationFn: (gameId: string) => endGridGame(deviceId!, gameId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: key }),
+  });
+
   const makeMove = useCallback(
-    (column: number) => {
+    (move: unknown) => {
       if (!game?.id || !game.isMyTurn) return;
-      sendWs("GAME_MOVE", { gameId: game.id, move: { column } });
-      void moveGridGame(deviceId!, game.id, { column }).then((updated) => {
-        queryClient.setQueryData(queryKeys.gridGame(GAME_TYPE), updated);
+      sendWs("GAME_MOVE", { gameId: game.id, move });
+      void moveGridGame(deviceId!, game.id, move).then((updated) => {
+        queryClient.setQueryData(key, updated);
       });
     },
-    [deviceId, game, queryClient, sendWs],
+    [deviceId, game, queryClient, sendWs, key],
   );
-
-  const board = game?.boardState as Connect4BoardState | undefined;
 
   return {
     game,
-    board,
     isLoading,
     startGame,
     joinGame,
+    endGame,
     makeMove,
   };
 }

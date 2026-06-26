@@ -113,7 +113,7 @@ export type GridGame = {
   id: string;
   gameType: string;
   status: string;
-  boardState: Connect4BoardState;
+  boardState: unknown;
   currentTurnUserId?: string;
   winnerUserId?: string;
   playerXUserId: string;
@@ -127,6 +127,38 @@ export type Connect4BoardState = {
   cols: number;
   cells: number[][];
   moves: number[];
+};
+
+export type TicTacToeBoardState = {
+  cells: number[];
+  moves: number;
+};
+
+export type WordGuessBoardState = {
+  secret?: string;
+  length: number;
+  maxGuesses: number;
+  guesses: string[];
+  feedback: number[][];
+  solved: boolean;
+};
+
+export type DotsBoxesBoardState = {
+  size: number;
+  hEdges: number[][];
+  vEdges: number[][];
+  boxes: number[][];
+  turn: number;
+  scores: [number, number];
+};
+
+export type BattleshipBoardState = {
+  size: number;
+  boards: {
+    ships: number[][];
+    shots: number[][];
+  }[];
+  turn: number;
 };
 
 export type AsyncNote = {

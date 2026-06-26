@@ -1,76 +1,74 @@
 import { Pressable, StyleSheet, View } from "react-native";
 
-import { AppText } from "@/components/ui/AppText";
+import { registerGameRenderer } from "@/games/registry";
 import { useProfile } from "@/hooks/useProfile";
 import type { Connect4BoardState } from "@/types";
 
 type Props = {
-  state: Connect4BoardState;
+  state: unknown;
   isMyTurn: boolean;
   myPlayerNumber: number;
-  onColumnPress: (column: number) => void;
+  onMove: (move: unknown) => void;
   disabled?: boolean;
 };
 
-const DISC_SIZE = 36;
-const GAP = 6;
+const DISC_SIZE = 38;
+const GAP = 8;
+
+const BOARD_BG = "#3C4A5E";
+const EMPTY_CELL = "rgba(0,0,0,0.28)";
 
 export function Connect4Board({
   state,
   isMyTurn,
   myPlayerNumber,
-  onColumnPress,
+  onMove,
   disabled,
 }: Props) {
+  const board = state as Connect4BoardState;
   const { mineColor, partnerColor } = useProfile();
   const colorFor = (cell: number) => {
-    if (cell === 0) return "rgba(255,255,255,0.08)";
+    if (cell === 0) return EMPTY_CELL;
     if (cell === myPlayerNumber) return mineColor;
     return partnerColor;
   };
 
   return (
     <View style={styles.wrap}>
-      <View style={styles.columns}>
-        {Array.from({ length: state.cols }).map((_, col) => (
+      <View style={styles.board}>
+        {Array.from({ length: board.cols }).map((_, col) => (
           <Pressable
             key={col}
             style={styles.columnTap}
             disabled={disabled || !isMyTurn}
-            onPress={() => onColumnPress(col)}
+            onPress={() => onMove({ column: col })}
           >
-            {Array.from({ length: state.rows }).map((__, row) => {
-              const cell = state.cells[row]?.[col] ?? 0;
+            {Array.from({ length: board.rows }).map((__, row) => {
+              const cell = board.cells[row]?.[col] ?? 0;
               return (
                 <View
                   key={`${row}-${col}`}
-                  style={[
-                    styles.disc,
-                    { backgroundColor: colorFor(cell) },
-                  ]}
+                  style={[styles.disc, { backgroundColor: colorFor(cell) }]}
                 />
               );
             })}
           </Pressable>
         ))}
       </View>
-      {!isMyTurn && !disabled ? (
-        <AppText variant="body" color="secondary" style={styles.hint}>
-          Waiting for partner&apos;s move…
-        </AppText>
-      ) : null}
     </View>
   );
 }
 
+registerGameRenderer("connect4", Connect4Board);
+
 const styles = StyleSheet.create({
   wrap: { alignItems: "center", gap: 12 },
-  columns: {
+  board: {
     flexDirection: "row",
     gap: GAP,
-    padding: 12,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.04)",
+    padding: 14,
+    borderRadius: 20,
+    backgroundColor: BOARD_BG,
   },
   columnTap: {
     gap: GAP,
@@ -81,5 +79,4 @@ const styles = StyleSheet.create({
     height: DISC_SIZE,
     borderRadius: DISC_SIZE / 2,
   },
-  hint: { textAlign: "center" },
 });
