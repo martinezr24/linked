@@ -16,10 +16,12 @@ type Props = {
 
 const KEY_ROWS = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
 
-const COLOR_CORRECT = "#4A8C5C";
-const COLOR_PRESENT = "#B59A3F";
-const COLOR_ABSENT = "#2A2324";
-const TILE_EMPTY = "rgba(255,255,255,0.06)";
+const COLOR_CORRECT = "#3E9B5F";
+const COLOR_PRESENT = "#C9A24A";
+const COLOR_ABSENT = "#4A4143";
+const TILE_EMPTY_BORDER = "rgba(255,255,255,0.14)";
+const KEY_UNUSED = "#5A4E51";
+const KEY_ABSENT = "#332B2D";
 
 export function WordGuessBoard({ state, isMyTurn, onMove, disabled }: Props) {
   const theme = useTheme();
@@ -72,17 +74,19 @@ export function WordGuessBoard({ state, isMyTurn, onMove, disabled }: Props) {
             <View key={row} style={styles.row}>
               {Array.from({ length }).map((__, col) => {
                 let letter = "";
-                let bg = TILE_EMPTY;
-                let border = "transparent";
+                let bg = "transparent";
+                let border = TILE_EMPTY_BORDER;
                 if (committed) {
                   letter = guesses[row][col]?.toUpperCase() ?? "";
                   bg = fillColor(feedback[row]?.[col] ?? 0);
+                  border = "transparent";
                 } else if (isCurrent) {
                   letter = draft[col]?.toUpperCase() ?? "";
+                  if (draft[col]) bg = "rgba(255,255,255,0.05)";
                   border =
                     col === draft.length
                       ? theme.colors.text.primary
-                      : "rgba(255,255,255,0.18)";
+                      : "rgba(255,255,255,0.28)";
                 }
                 return (
                   <View
@@ -106,7 +110,14 @@ export function WordGuessBoard({ state, isMyTurn, onMove, disabled }: Props) {
           <View key={i} style={styles.keyRow}>
             {i === 2 ? (
               <Pressable
-                style={[styles.key, styles.wideKey]}
+                style={[
+                  styles.key,
+                  styles.wideKey,
+                  {
+                    backgroundColor: theme.colors.accent.primary,
+                    opacity: !locked && draft.length === length ? 1 : 0.4,
+                  },
+                ]}
                 disabled={locked || draft.length !== length}
                 onPress={handleSubmit}
               >
@@ -117,12 +128,12 @@ export function WordGuessBoard({ state, isMyTurn, onMove, disabled }: Props) {
               const s = letterStatus[ch];
               const bg =
                 s === undefined
-                  ? "#5A6473"
+                  ? KEY_UNUSED
                   : s === 2
                     ? COLOR_CORRECT
                     : s === 1
                       ? COLOR_PRESENT
-                      : "#3A3334";
+                      : KEY_ABSENT;
               return (
                 <Pressable
                   key={ch}
@@ -136,7 +147,11 @@ export function WordGuessBoard({ state, isMyTurn, onMove, disabled }: Props) {
             })}
             {i === 2 ? (
               <Pressable
-                style={[styles.key, styles.wideKey]}
+                style={[
+                  styles.key,
+                  styles.wideKey,
+                  { backgroundColor: KEY_UNUSED },
+                ]}
                 disabled={locked}
                 onPress={handleBackspace}
               >
@@ -164,7 +179,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  tileText: { fontSize: 24, fontFamily: "DMSans_700Bold", color: "#F5F0F1" },
+  tileText: {
+    fontSize: 24,
+    lineHeight: 30,
+    fontFamily: "DMSans_700Bold",
+    color: "#F5F0F1",
+    textAlign: "center",
+    includeFontPadding: false,
+  },
   keyboard: { gap: 8, alignItems: "center" },
   keyRow: { flexDirection: "row", gap: 6 },
   key: {
