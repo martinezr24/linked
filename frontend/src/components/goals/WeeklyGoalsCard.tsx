@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Keyboard, Pressable, StyleSheet, View } from "react-native";
+import { useState } from "react";
+import { Keyboard, StyleSheet, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { AppTextInput } from "@/components/AppTextInput";
@@ -17,27 +17,15 @@ import type { WeeklyGoal } from "@/types";
 
 type Props = {
   goals: WeeklyGoal[];
-  expanded: boolean;
-  onToggleExpanded: () => void;
 };
 
-export function WeeklyGoalsCard({
-  goals,
-  expanded,
-  onToggleExpanded,
-}: Props) {
+export function WeeklyGoalsCard({ goals }: Props) {
   const theme = useTheme();
   const { deviceId } = useRelationship();
   const queryClient = useQueryClient();
   const [goalInput, setGoalInput] = useState("");
   const completed = goals.filter((g) => g.done).length;
   const total = goals.length;
-
-  useEffect(() => {
-    if (goals.length > 0 && !expanded) {
-      // parent controls expanded; no auto-expand here
-    }
-  }, [goals.length, expanded]);
 
   const addGoal = useMutation({
     mutationFn: async (text: string) => {
@@ -90,20 +78,21 @@ export function WeeklyGoalsCard({
 
   return (
     <View style={styles.section}>
-      <Pressable onPress={onToggleExpanded} style={styles.header}>
-        <AppText variant="label" color="secondary">
-          THIS WEEK {expanded ? "" : "(tap to expand)"}
-        </AppText>
-        {total > 0 ? <WeeklyScoreRing completed={completed} total={total} /> : null}
-      </Pressable>
-      {expanded ? (
-        <ArtifactCard category="This week" title="Connection goals">
+      <ArtifactCard category="This week" title="Connection goals">
+        <View style={styles.introRow}>
+          <AppText variant="body" color="secondary" style={styles.intro}>
+            Little things to grow closer this week.
+          </AppText>
           {total > 0 ? (
-            <AppText variant="caption" color="secondary" style={styles.scoreHint}>
-              Weekly connection score · {completed} of {total} done
-            </AppText>
+            <WeeklyScoreRing completed={completed} total={total} />
           ) : null}
-          <View style={styles.goalInputRow}>
+        </View>
+        {total > 0 ? (
+          <AppText variant="caption" color="secondary" style={styles.scoreHint}>
+            {completed} of {total} done this week
+          </AppText>
+        ) : null}
+        <View style={styles.goalInputRow}>
             <AppTextInput
               style={[
                 styles.goalInput,
@@ -142,20 +131,21 @@ export function WeeklyGoalsCard({
               />
             ))
           )}
-        </ArtifactCard>
-      ) : null}
+      </ArtifactCard>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   section: { paddingHorizontal: 20 },
-  header: {
+  introRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
+    gap: 12,
     marginBottom: 8,
   },
+  intro: { flex: 1 },
   scoreHint: { marginBottom: 12, letterSpacing: 0.5 },
   goalInputRow: { flexDirection: "row", gap: 8, marginBottom: 12 },
   goalInput: {

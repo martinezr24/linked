@@ -30,6 +30,8 @@ type Props = {
   placeholder: string;
   notePlaceholder?: string;
   eventId?: string;
+  description?: string;
+  stacked?: boolean;
 };
 
 export function SharedListSection({
@@ -38,6 +40,8 @@ export function SharedListSection({
   placeholder,
   notePlaceholder,
   eventId,
+  description,
+  stacked = true,
 }: Props) {
   const theme = useTheme();
   const { deviceId, relationshipId } = useRelationship();
@@ -102,7 +106,7 @@ export function SharedListSection({
   if (isLoading) {
     return (
       <View style={styles.wrap}>
-        <ArtifactCard title={title}>
+        <ArtifactCard title={title} stacked={stacked}>
           <ActivityIndicator color={theme.colors.accent.primary} />
         </ArtifactCard>
       </View>
@@ -111,7 +115,12 @@ export function SharedListSection({
 
   return (
     <View style={styles.wrap}>
-      <ArtifactCard title={title} stacked>
+      <ArtifactCard title={title} stacked={stacked}>
+        {description ? (
+          <AppText variant="body" color="secondary" style={styles.description}>
+            {description}
+          </AppText>
+        ) : null}
         {error ? (
           <AppText variant="body" color="accent" style={styles.errorText}>
             Could not load list. Is the backend running?
@@ -180,6 +189,7 @@ export function SharedListSection({
 
 const styles = StyleSheet.create({
   wrap: { marginHorizontal: 20, marginBottom: 8 },
+  description: { marginBottom: 12, marginTop: -4 },
   errorText: { marginBottom: 12 },
   inputRow: { flexDirection: "row", marginBottom: 10, gap: 8 },
   input: {

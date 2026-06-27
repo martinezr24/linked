@@ -13,10 +13,13 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { DailyPhotoCard } from "@/components/photos/DailyPhotoCard";
+import { GoalsSummaryCard } from "@/components/goals/GoalsSummaryCard";
 import { PartnerPresenceCard } from "@/components/presence/PartnerPresenceCard";
+import { CoupleProgressCard } from "@/components/ui/CoupleProgressCard";
 import { VisitCountdownHero } from "@/components/VisitCountdownHero";
 import { VisitEditSheet } from "@/components/VisitEditSheet";
 import { useCoupleNames } from "@/hooks/useCoupleNames";
+import { useDailyCheckIn } from "@/hooks/useDailyCheckIn";
 import { useProfile } from "@/hooks/useProfile";
 import { initialFromName } from "@/utils/coupleNames";
 import { AppText } from "@/components/ui/AppText";
@@ -65,6 +68,14 @@ export default function HomeScreen() {
   const { mineName, partnerName } = useCoupleNames();
   const { mineAvatarUrl, partnerAvatarUrl, mineColor, partnerColor } =
     useProfile();
+  const {
+    checkIns,
+    note,
+    setNote,
+    sendCheckIn,
+    sending,
+    isLoading: checkInLoading,
+  } = useDailyCheckIn();
 
   const enabled = Boolean(deviceId);
 
@@ -182,6 +193,19 @@ export default function HomeScreen() {
             <PartnerPresenceCard />
 
             <DailyPhotoCard />
+
+            {!checkInLoading ? (
+              <CoupleProgressCard
+                checkIns={checkIns}
+                note={note}
+                onChangeNote={setNote}
+                onSend={sendCheckIn}
+                sending={sending}
+                tzLabel={tzLabel}
+              />
+            ) : null}
+
+            <GoalsSummaryCard />
 
             <VisitCountdownHero
               nextVisitAt={nextVisitAt}
