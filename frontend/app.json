@@ -61,6 +61,13 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bc666e2b-a60d-47bb-8e74-8087daef6895"
+      }
+    },
+    "owner": "giojetski"
   }
 }

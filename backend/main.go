@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
@@ -119,8 +120,18 @@ func initDB() {
 		log.Fatalf("Failed to open database: %v", err)
 	}
 
-	if err = db.Ping(); err != nil {
-		log.Fatalf("Database unreachable: %v", err)
+	// Postgres may still be waking up (e.g. Fly auto-start), so retry the
+	// initial connection with backoff instead of crashing immediately.
+	const maxAttempts = 15
+	for attempt := 1; ; attempt++ {
+		if err = db.Ping(); err == nil {
+			break
+		}
+		if attempt >= maxAttempts {
+			log.Fatalf("Database unreachable after %d attempts: %v", attempt, err)
+		}
+		log.Printf("Database not ready (attempt %d/%d): %v", attempt, maxAttempts, err)
+		time.Sleep(2 * time.Second)
 	}
 
 	fmt.Println("Successfully connected to PostgreSQL database!")
@@ -1809,6 +1820,87 @@ func handlePairingUnlink(w http.ResponseWriter, r *http.Request) {
 	broadcastServerEvent(relationshipID, "RELATIONSHIP_ENDED", map[string]any{})
 }
 
+// handleAccountDelete permanently removes the requesting user's account and all
+// associated data. Because the app has no separate login, the device identity is
+// the account. If the user is paired, the shared relationship and its content are
+// also removed and the partner is notified/unpaired (Apple account-deletion req).
+func handleAccountDelete(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
+		return
+	}
+	if r.Method != http.MethodPost && r.Method != http.MethodDelete {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+
+	user, err := getOrCreateUser(deviceID)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	var relationshipID string
+	if user.RelationshipID != nil {
+		relationshipID = *user.RelationshipID
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	defer tx.Rollback()
+
+	if relationshipID != "" {
+		if err = deleteRelationshipData(tx, relationshipID); err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		if _, err = tx.Exec(`UPDATE users SET relationship_id = NULL WHERE relationship_id = $1`, relationshipID); err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		if _, err = tx.Exec(`DELETE FROM relationships WHERE id = $1`, relationshipID); err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	if _, err = tx.Exec(`DELETE FROM pairing_codes WHERE creator_user_id = $1`, user.ID); err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if _, err = tx.Exec(`DELETE FROM users WHERE id = $1`, user.ID); err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	if err = tx.Commit(); err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	// Best-effort removal of stored media for the relationship. Failures here
+	// must not fail the request since the account is already deleted.
+	if relationshipID != "" && mediaStore != nil {
+		ctx := context.Background()
+		for _, prefix := range []string{"photos/" + relationshipID + "/", "avatars/" + relationshipID + "/"} {
+			if err := mediaStore.DeleteByPrefix(ctx, prefix); err != nil {
+				log.Printf("account delete: media cleanup %q: %v", prefix, err)
+			}
+		}
+	}
+
+	if relationshipID != "" {
+		broadcastServerEvent(relationshipID, "RELATIONSHIP_ENDED", map[string]any{})
+	}
+	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
 func main() {
 	initDB()
 	defer db.Close()
@@ -1848,6 +1940,7 @@ func main() {
 	http.HandleFunc("/api/pairing/link", handlePairingLink)
 	http.HandleFunc("/api/pairing/status", handlePairingStatus)
 	http.HandleFunc("/api/pairing/unlink", handlePairingUnlink)
+	http.HandleFunc("/api/account/delete", handleAccountDelete)
 
 	fmt.Println("Linked engine running with persistence on :8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))

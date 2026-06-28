@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 )
 
 type Client struct {
@@ -105,4 +106,41 @@ func (c *Client) SaveLocal(objectKey string, data []byte) error {
 
 func (c *Client) ReadLocal(objectKey string) ([]byte, error) {
 	return os.ReadFile(c.LocalPath(objectKey))
+}
+
+// DeleteByPrefix removes every stored object whose key starts with prefix.
+// For S3/R2 it lists and batch-deletes matching objects; for local storage it
+// removes the corresponding directory tree. Missing objects are not an error.
+func (c *Client) DeleteByPrefix(ctx context.Context, prefix string) error {
+	if c.UsesS3() {
+		paginator := s3.NewListObjectsV2Paginator(c.s3, &s3.ListObjectsV2Input{
+			Bucket: aws.String(c.bucket),
+			Prefix: aws.String(prefix),
+		})
+		for paginator.HasMorePages() {
+			page, err := paginator.NextPage(ctx)
+			if err != nil {
+				return err
+			}
+			if len(page.Contents) == 0 {
+				continue
+			}
+			ids := make([]s3types.ObjectIdentifier, 0, len(page.Contents))
+			for _, obj := range page.Contents {
+				ids = append(ids, s3types.ObjectIdentifier{Key: obj.Key})
+			}
+			if _, err := c.s3.DeleteObjects(ctx, &s3.DeleteObjectsInput{
+				Bucket: aws.String(c.bucket),
+				Delete: &s3types.Delete{Objects: ids, Quiet: aws.Bool(true)},
+			}); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	dir := filepath.Join(c.localDir, filepath.FromSlash(prefix))
+	if err := os.RemoveAll(dir); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }

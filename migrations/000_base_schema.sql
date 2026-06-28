@@ -1,0 +1,144 @@
+-- Couples "room"
+CREATE TABLE IF NOT EXISTS relationships (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    next_visit_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Individual users
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    device_id TEXT UNIQUE NOT NULL,
+    relationship_id UUID REFERENCES relationships(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Temporary pairing codes
+CREATE TABLE IF NOT EXISTS pairing_codes (
+    code VARCHAR(6) PRIMARY KEY,
+    creator_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_pairing_codes_expires_at
+    ON pairing_codes (expires_at);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_users_relationship_max_two
+    ON users (relationship_id, id)
+    WHERE relationship_id IS NOT NULL;
+
+-- Shared lists (reunion bucket list + per-event visit plans)
+CREATE TABLE IF NOT EXISTS itinerary_items (
+    id TEXT PRIMARY KEY,
+    text TEXT NOT NULL,
+    note TEXT,
+    list_type TEXT NOT NULL DEFAULT 'reunion',
+    relationship_id UUID REFERENCES relationships(id) ON DELETE CASCADE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    CHECK (list_type IN ('reunion', 'visit'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_itinerary_items_relationship
+    ON itinerary_items (relationship_id);
+
+CREATE INDEX IF NOT EXISTS idx_itinerary_items_list_type
+    ON itinerary_items (relationship_id, list_type);
+
+-- Daily check-in (one per user per day)
+CREATE TABLE IF NOT EXISTS daily_checkins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    relationship_id UUID NOT NULL REFERENCES relationships(id) ON DELETE CASCADE,
+    check_date DATE NOT NULL,
+    note TEXT,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, check_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_daily_checkins_relationship_date
+    ON daily_checkins (relationship_id, check_date);
+
+ALTER TABLE relationships
+    ADD COLUMN IF NOT EXISTS next_visit_at TIMESTAMPTZ;
+
+ALTER TABLE itinerary_items
+    ADD COLUMN IF NOT EXISTS relationship_id UUID REFERENCES relationships(id) ON DELETE CASCADE;
+
+ALTER TABLE itinerary_items
+    ADD COLUMN IF NOT EXISTS list_type TEXT NOT NULL DEFAULT 'reunion';
+
+ALTER TABLE itinerary_items
+    ADD COLUMN IF NOT EXISTS note TEXT;
+
+-- Weekly connection goals (multiple per week)
+CREATE TABLE IF NOT EXISTS weekly_goals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    relationship_id UUID NOT NULL REFERENCES relationships(id) ON DELETE CASCADE,
+    goal_text TEXT NOT NULL,
+    week_start DATE NOT NULL,
+    done BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE weekly_goals
+    DROP CONSTRAINT IF EXISTS weekly_goals_relationship_id_week_start_key;
+
+CREATE INDEX IF NOT EXISTS idx_weekly_goals_relationship_week
+    ON weekly_goals (relationship_id, week_start);
+
+-- Shared upcoming events (shared calendar)
+CREATE TABLE IF NOT EXISTS shared_events (
+    id TEXT PRIMARY KEY,
+    relationship_id UUID NOT NULL REFERENCES relationships(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    event_at TIMESTAMPTZ NOT NULL,
+    start_at TIMESTAMPTZ NOT NULL,
+    end_at TIMESTAMPTZ NOT NULL,
+    all_day BOOLEAN NOT NULL DEFAULT TRUE,
+    created_by UUID REFERENCES users(id) ON DELETE SET NULL,
+    description TEXT,
+    recurrence_rule TEXT,
+    color TEXT,
+    owner_label TEXT,
+    owner_type TEXT NOT NULL DEFAULT 'shared'
+        CHECK (owner_type IN ('self', 'partner', 'shared')),
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_shared_events_relationship
+    ON shared_events (relationship_id, start_at);
+
+CREATE INDEX IF NOT EXISTS idx_shared_events_range
+    ON shared_events (relationship_id, start_at, end_at);
+
+ALTER TABLE itinerary_items
+    ADD COLUMN IF NOT EXISTS event_id TEXT REFERENCES shared_events(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_itinerary_items_event
+    ON itinerary_items (event_id)
+    WHERE event_id IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS idx_itinerary_items_list
+    ON itinerary_items (relationship_id, list_type, event_id);
+
+-- Async "Open When" notes
+CREATE TABLE IF NOT EXISTS async_notes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    relationship_id UUID NOT NULL REFERENCES relationships(id) ON DELETE CASCADE,
+    author_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    trigger_type TEXT NOT NULL DEFAULT 'anytime',
+    trigger_value TEXT,
+    body TEXT NOT NULL,
+    opened_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_async_notes_relationship
+    ON async_notes (relationship_id, opened_at);
+
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS display_name TEXT;
+
+ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS timezone TEXT;

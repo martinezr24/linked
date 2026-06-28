@@ -41,6 +41,27 @@ function confirmUnlink(): Promise<boolean> {
   });
 }
 
+function confirmDeleteAccount(): Promise<boolean> {
+  const title = "Delete your account?";
+  const message =
+    "This permanently deletes your account and all of your data — your profile, photos, and any shared history with your partner. If you're paired, your partner is unlinked too. This cannot be undone.";
+
+  if (Platform.OS === "web") {
+    return Promise.resolve(window.confirm(`${title}\n\n${message}`));
+  }
+
+  return new Promise((resolve) => {
+    Alert.alert(title, message, [
+      { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+      {
+        text: "Delete account",
+        style: "destructive",
+        onPress: () => resolve(true),
+      },
+    ]);
+  });
+}
+
 export default function SettingsScreen() {
   const theme = useTheme();
   const { deviceId, clearPaired } = useRelationship();
@@ -80,6 +101,28 @@ export default function SettingsScreen() {
     } catch (error) {
       console.error("Failed to unlink:", error);
       showMutationError("Failed to unlink.");
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = await confirmDeleteAccount();
+    if (!confirmed || !deviceId) return;
+
+    try {
+      const res = await apiFetch("/api/account/delete", deviceId, {
+        method: "POST",
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        showMutationError(text || "Failed to delete account.");
+        return;
+      }
+      queryClient.clear();
+      await clearPaired();
+      router.replace("/pair");
+    } catch (error) {
+      console.error("Failed to delete account:", error);
+      showMutationError("Failed to delete account.");
     }
   };
 
@@ -161,6 +204,18 @@ export default function SettingsScreen() {
               Unlinking removes all shared history for both partners.
             </AppText>
             <PrimaryButton label="Unlink partner" onPress={handleUnlink} />
+          </ArtifactCard>
+
+          <ArtifactCard category="Account" title="Delete account">
+            <AppText variant="body" color="secondary" style={styles.hint}>
+              Permanently delete your account and all of your data. If you&apos;re
+              paired, your partner is unlinked too. This cannot be undone.
+            </AppText>
+            <PrimaryButton
+              label="Delete my account"
+              variant="ghost"
+              onPress={handleDeleteAccount}
+            />
           </ArtifactCard>
         </ScrollView>
       </SafeAreaView>
