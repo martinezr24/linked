@@ -1,33 +1,30 @@
 {
   "expo": {
-    "name": "frontend",
-    "slug": "frontend",
+    "name": "Orbit",
+    "slug": "orbit",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "orbit",
     "userInterfaceStyle": "dark",
     "ios": {
       "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.anonymous.frontend"
+      "bundleIdentifier": "com.martinez.orbit",
+      "buildNumber": "1"
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#3D1528",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "package": "com.anonymous.frontend"
+      "package": "com.martinez.orbit"
     },
     "web": {
       "output": "static",
@@ -51,14 +48,14 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Linked needs photo access so you can share daily moments with your partner.",
-          "cameraPermission": "Linked needs camera access so you can take photos for your partner."
+          "photosPermission": "Orbit needs photo access so you can share daily moments with your partner.",
+          "cameraPermission": "Orbit needs camera access so you can take photos for your partner."
         }
       ],
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Linked uses your location to show your partner the weather in your area."
+          "locationWhenInUsePermission": "Orbit uses your location to show your partner the weather in your area."
         }
       ]
     ],
