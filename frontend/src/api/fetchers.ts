@@ -18,7 +18,11 @@ import type {
 export async function fetchRelationship(deviceId: string) {
   const res = await apiFetch("/api/relationship", deviceId);
   if (!res.ok) throw new Error("Failed to load relationship");
-  return res.json() as Promise<{ relationshipId: string; nextVisitAt?: string | null }>;
+  return res.json() as Promise<{
+    relationshipId: string;
+    nextVisitAt?: string | null;
+    anniversaryAt?: string | null;
+  }>;
 }
 
 export async function fetchGoals(deviceId: string) {

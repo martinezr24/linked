@@ -12,6 +12,10 @@ import (
 	"os"
 	"strings"
 	"time"
+	// Embed the IANA timezone database so time.LoadLocation works even on
+	// minimal base images (e.g. Alpine) that don't ship tzdata. Without this,
+	// partner local-time lookups silently fall back to the server's UTC clock.
+	_ "time/tzdata"
 
 	"github.com/gorilla/websocket"
 	_ "github.com/lib/pq"
@@ -715,9 +719,10 @@ func handleGetRelationship(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var nextVisit sql.NullTime
+	var anniversary sql.NullTime
 	err = db.QueryRow(
-		`SELECT next_visit_at FROM relationships WHERE id = $1`, relationshipID,
-	).Scan(&nextVisit)
+		`SELECT next_visit_at, anniversary_at FROM relationships WHERE id = $1`, relationshipID,
+	).Scan(&nextVisit, &anniversary)
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
@@ -728,6 +733,11 @@ func handleGetRelationship(w http.ResponseWriter, r *http.Request) {
 		resp["nextVisitAt"] = nextVisit.Time.UTC().Format(time.RFC3339)
 	} else {
 		resp["nextVisitAt"] = nil
+	}
+	if anniversary.Valid {
+		resp["anniversaryAt"] = anniversary.Time.UTC().Format("2006-01-02")
+	} else {
+		resp["anniversaryAt"] = nil
 	}
 	json.NewEncoder(w).Encode(resp)
 }
@@ -771,6 +781,55 @@ func handlePutRelationshipVisit(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, err = db.Exec(`UPDATE relationships SET next_visit_at = $1 WHERE id = $2`, t, relationshipID)
+	}
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	handleGetRelationship(w, r)
+	broadcastServerEvent(relationshipID, "SYNC_RELATIONSHIP", map[string]any{"relationshipId": relationshipID})
+}
+
+func handlePutRelationshipAnniversary(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
+		return
+	}
+	if r.Method != http.MethodPut {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+	relationshipID, err := getRelationshipIDForDevice(deviceID)
+	if err != nil {
+		if errors.Is(err, errNotPaired) {
+			http.Error(w, "not paired", http.StatusForbidden)
+			return
+		}
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	var body struct {
+		AnniversaryAt *string `json:"anniversaryAt"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+
+	if body.AnniversaryAt == nil || *body.AnniversaryAt == "" {
+		_, err = db.Exec(`UPDATE relationships SET anniversary_at = NULL WHERE id = $1`, relationshipID)
+	} else {
+		d, parseErr := time.Parse("2006-01-02", *body.AnniversaryAt)
+		if parseErr != nil {
+			http.Error(w, "invalid anniversaryAt (expected YYYY-MM-DD)", http.StatusBadRequest)
+			return
+		}
+		_, err = db.Exec(`UPDATE relationships SET anniversary_at = $1 WHERE id = $2`, d, relationshipID)
 	}
 	if err != nil {
 		http.Error(w, "db error", http.StatusInternalServerError)
@@ -1440,12 +1499,20 @@ func presentAsyncNote(
 		n.OpenedAt = &s
 	}
 	unlocked := asyncNoteUnlocked(n.LockType, opensAt, opened, now)
+	// "time" locks stay hard-locked (body hidden, not openable) until their
+	// open date. "state" notes ("open when you miss me") are sealed but the
+	// recipient can open them whenever the moment is right.
+	timeLocked := n.LockType == "time" && !unlocked
 	if n.IsMine || unlocked {
 		n.Body = &body
 		n.IsLocked = false
-	} else {
+	} else if timeLocked {
 		n.Body = nil
 		n.IsLocked = true
+	} else {
+		// State note the recipient hasn't opened yet: sealed but openable.
+		n.Body = nil
+		n.IsLocked = false
 	}
 	return n
 }
@@ -1916,6 +1983,7 @@ func main() {
 	http.HandleFunc("/api/lists/items/", handleListItems)
 	http.HandleFunc("/api/relationship", handleGetRelationship)
 	http.HandleFunc("/api/relationship/visit", handlePutRelationshipVisit)
+	http.HandleFunc("/api/relationship/anniversary", handlePutRelationshipAnniversary)
 	http.HandleFunc("/api/goals/current", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			handlePostWeeklyGoal(w, r)

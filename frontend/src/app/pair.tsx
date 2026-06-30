@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { Share, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
@@ -92,6 +92,19 @@ export default function PairScreen() {
     }, 1000);
   }
 
+  async function handleShareCode() {
+    if (!generatedCode) return;
+    try {
+      await Share.share({
+        message:
+          `Join me on Orbit \u2728 Download the app, then enter pairing code ` +
+          `${generatedCode} to connect with me. (Code expires in 10 minutes.)`,
+      });
+    } catch {
+      // User dismissed the share sheet — nothing to do.
+    }
+  }
+
   async function handleLink() {
     if (!deviceId || enteredCode.length !== 6) return;
     setError(null);
@@ -134,11 +147,13 @@ export default function PairScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
-        <DismissKeyboardView>
+        <DismissKeyboardView
+          scrollProps={{ automaticallyAdjustKeyboardInsets: true }}
+        >
           <View style={styles.brandRow}>
             <AppMark size={36} />
             <AppText variant="h1" style={styles.title}>
-              Link together
+              Get in Orbit
             </AppText>
           </View>
 
@@ -158,6 +173,22 @@ export default function PairScreen() {
             />
           </View>
 
+          {error ? (
+            <View
+              style={[
+                styles.errorBanner,
+                {
+                  backgroundColor: theme.colors.surface.card,
+                  borderColor: theme.colors.accent.primary,
+                },
+              ]}
+            >
+              <AppText variant="bodySemibold" color="accent" style={styles.errorText}>
+                {error}
+              </AppText>
+            </View>
+          ) : null}
+
           <ArtifactCard category="Share" title="Generate a code">
             <AppText variant="body" color="secondary" style={styles.hint}>
               Share this code with your partner. It expires in 10 minutes.
@@ -171,6 +202,11 @@ export default function PairScreen() {
                 <AppText variant="body" color="muted">
                   Expires in {minutes}:{secs}
                 </AppText>
+                <PrimaryButton
+                  label="Share with partner"
+                  onPress={handleShareCode}
+                  style={styles.shareButton}
+                />
               </View>
             ) : (
               <PrimaryButton label="Generate code" onPress={handleGenerate} />
@@ -200,12 +236,6 @@ export default function PairScreen() {
               loading={linking}
             />
           </ArtifactCard>
-
-          {error ? (
-            <AppText variant="body" color="accent" style={styles.error}>
-              {error}
-            </AppText>
-          ) : null}
         </DismissKeyboardView>
       </SafeAreaView>
     </ScreenBackground>
@@ -217,11 +247,12 @@ const styles = StyleSheet.create({
   brandRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 12,
     marginBottom: 24,
     marginTop: 10,
   },
-  title: { fontFamily: "DMSans_700Bold", flex: 1 },
+  title: { fontFamily: "DMSans_700Bold", textAlign: "center" },
   linkVisual: {
     flexDirection: "row",
     alignItems: "center",
@@ -230,6 +261,14 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   deviceDot: { width: 36, height: 36, borderRadius: 18 },
+  errorBanner: {
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  errorText: { textAlign: "center" },
   hint: { marginBottom: 12 },
   codeBox: { alignItems: "center", marginVertical: 12 },
   codeText: {
@@ -237,6 +276,7 @@ const styles = StyleSheet.create({
     fontFamily: "Fraunces_700Bold",
     marginBottom: 8,
   },
+  shareButton: { marginTop: 12, alignSelf: "stretch" },
   divider: { textAlign: "center", marginVertical: 16 },
   input: {
     borderWidth: 1,

@@ -2,6 +2,7 @@ import { useState } from "react";
 import {
   ActivityIndicator,
   Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   View,
@@ -21,6 +22,7 @@ import { VisitEditSheet } from "@/components/VisitEditSheet";
 import { useCoupleNames } from "@/hooks/useCoupleNames";
 import { useDailyCheckIn } from "@/hooks/useDailyCheckIn";
 import { useProfile } from "@/hooks/useProfile";
+import { useTabReload } from "@/hooks/useTabReload";
 import { initialFromName } from "@/utils/coupleNames";
 import { AppText } from "@/components/ui/AppText";
 import { TreatsModal } from "@/components/treats/TreatsModal";
@@ -65,6 +67,9 @@ export default function HomeScreen() {
   const [visitSheetOpen, setVisitSheetOpen] = useState(false);
   const [treatsOpen, setTreatsOpen] = useState(false);
   const tzLabel = getDeviceTimezoneLabel();
+  const { scrollRef, refreshing, onRefresh } = useTabReload(() =>
+    queryClient.invalidateQueries(),
+  );
   const { mineName, partnerName } = useCoupleNames();
   const { mineAvatarUrl, partnerAvatarUrl, mineColor, partnerColor } =
     useProfile();
@@ -165,6 +170,7 @@ export default function HomeScreen() {
           />
 
           <ScrollView
+            ref={scrollRef}
             style={styles.flex}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={[
@@ -173,6 +179,13 @@ export default function HomeScreen() {
             ]}
             keyboardShouldPersistTaps="handled"
             keyboardDismissMode="on-drag"
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={theme.colors.text.secondary}
+              />
+            }
           >
             {bothSentPhotoToday ? (
               <View
@@ -185,7 +198,7 @@ export default function HomeScreen() {
                 ]}
               >
                 <AppText variant="bodySemibold" color="accent">
-                  Both sent today's photo — streak secured!
+                  Both sent today&apos;s photo — streak secured!
                 </AppText>
               </View>
             ) : null}

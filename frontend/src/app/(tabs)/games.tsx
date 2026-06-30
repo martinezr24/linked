@@ -1,7 +1,7 @@
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, type Href } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
 import { fetchGridGame, fetchGridStats, fetchPhotoToday } from "@/api/fetchers";
@@ -10,8 +10,10 @@ import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { StreakPill } from "@/components/ui/StreakPill";
 import { GAMES, type GameMeta } from "@/games/catalog";
 import { useProfile } from "@/hooks/useProfile";
+import { useTabReload } from "@/hooks/useTabReload";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
+import { colors } from "@/theme/tokens";
 import { useTheme } from "@/theme/useTheme";
 
 type Status = { label: string; active: boolean };
@@ -156,6 +158,10 @@ function TriviaGameCard({ meta }: { meta: GameMeta }) {
 
 export default function GamesScreen() {
   const { deviceId } = useRelationship();
+  const queryClient = useQueryClient();
+  const { scrollRef, refreshing, onRefresh } = useTabReload(() =>
+    queryClient.invalidateQueries(),
+  );
   const { data: photoToday } = useQuery({
     queryKey: queryKeys.photoToday,
     queryFn: () => fetchPhotoToday(deviceId!),
@@ -167,8 +173,16 @@ export default function GamesScreen() {
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.text.secondary}
+            />
+          }
         >
           <View style={styles.header}>
             <View style={styles.headerText}>

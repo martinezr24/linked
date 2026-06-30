@@ -266,27 +266,46 @@ func (m *Manager) CreateGame(relationshipID, userID, gameType string) (GridGameD
 	if err != nil {
 		return GridGameDTO{}, err
 	}
+	tx, err := m.db.Begin()
+	if err != nil {
+		return GridGameDTO{}, err
+	}
+	defer tx.Rollback()
+	// Serialize concurrent creates for the same relationship + game type so two
+	// players tapping "start" at the same time can't create duplicate games.
+	if _, err = tx.Exec(`SELECT pg_advisory_xact_lock(hashtext($1))`, relationshipID+":"+gameType); err != nil {
+		return GridGameDTO{}, err
+	}
 	var existingID string
-	err = m.db.QueryRow(
+	err = tx.QueryRow(
 		`SELECT id::text FROM grid_games
          WHERE relationship_id = $1 AND game_type = $2 AND status IN ('waiting','active')
          ORDER BY created_at DESC LIMIT 1`,
 		relationshipID, gameType,
 	).Scan(&existingID)
 	if err == nil {
+		if cErr := tx.Commit(); cErr != nil {
+			return GridGameDTO{}, cErr
+		}
 		return m.LoadGame(existingID, userID)
+	}
+	if err != sql.ErrNoRows {
+		return GridGameDTO{}, err
 	}
 	state, err := engine.InitialState(userID, "")
 	if err != nil {
 		return GridGameDTO{}, err
 	}
 	var gameID string
-	err = m.db.QueryRow(
+	err = tx.QueryRow(
 		`INSERT INTO grid_games (relationship_id, game_type, status, board_state, player_x_user_id, current_turn_user_id)
          VALUES ($1, $2, 'active', $3, $4, $4) RETURNING id::text`,
 		relationshipID, gameType, state, userID,
 	).Scan(&gameID)
 	if err != nil {
+		return GridGameDTO{}, err
+	}
+	if err = tx.Commit(); err != nil {
 		return GridGameDTO{}, err
 	}
 	return m.LoadGame(gameID, userID)
@@ -333,9 +352,12 @@ func (m *Manager) JoinGame(relationshipID, gameID, userID string) (GridGameDTO, 
 
 func (m *Manager) GetActiveGame(relationshipID, userID, gameType string) (*GridGameDTO, error) {
 	var gameID string
+	// Return the latest game regardless of status. Keeping a recently finished
+	// game means the result/win overlay stays on screen until a player taps
+	// "Play again" (which starts a fresh game) instead of vanishing on refetch.
 	err := m.db.QueryRow(
 		`SELECT id::text FROM grid_games
-         WHERE relationship_id = $1 AND game_type = $2 AND status IN ('waiting','active')
+         WHERE relationship_id = $1 AND game_type = $2
          ORDER BY created_at DESC LIMIT 1`,
 		relationshipID, gameType,
 	).Scan(&gameID)

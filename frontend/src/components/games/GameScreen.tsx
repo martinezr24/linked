@@ -5,7 +5,7 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
-import { fetchPhotoToday } from "@/api/fetchers";
+import { fetchGridStats, fetchPhotoToday } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { AppMark } from "@/components/ui/AppMark";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
@@ -36,6 +36,13 @@ export function GameScreen({ gameType }: Props) {
     enabled: Boolean(deviceId),
   });
   const streak = photoToday?.currentStreak ?? 0;
+
+  const { data: stats } = useQuery({
+    queryKey: queryKeys.gridStats(gameType),
+    queryFn: () => fetchGridStats(deviceId!, gameType),
+    enabled: Boolean(deviceId),
+  });
+  const collaborative = gameType === "wordguess";
 
   const partner = partnerName?.trim() || "your partner";
   const Renderer = getGameRenderer(gameType);
@@ -110,6 +117,51 @@ export function GameScreen({ gameType }: Props) {
             <AppText variant="caption" color="secondary" style={styles.waiting}>
               {partner} can jump in anytime — go ahead and play!
             </AppText>
+          ) : null}
+
+          {!active && stats ? (
+            <View
+              style={[
+                styles.scoreCard,
+                { backgroundColor: theme.colors.surface.card },
+              ]}
+            >
+              <AppText variant="caption" color="secondary" style={styles.scoreTitle}>
+                All-time
+              </AppText>
+              {collaborative ? (
+                <AppText variant="h2" style={styles.scoreSolved}>
+                  {stats.me.wins + stats.partner.wins} solved together
+                </AppText>
+              ) : (
+                <View style={styles.scoreRow}>
+                  <View style={styles.scoreSide}>
+                    <AppText variant="h1" style={{ color: mineColor }}>
+                      {stats.me.wins}
+                    </AppText>
+                    <AppText variant="caption" color="secondary">
+                      You
+                    </AppText>
+                  </View>
+                  <AppText variant="h2" color="secondary" style={styles.scoreDash}>
+                    –
+                  </AppText>
+                  <View style={styles.scoreSide}>
+                    <AppText variant="h1" style={{ color: partnerColor }}>
+                      {stats.partner.wins}
+                    </AppText>
+                    <AppText variant="caption" color="secondary">
+                      {partner}
+                    </AppText>
+                  </View>
+                </View>
+              )}
+              {!collaborative && stats.me.draws > 0 ? (
+                <AppText variant="caption" color="secondary" style={styles.scoreDraws}>
+                  {stats.me.draws} {stats.me.draws === 1 ? "draw" : "draws"}
+                </AppText>
+              ) : null}
+            </View>
           ) : null}
 
           {isLoading || (canAutoJoin && !finished) ? (
@@ -189,6 +241,25 @@ const styles = StyleSheet.create({
   turnDot: { width: 16, height: 16, borderRadius: 8 },
   loader: { marginTop: 24 },
   waiting: { textAlign: "center" },
+  scoreCard: {
+    alignSelf: "center",
+    minWidth: 220,
+    borderRadius: 20,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    alignItems: "center",
+  },
+  scoreTitle: { textTransform: "uppercase", letterSpacing: 1, marginBottom: 8 },
+  scoreSolved: { textAlign: "center" },
+  scoreRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 24,
+  },
+  scoreSide: { alignItems: "center" },
+  scoreDash: { marginBottom: 14 },
+  scoreDraws: { marginTop: 8 },
   boardWrap: { alignItems: "center", marginTop: 8 },
   endBtn: { marginTop: 8 },
 });

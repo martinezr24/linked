@@ -3,11 +3,11 @@ import { Redirect, Tabs } from "expo-router";
 import { BlurView } from "expo-blur";
 
 import {
+  TabCoupleIcon,
   TabEventsIcon,
   TabGamesIcon,
   TabHomeIcon,
   TabPlayIcon,
-  TabSettingsIcon,
 } from "@/components/ui/TabIcons";
 import { useRelationship } from "@/context/RelationshipContext";
 import { colors } from "@/theme/tokens";
@@ -104,10 +104,10 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: "Settings",
-          tabBarLabel: "Settings",
+          title: "Couple",
+          tabBarLabel: "Couple",
           tabBarIcon: ({ focused }) => (
-            <TabSettingsIcon
+            <TabCoupleIcon
               color={focused ? colors.text.primary : colors.text.muted}
             />
           ),

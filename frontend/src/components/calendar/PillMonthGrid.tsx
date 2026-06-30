@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import {
   LayoutChangeEvent,
+  PanResponder,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -63,6 +64,21 @@ export function PillMonthGrid({
     [visibleMonth, filteredEvents, timeZone],
   );
 
+  // Swipe left/right anywhere on the calendar to move between months. Only
+  // claim clearly-horizontal gestures so the vertical grid scroll still works.
+  const swipeResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) =>
+          Math.abs(g.dx) > 24 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+        onPanResponderRelease: (_, g) => {
+          if (g.dx <= -40) onMonthChange(shiftMonth(visibleMonth, 1));
+          else if (g.dx >= 40) onMonthChange(shiftMonth(visibleMonth, -1));
+        },
+      }),
+    [visibleMonth, onMonthChange],
+  );
+
   const onGridLayout = (e: LayoutChangeEvent) => {
     const width = e.nativeEvent.layout.width;
     if (width > 0) {
@@ -71,7 +87,7 @@ export function PillMonthGrid({
   };
 
   return (
-    <View style={styles.wrap}>
+    <View style={styles.wrap} {...swipeResponder.panHandlers}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.monthNavBtn}

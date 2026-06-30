@@ -21,6 +21,7 @@ type Props = {
   value: Date | null;
   onChange: (date: Date) => void;
   minimumDate?: Date;
+  maximumDate?: Date;
 };
 
 export function DatePickerField({
@@ -28,6 +29,7 @@ export function DatePickerField({
   value,
   onChange,
   minimumDate,
+  maximumDate,
 }: Props) {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
@@ -153,6 +155,7 @@ export function DatePickerField({
                   textColor={theme.colors.text.primary}
                   accentColor={theme.colors.accent.primary}
                   minimumDate={minimumDate}
+                  maximumDate={maximumDate}
                   onChange={onPickerChange}
                   style={styles.picker}
                 />
@@ -168,6 +171,7 @@ export function DatePickerField({
           mode="date"
           display="default"
           minimumDate={minimumDate}
+          maximumDate={maximumDate}
           onChange={onPickerChange}
         />
       ) : null}

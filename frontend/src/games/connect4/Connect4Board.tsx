@@ -1,7 +1,6 @@
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { registerGameRenderer } from "@/games/registry";
-import { useProfile } from "@/hooks/useProfile";
 import type { Connect4BoardState } from "@/types";
 
 type Props = {
@@ -18,19 +17,23 @@ const GAP = 8;
 const BOARD_BG = "#3C4A5E";
 const EMPTY_CELL = "rgba(0,0,0,0.28)";
 
+// Classic, fixed Connect 4 colors keyed to the player number so both players
+// always see the same disc in the same color regardless of profile colors.
+const PLAYER_COLORS: Record<number, string> = {
+  1: "#E63946", // red
+  2: "#F1C40F", // gold
+};
+
 export function Connect4Board({
   state,
   isMyTurn,
-  myPlayerNumber,
   onMove,
   disabled,
 }: Props) {
   const board = state as Connect4BoardState;
-  const { mineColor, partnerColor } = useProfile();
   const colorFor = (cell: number) => {
     if (cell === 0) return EMPTY_CELL;
-    if (cell === myPlayerNumber) return mineColor;
-    return partnerColor;
+    return PLAYER_COLORS[cell] ?? EMPTY_CELL;
   };
 
   return (
