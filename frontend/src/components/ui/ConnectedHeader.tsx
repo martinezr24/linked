@@ -18,6 +18,7 @@ type Props = {
   partnerColor?: string;
   partnerPhotoSent?: boolean;
   minePhotoSent?: boolean;
+  showStreak?: boolean;
   headerRight?: ReactNode;
 };
 
@@ -66,6 +67,7 @@ export function ConnectedHeader({
   partnerColor,
   partnerPhotoSent,
   minePhotoSent,
+  showStreak = true,
   headerRight,
 }: Props) {
   const theme = useTheme();
@@ -92,7 +94,7 @@ export function ConnectedHeader({
       </View>
       <View style={styles.right}>
         {headerRight}
-        <StreakPill count={streakCount} />
+        {showStreak ? <StreakPill count={streakCount} /> : null}
       </View>
     </View>
   );

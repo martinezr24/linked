@@ -11,6 +11,7 @@ export const queryKeys = {
   photoHistory: (cursor?: string) => ["photoHistory", cursor ?? ""] as const,
   partnerPresence: ["partnerPresence"] as const,
   profile: ["profile"] as const,
+  drawings: ["drawings"] as const,
   triviaGame: ["triviaGame"] as const,
   gridGame: (gameType: string) => ["gridGame", gameType] as const,
   gridStats: (gameType: string) => ["gridStats", gameType] as const,

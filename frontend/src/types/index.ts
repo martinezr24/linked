@@ -187,3 +187,23 @@ export type WsMessage = {
   action: string;
   payload: Record<string, unknown>;
 };
+
+export type DrawStroke = {
+  color: string;
+  width: number;
+  path: string;
+};
+
+export type DrawingData = {
+  width: number;
+  height: number;
+  background: string;
+  strokes: DrawStroke[];
+};
+
+export type Drawing = {
+  id: string;
+  data: DrawingData;
+  isMine: boolean;
+  createdAt: string;
+};

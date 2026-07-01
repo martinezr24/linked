@@ -30,6 +30,8 @@ export default function RootLayout() {
                 name="games/connect4"
                 options={{ headerShown: false }}
               />
+              <Stack.Screen name="draw" options={{ headerShown: false }} />
+              <Stack.Screen name="drawings" options={{ headerShown: false }} />
             </Stack>
           </RelationshipProvider>
         </QueryProvider>

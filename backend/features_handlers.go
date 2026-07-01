@@ -969,6 +969,107 @@ func handleTriviaAnswer(w http.ResponseWriter, r *http.Request) {
 	broadcastServerEvent(*user.RelationshipID, "SYNC_GAMES", map[string]any{})
 }
 
+type Drawing struct {
+	ID        string          `json:"id"`
+	Data      json.RawMessage `json:"data"`
+	IsMine    bool            `json:"isMine"`
+	CreatedAt string          `json:"createdAt"`
+}
+
+const maxDrawingBytes = 512 * 1024
+
+// handleDrawings serves the shared drawings feed (GET) and accepts a new
+// drawing to deliver to the partner (POST). Drawings are stored as vector
+// stroke data (JSONB) so they re-render crisply at any size.
+func handleDrawings(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
+		return
+	}
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+	user, err := getOrCreateUser(deviceID)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+	if user.RelationshipID == nil {
+		http.Error(w, "not paired", http.StatusForbidden)
+		return
+	}
+	relationshipID := *user.RelationshipID
+
+	switch r.Method {
+	case http.MethodGet:
+		rows, err := db.Query(
+			`SELECT id::text, data, author_user_id::text, created_at
+             FROM drawings WHERE relationship_id = $1
+             ORDER BY created_at DESC LIMIT 30`,
+			relationshipID,
+		)
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		defer rows.Close()
+		drawings := []Drawing{}
+		for rows.Next() {
+			var id, authorID string
+			var data []byte
+			var created time.Time
+			if err := rows.Scan(&id, &data, &authorID, &created); err != nil {
+				continue
+			}
+			drawings = append(drawings, Drawing{
+				ID:        id,
+				Data:      json.RawMessage(data),
+				IsMine:    authorID == user.ID,
+				CreatedAt: created.UTC().Format(time.RFC3339),
+			})
+		}
+		json.NewEncoder(w).Encode(drawings)
+
+	case http.MethodPost:
+		raw, err := io.ReadAll(io.LimitReader(r.Body, maxDrawingBytes+1))
+		if err != nil {
+			http.Error(w, "invalid body", http.StatusBadRequest)
+			return
+		}
+		if len(raw) > maxDrawingBytes {
+			http.Error(w, "drawing too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		if !json.Valid(raw) {
+			http.Error(w, "invalid json", http.StatusBadRequest)
+			return
+		}
+		var id string
+		var created time.Time
+		err = db.QueryRow(
+			`INSERT INTO drawings (relationship_id, author_user_id, data)
+             VALUES ($1, $2, $3)
+             RETURNING id::text, created_at`,
+			relationshipID, user.ID, string(raw),
+		).Scan(&id, &created)
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(Drawing{
+			ID:        id,
+			Data:      json.RawMessage(raw),
+			IsMine:    true,
+			CreatedAt: created.UTC().Format(time.RFC3339),
+		})
+		broadcastServerEvent(relationshipID, "SYNC_DRAWINGS", map[string]any{"relationshipId": relationshipID})
+
+	default:
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
 func registerFeatureRoutes() {
 	registerProfileRoutes()
 	http.HandleFunc("/api/profile/presence", handlePutProfilePresence)
@@ -980,6 +1081,7 @@ func registerFeatureRoutes() {
 	http.HandleFunc("/api/photos", handlePhotosPost)
 	http.HandleFunc("/api/photos/history", handlePhotosHistory)
 	http.HandleFunc("/api/photos/streak", handlePhotosStreak)
+	http.HandleFunc("/api/drawings", handleDrawings)
 	http.HandleFunc("/api/games/trivia/active", handleTriviaActive)
 	http.HandleFunc("/api/games/trivia/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasSuffix(r.URL.Path, "/answer") {

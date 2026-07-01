@@ -1,6 +1,8 @@
 import { apiFetch } from "@/utils/api";
 import type {
   AsyncNote,
+  Drawing,
+  DrawingData,
   GridGame,
   ListItem,
   PartnerPresence,
@@ -199,6 +201,23 @@ export async function fetchAsyncNotes(deviceId: string) {
   if (!res.ok) throw new Error("Failed to load notes");
   const data: AsyncNote[] = await res.json();
   return Array.isArray(data) ? data : [];
+}
+
+export async function fetchDrawings(deviceId: string) {
+  const res = await apiFetch("/api/drawings", deviceId);
+  if (!res.ok) throw new Error("Failed to load drawings");
+  const data: Drawing[] = await res.json();
+  return Array.isArray(data) ? data : [];
+}
+
+export async function createDrawing(deviceId: string, data: DrawingData) {
+  const res = await apiFetch("/api/drawings", deviceId, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to send drawing");
+  return res.json() as Promise<Drawing>;
 }
 
 export async function fetchListItems(
