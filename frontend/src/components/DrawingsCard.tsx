@@ -10,6 +10,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { fetchDrawings } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
 import { useProfile } from "@/hooks/useProfile";
+import { colors } from "@/theme/tokens";
 
 function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
@@ -45,7 +46,7 @@ export function DrawingsCard() {
     <ArtifactCard category="Doodles">
       {latest ? (
         <View style={styles.body}>
-          <DrawingCanvas data={latest.data} />
+          <DrawingCanvas data={latest.data} style={styles.preview} />
           <View style={styles.metaRow}>
             <AppText variant="bodySemibold">
               {latest.isMine ? "From you" : `From ${partner}`}
@@ -56,8 +57,11 @@ export function DrawingsCard() {
           </View>
         </View>
       ) : (
-        <View style={styles.empty}>
-          <AppText color="secondary" style={styles.emptyText}>
+        <View style={styles.placeholder}>
+          <AppText color="muted" style={styles.emptyText}>
+            No doodles yet
+          </AppText>
+          <AppText color="secondary" variant="caption" style={styles.emptyText}>
             Draw something sweet and send it to {partner}.
           </AppText>
         </View>
@@ -85,12 +89,28 @@ export function DrawingsCard() {
 
 const styles = StyleSheet.create({
   body: { gap: 12 },
+  preview: {
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border.subtle,
+  },
   metaRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
   },
-  empty: { paddingVertical: 12 },
+  placeholder: {
+    aspectRatio: 3 / 2,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: colors.border.subtle,
+    backgroundColor: colors.surface.input,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingHorizontal: 24,
+  },
   emptyText: { textAlign: "center" },
   cta: { marginTop: 16 },
   seeAll: { marginTop: 14, textAlign: "center" },

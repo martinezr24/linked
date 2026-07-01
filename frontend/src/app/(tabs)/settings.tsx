@@ -6,7 +6,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AnniversaryCard } from "@/components/AnniversaryCard";
 import { AppText } from "@/components/ui/AppText";
 import { CoupleMilestones } from "@/components/CoupleMilestones";
-import { DrawingsCard } from "@/components/DrawingsCard";
 import { ConnectedHeader } from "@/components/ui/ConnectedHeader";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { TabSettingsIcon } from "@/components/ui/TabIcons";
@@ -112,8 +111,6 @@ export default function CoupleScreen() {
           </View>
 
           <CoupleMilestones />
-
-          <DrawingsCard />
         </ScrollView>
       </SafeAreaView>
     </ScreenBackground>

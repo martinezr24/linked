@@ -14,6 +14,7 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { DailyPhotoCard } from "@/components/photos/DailyPhotoCard";
+import { DrawingsCard } from "@/components/DrawingsCard";
 import { GoalsSummaryCard } from "@/components/goals/GoalsSummaryCard";
 import { PartnerPresenceCard } from "@/components/presence/PartnerPresenceCard";
 import { CoupleProgressCard } from "@/components/ui/CoupleProgressCard";
@@ -219,6 +220,8 @@ export default function HomeScreen() {
             ) : null}
 
             <GoalsSummaryCard />
+
+            <DrawingsCard />
 
             <VisitCountdownHero
               nextVisitAt={nextVisitAt}
