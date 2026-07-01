@@ -30,7 +30,7 @@ export function GoalsSummaryCard() {
       accessibilityRole="button"
       accessibilityLabel="Open connection goals in Us"
     >
-      <ArtifactCard category="Connection goals" title="This week's goals">
+      <ArtifactCard category="Connection goals" title="This week's goals" style={styles.card}>
         <View style={styles.headerRow}>
           <AppText variant="body" color="secondary" style={styles.intro}>
             {total === 0
@@ -67,7 +67,8 @@ export function GoalsSummaryCard() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginHorizontal: 20, marginBottom: 16 },
+  wrap: { flex: 1 },
+  card: { flex: 1, marginBottom: 0 },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",

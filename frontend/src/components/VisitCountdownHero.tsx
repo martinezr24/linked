@@ -2,10 +2,7 @@ import { Pressable, StyleSheet } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
-import {
-  formatLocalDateLabel,
-  formatMMDDYYYY,
-} from "@/utils/dates";
+import { formatLocalDateLabel } from "@/utils/dates";
 
 type Props = {
   nextVisitAt: string | null;
@@ -24,14 +21,14 @@ export function VisitCountdownHero({
 }: Props) {
   return (
     <Pressable onPress={onPress} style={styles.wrap}>
-      <ArtifactCard category="Visit" title="Next visit" stacked>
+      <ArtifactCard category="Visit" title="Next visit" stacked style={styles.card}>
         {nextVisitAt ? (
           <>
             <AppText display variant="displayHero" style={styles.days}>
               {countdownDays(nextVisitAt)}
             </AppText>
             <AppText variant="caption" color="secondary" style={styles.label}>
-              DAYS UNTIL YOU'RE TOGETHER
+              DAYS UNTIL YOU&apos;RE TOGETHER
             </AppText>
             <AppText variant="body" style={styles.sub}>
               {formatCountdown(nextVisitAt)}
@@ -59,7 +56,8 @@ export function VisitCountdownHero({
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginHorizontal: 20, marginBottom: 8 },
+  wrap: { flex: 1 },
+  card: { flex: 1, marginBottom: 0 },
   days: { fontFamily: "Fraunces_700Bold", marginBottom: 4 },
   label: { marginBottom: 8 },
   sub: { marginBottom: 6 },

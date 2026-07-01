@@ -97,7 +97,7 @@ export function PartnerPresenceCard() {
 
   return (
     <View style={styles.wrap}>
-      <ArtifactCard>
+      <ArtifactCard style={styles.card}>
         <AppText variant="label" color="secondary" style={styles.category}>
           THEIR WORLD
         </AppText>
@@ -199,7 +199,8 @@ export function PartnerPresenceCard() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginHorizontal: 20, marginBottom: 16 },
+  wrap: {},
+  card: { marginBottom: 0 },
   loader: { padding: 16, alignItems: "center" },
   category: { marginBottom: 8 },
   nameRow: {

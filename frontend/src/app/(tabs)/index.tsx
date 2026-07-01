@@ -14,7 +14,9 @@ import {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { DailyPhotoCard } from "@/components/photos/DailyPhotoCard";
-import { DrawingsCard } from "@/components/DrawingsCard";
+import { DoodlesTile } from "@/components/home/DoodlesTile";
+import { PlayTile } from "@/components/home/PlayTile";
+import { StreakTile } from "@/components/home/StreakTile";
 import { GoalsSummaryCard } from "@/components/goals/GoalsSummaryCard";
 import { PartnerPresenceCard } from "@/components/presence/PartnerPresenceCard";
 import { CoupleProgressCard } from "@/components/ui/CoupleProgressCard";
@@ -206,6 +208,22 @@ export default function HomeScreen() {
 
             <PartnerPresenceCard />
 
+            <View style={styles.bentoRow}>
+              <View style={styles.heroCol}>
+                <VisitCountdownHero
+                  nextVisitAt={nextVisitAt}
+                  tzLabel={tzLabel}
+                  formatCountdown={formatCountdown}
+                  countdownDays={countdownDays}
+                  onPress={() => setVisitSheetOpen(true)}
+                />
+              </View>
+              <View style={styles.sideCol}>
+                <DoodlesTile />
+                <PlayTile />
+              </View>
+            </View>
+
             <DailyPhotoCard />
 
             {!checkInLoading ? (
@@ -219,17 +237,14 @@ export default function HomeScreen() {
               />
             ) : null}
 
-            <GoalsSummaryCard />
-
-            <DrawingsCard />
-
-            <VisitCountdownHero
-              nextVisitAt={nextVisitAt}
-              tzLabel={tzLabel}
-              formatCountdown={formatCountdown}
-              countdownDays={countdownDays}
-              onPress={() => setVisitSheetOpen(true)}
-            />
+            <View style={styles.bentoRow}>
+              <View style={styles.heroCol}>
+                <GoalsSummaryCard />
+              </View>
+              <View style={styles.sideCol}>
+                <StreakTile streak={streakCount} />
+              </View>
+            </View>
           </ScrollView>
 
           <VisitEditSheet
@@ -262,10 +277,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  scroll: { paddingTop: 8 },
+  scroll: { paddingTop: 8, paddingHorizontal: 20, rowGap: 16 },
+  bentoRow: { flexDirection: "row", gap: 12 },
+  heroCol: { flex: 3 },
+  sideCol: { flex: 2, gap: 12 },
   celebration: {
-    marginHorizontal: 20,
-    marginBottom: 16,
     padding: 12,
     borderRadius: 12,
     borderWidth: 1,

@@ -77,7 +77,7 @@ export function DailyPhotoCard() {
 
   return (
     <View style={styles.wrap}>
-      <ArtifactCard category="Daily photo" title="Send today's moment" featured>
+      <ArtifactCard category="Daily photo" title="Send today's moment" featured style={styles.card}>
         <AppText variant="body" color="secondary" style={styles.hint}>
           Both send a photo to grow your streak ({data?.currentStreak ?? 0} days).
         </AppText>
@@ -153,7 +153,8 @@ export function DailyPhotoCard() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginHorizontal: 20, marginBottom: 16 },
+  wrap: {},
+  card: { marginBottom: 0 },
   loader: { padding: 24, alignItems: "center" },
   hint: { marginBottom: 12 },
   previewRow: {

@@ -64,11 +64,11 @@ export function CoupleProgressCard({
 
   return (
     <Animated.View style={[styles.outer, { transform: [{ scale }] }]}>
-      <ArtifactCard category="Daily check-in" featured>
+      <ArtifactCard category="Daily check-in" featured style={styles.card}>
         {bothDone ? (
           <View style={styles.doneBlock}>
             <AppText variant="h2" style={styles.doneTitle}>
-              You're both here today
+              You&apos;re both here today
             </AppText>
             {checkIns?.mine?.note ? (
               <AppText variant="body" color="secondary">
@@ -153,7 +153,8 @@ export function CoupleProgressCard({
 }
 
 const styles = StyleSheet.create({
-  outer: { marginHorizontal: 20, marginBottom: 8 },
+  outer: {},
+  card: { marginBottom: 0 },
   prompt: {
     marginBottom: 12,
     fontFamily: "Fraunces_600SemiBold",

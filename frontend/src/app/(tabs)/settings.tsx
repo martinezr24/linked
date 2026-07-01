@@ -74,7 +74,7 @@ export default function CoupleScreen() {
           partnerPhotoSent={Boolean(photoToday?.partner)}
           headerRight={
             <Pressable
-              onPress={() => router.push("/settings")}
+              onPress={() => router.push("/account")}
               hitSlop={12}
               accessibilityRole="button"
               accessibilityLabel="Settings"
