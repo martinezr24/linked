@@ -11,6 +11,7 @@ import {
 
 import { EventPill } from "@/components/calendar/EventPill";
 import { AppText } from "@/components/ui/AppText";
+import { ChevronLeftIcon, ChevronRightIcon } from "@/components/ui/icons";
 import { useTheme } from "@/theme/useTheme";
 import {
   DAY_NUMBER_HEIGHT,
@@ -95,9 +96,7 @@ export function PillMonthGrid({
           hitSlop={{ top: 8, bottom: 8, left: 4, right: 8 }}
           accessibilityLabel="Previous month"
         >
-          <AppText variant="h2" color="accent" style={styles.monthNavIcon}>
-            ‹
-          </AppText>
+          <ChevronLeftIcon size={22} color={theme.colors.accent.primary} />
         </TouchableOpacity>
         <AppText variant="h2" style={styles.monthTitle}>
           {monthTitle(visibleMonth)}
@@ -108,9 +107,7 @@ export function PillMonthGrid({
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 4 }}
           accessibilityLabel="Next month"
         >
-          <AppText variant="h2" color="accent" style={styles.monthNavIcon}>
-            ›
-          </AppText>
+          <ChevronRightIcon size={22} color={theme.colors.accent.primary} />
         </TouchableOpacity>
       </View>
 

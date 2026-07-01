@@ -5,6 +5,12 @@ import { queryKeys } from "@/api/queryKeys";
 import { fetchGridStats } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import {
+  BrokenHeartIcon,
+  CelebrationIcon,
+  HandshakeIcon,
+  TrophyIcon,
+} from "@/components/ui/icons";
 import { resolveOutcome, resolveResult } from "@/games/catalog";
 import { useProfile } from "@/hooks/useProfile";
 import { useRelationship } from "@/context/RelationshipContext";
@@ -18,12 +24,6 @@ type Props = {
   onPlayAgain: () => void;
   onBack: () => void;
   playAgainLoading?: boolean;
-};
-
-const EMOJI: Record<string, string> = {
-  win: "🏆",
-  lose: "💔",
-  draw: "🤝",
 };
 
 export function GameResultOverlay({
@@ -55,6 +55,14 @@ export function GameResultOverlay({
         ? theme.colors.accent.primary
         : theme.colors.text.secondary;
 
+  const ResultIcon = collaborative
+    ? CelebrationIcon
+    : outcome === "win"
+      ? TrophyIcon
+      : outcome === "lose"
+        ? BrokenHeartIcon
+        : HandshakeIcon;
+
   return (
     <View style={styles.backdrop}>
       <View
@@ -63,9 +71,9 @@ export function GameResultOverlay({
           { backgroundColor: theme.colors.surface.card, borderColor: accent },
         ]}
       >
-        <AppText style={styles.emoji}>
-          {collaborative ? "🎉" : EMOJI[outcome]}
-        </AppText>
+        <View style={styles.iconWrap}>
+          <ResultIcon size={64} color={accent} />
+        </View>
         <AppText variant="h1" style={[styles.headline, { color: accent }]}>
           {headline}
         </AppText>
@@ -140,7 +148,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     alignItems: "center",
   },
-  emoji: { fontSize: 64, marginBottom: 8 },
+  iconWrap: { marginBottom: 8 },
   headline: { textAlign: "center", marginBottom: 20 },
   record: {
     flexDirection: "row",

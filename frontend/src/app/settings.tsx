@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { ChevronLeftIcon } from "@/components/ui/icons";
 import { ProfileSettingsCard } from "@/components/profile/ProfileSettingsCard";
 import { WidgetPreviewCard } from "@/components/WidgetPreviewCard";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
@@ -144,7 +145,7 @@ export default function SettingsDetailScreen() {
             accessibilityRole="button"
             accessibilityLabel="Back"
           >
-            <AppText style={styles.backChevron}>‹</AppText>
+            <ChevronLeftIcon size={30} color={theme.colors.text.primary} />
           </Pressable>
           <AppText variant="h2">Settings</AppText>
           <View style={styles.back} />

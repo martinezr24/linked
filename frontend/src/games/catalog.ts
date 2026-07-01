@@ -1,3 +1,14 @@
+import type { ComponentType } from "react";
+
+import {
+  BattleshipIcon,
+  Connect4Icon,
+  DotsBoxesIcon,
+  TicTacToeIcon,
+  TriviaIcon,
+  WordGuessIcon,
+  type IconProps,
+} from "@/components/ui/icons";
 import type { GridGame } from "@/types";
 
 export type GameResultContext = {
@@ -9,7 +20,7 @@ export type GameMeta = {
   type: string;
   title: string;
   subtitle: string;
-  emoji: string;
+  icon: ComponentType<IconProps>;
   /** Grid games use the shared engine; trivia uses its own system. */
   kind: "grid" | "trivia";
   route: string;
@@ -24,7 +35,7 @@ function defaultResult({ game, partnerName }: GameResultContext): string {
     (game.myPlayerNumber === 2 &&
       !!game.playerOUserId &&
       game.winnerUserId === game.playerOUserId);
-  return iWon ? "You win! 🎉" : `${partnerName} wins!`;
+  return iWon ? "You win!" : `${partnerName} wins!`;
 }
 
 export const GAMES: GameMeta[] = [
@@ -32,7 +43,7 @@ export const GAMES: GameMeta[] = [
     type: "connect4",
     title: "Connect 4",
     subtitle: "Drop discs, line up four in a row.",
-    emoji: "🔴",
+    icon: Connect4Icon,
     kind: "grid",
     route: "/games/connect4",
   },
@@ -40,7 +51,7 @@ export const GAMES: GameMeta[] = [
     type: "tictactoe",
     title: "Tic-Tac-Toe",
     subtitle: "Three in a row, classic and quick.",
-    emoji: "⭕️",
+    icon: TicTacToeIcon,
     kind: "grid",
     route: "/games/tictactoe",
   },
@@ -48,17 +59,17 @@ export const GAMES: GameMeta[] = [
     type: "wordguess",
     title: "Word Guess",
     subtitle: "Crack today's 5-letter word together.",
-    emoji: "🔤",
+    icon: WordGuessIcon,
     kind: "grid",
     route: "/games/wordguess",
     getResult: ({ game }) =>
-      game.winnerUserId ? "Solved together! 🎉" : "Out of guesses — try again tomorrow.",
+      game.winnerUserId ? "Solved together!" : "Out of guesses — try again tomorrow.",
   },
   {
     type: "dotsboxes",
     title: "Dots & Boxes",
     subtitle: "Close boxes to claim the board.",
-    emoji: "▦",
+    icon: DotsBoxesIcon,
     kind: "grid",
     route: "/games/dotsboxes",
   },
@@ -66,7 +77,7 @@ export const GAMES: GameMeta[] = [
     type: "battleship",
     title: "Battleship",
     subtitle: "Hunt and sink each other's fleet.",
-    emoji: "🚢",
+    icon: BattleshipIcon,
     kind: "grid",
     route: "/games/battleship",
   },
@@ -74,7 +85,7 @@ export const GAMES: GameMeta[] = [
     type: "trivia",
     title: "Trivia",
     subtitle: "Ask questions only you two would know.",
-    emoji: "❓",
+    icon: TriviaIcon,
     kind: "trivia",
     route: "/games/trivia",
   },

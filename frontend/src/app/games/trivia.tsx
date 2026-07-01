@@ -20,6 +20,7 @@ import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { StreakPill } from "@/components/ui/StreakPill";
+import { CheckIcon, ChevronLeftIcon } from "@/components/ui/icons";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { showMutationError } from "@/utils/errors";
@@ -140,7 +141,7 @@ export default function TriviaScreen() {
         <ScrollView contentContainerStyle={styles.scroll}>
           <View style={styles.topRow}>
             <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
-              <AppText style={styles.backChevron}>‹</AppText>
+              <ChevronLeftIcon size={30} color={theme.colors.text.primary} />
             </Pressable>
             <AppMark size={28} />
             <View style={styles.topRight}>
@@ -254,15 +255,14 @@ export default function TriviaScreen() {
                     ROUNDS
                   </AppText>
                   {game.rounds.map((r) => (
-                    <AppText
-                      key={r.id}
-                      variant="body"
-                      color="muted"
-                      style={styles.roundLine}
-                    >
-                      {r.isMine ? "You asked" : "They asked"}: {r.prompt}
-                      {r.answered ? " ✓" : ""}
-                    </AppText>
+                    <View key={r.id} style={styles.roundLine}>
+                      <AppText variant="body" color="muted" style={styles.roundText}>
+                        {r.isMine ? "You asked" : "They asked"}: {r.prompt}
+                      </AppText>
+                      {r.answered ? (
+                        <CheckIcon size={14} color={theme.colors.accent.success} />
+                      ) : null}
+                    </View>
                   ))}
                 </View>
               ) : null}
@@ -310,5 +310,11 @@ const styles = StyleSheet.create({
   },
   optBtn: { marginTop: 8 },
   history: { marginTop: 8 },
-  roundLine: { marginTop: 6 },
+  roundLine: {
+    marginTop: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  roundText: { flex: 1 },
 });

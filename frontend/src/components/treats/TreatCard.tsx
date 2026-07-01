@@ -31,7 +31,9 @@ export function TreatCard({ treat }: Props) {
         },
       ]}
     >
-      <AppText style={styles.emoji}>{treat.emoji}</AppText>
+      <View style={styles.iconWrap}>
+        <treat.icon size={28} color={theme.colors.accent.primary} />
+      </View>
       <View style={styles.copy}>
         <AppText variant="bodySemibold">{treat.title}</AppText>
         <AppText variant="caption" color="secondary" style={styles.subtitle}>
@@ -57,6 +59,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   emoji: { fontSize: 28 },
+  iconWrap: { width: 28, alignItems: "center" },
   copy: { flex: 1 },
   subtitle: { marginTop: 2, letterSpacing: 0 },
   btn: { minWidth: 88 },

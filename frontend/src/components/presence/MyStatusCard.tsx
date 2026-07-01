@@ -6,6 +6,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { updateProfile } from "@/api/fetchers";
 import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
+import { ArrowRightIcon } from "@/components/ui/icons";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { useProfile } from "@/hooks/useProfile";
@@ -64,9 +65,12 @@ export function MyStatusCard() {
               <AppText variant="bodySemibold" style={styles.statusLine}>
                 {current || "Tap to set what you're up to"}
               </AppText>
-              <AppText variant="caption" color="accent">
-                Update status →
-              </AppText>
+              <View style={styles.updateRow}>
+                <AppText variant="caption" color="accent">
+                  Update status
+                </AppText>
+                <ArrowRightIcon size={14} color={theme.colors.accent.primary} />
+              </View>
             </Pressable>
             <View style={styles.quickRow}>
               {PRESETS.slice(0, 4).map((preset) => (
@@ -148,6 +152,7 @@ export function MyStatusCard() {
 const styles = StyleSheet.create({
   wrap: { marginHorizontal: 20, marginBottom: 12 },
   statusTap: { gap: 6, marginBottom: 12 },
+  updateRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   statusLine: { lineHeight: 22 },
   quickRow: {
     flexDirection: "row",

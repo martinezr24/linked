@@ -2,7 +2,10 @@ import { useRef, useState } from "react";
 import { Animated, StyleSheet, TouchableOpacity, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
+import { FlameIcon } from "@/components/ui/FlameIcon";
+import { CloseIcon } from "@/components/ui/icons";
 import { GoalCompleteBurst } from "@/components/goals/GoalCompleteBurst";
+import { colors } from "@/theme/tokens";
 import { hapticLight, hapticSuccess } from "@/utils/haptics";
 import type { WeeklyGoal } from "@/types";
 
@@ -68,7 +71,13 @@ export function GoalRow({ goal, onToggle, onDelete }: Props) {
       />
       <View style={styles.row}>
         <TouchableOpacity style={styles.checkArea} onPress={handleToggle}>
-          <AppText style={styles.checkbox}>{goal.done ? "🔥" : "○"}</AppText>
+          <View style={styles.checkbox}>
+            {goal.done ? (
+              <FlameIcon size={18} />
+            ) : (
+              <View style={styles.emptyCheck} />
+            )}
+          </View>
           <AppText
             variant="body"
             style={goal.done ? styles.goalDone : undefined}
@@ -77,7 +86,7 @@ export function GoalRow({ goal, onToggle, onDelete }: Props) {
           </AppText>
         </TouchableOpacity>
         <TouchableOpacity onPress={onDelete} hitSlop={8}>
-          <AppText color="accent">✕</AppText>
+          <CloseIcon size={18} color={colors.accent.primary} />
         </TouchableOpacity>
       </View>
       <GoalCompleteBurst active={burst} onDone={() => setBurst(false)} />
@@ -100,7 +109,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   checkArea: { flexDirection: "row", alignItems: "center", flex: 1, gap: 10 },
-  checkbox: { fontSize: 18, width: 24 },
+  checkbox: { width: 24, alignItems: "center", justifyContent: "center" },
+  emptyCheck: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    borderWidth: 1.8,
+    borderColor: colors.text.muted,
+  },
   goalDone: {
     textDecorationLine: "line-through",
     opacity: 0.55,

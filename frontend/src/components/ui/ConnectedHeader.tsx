@@ -5,6 +5,7 @@ import { AppMark } from "./AppMark";
 import { AppText } from "./AppText";
 import { AvatarImage } from "./AvatarImage";
 import { ConnectionLink } from "./ConnectionLink";
+import { CheckIcon } from "./icons";
 import { StreakPill } from "./StreakPill";
 import { useTheme } from "@/theme/useTheme";
 
@@ -50,7 +51,7 @@ function AvatarCircle({
             { backgroundColor: theme.colors.accent.primary },
           ]}
         >
-          <AppText style={styles.checkMark}>✓</AppText>
+          <CheckIcon size={12} color={theme.colors.text.onAccent} />
         </View>
       ) : null}
     </View>

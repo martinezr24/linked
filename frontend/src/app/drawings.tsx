@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { AppText } from "@/components/ui/AppText";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
+import { ChevronLeftIcon } from "@/components/ui/icons";
 import { DrawingCanvas } from "@/components/DrawingCanvas";
 import { queryKeys } from "@/api/queryKeys";
 import { fetchDrawings } from "@/api/fetchers";
@@ -34,7 +35,7 @@ export default function DrawingsScreen() {
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <AppText style={styles.back}>‹</AppText>
+            <ChevronLeftIcon size={28} color={colors.text.primary} />
           </Pressable>
           <AppText variant="h2">Doodles</AppText>
           <View style={styles.backSpacer} />

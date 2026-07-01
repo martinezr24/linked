@@ -1,6 +1,7 @@
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "./AppText";
+import { DiceIcon } from "./icons";
 import { useTheme } from "@/theme/useTheme";
 
 type Props = {
@@ -28,7 +29,9 @@ export function PromptShuffleButton({ onPress }: Props) {
       <AppText variant="bodySemibold" color="accent">
         Shuffle prompt
       </AppText>
-      <AppText style={styles.dice}> 🎲</AppText>
+      <View style={styles.dice}>
+        <DiceIcon size={16} color={theme.colors.accent.primary} />
+      </View>
     </Pressable>
   );
 }
@@ -43,6 +46,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
   },
-  dice: { fontSize: 16 },
+  dice: { marginLeft: 6 },
   pressed: { opacity: 0.85 },
 });

@@ -15,6 +15,7 @@ import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { ChevronDownIcon, EnvelopeIcon, LockIcon } from "@/components/ui/icons";
 import { queryKeys } from "@/api/queryKeys";
 import { fetchAsyncNotes } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
@@ -164,9 +165,13 @@ export function AsyncNotesCard() {
               </AppText>
             </View>
           ) : null}
-          <AppText color="muted" style={styles.chevron}>
-            {expanded ? "▼" : "✉"}
-          </AppText>
+          <View style={styles.chevron}>
+            {expanded ? (
+              <ChevronDownIcon size={18} color={theme.colors.text.muted} />
+            ) : (
+              <EnvelopeIcon size={18} color={theme.colors.text.muted} />
+            )}
+          </View>
         </View>
       </Pressable>
 
@@ -205,8 +210,9 @@ export function AsyncNotesCard() {
             <View style={styles.lockedList}>
               {waitingLocked.map((note) => (
                 <View key={note.id} style={styles.lockedRow}>
+                  <LockIcon size={14} color={theme.colors.text.muted} />
                   <AppText variant="caption" color="muted">
-                    🔒 {triggerLabel(note)}
+                    {triggerLabel(note)}
                   </AppText>
                 </View>
               ))}
@@ -406,7 +412,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  chevron: { fontSize: 16 },
+  chevron: { alignItems: "center", justifyContent: "center" },
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -423,7 +429,12 @@ const styles = StyleSheet.create({
   inboxTitle: { marginBottom: 8 },
   revealBtn: { marginTop: 6 },
   lockedList: { marginBottom: 12, gap: 6 },
-  lockedRow: { paddingVertical: 4 },
+  lockedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 4,
+  },
   lockRow: { flexDirection: "row", gap: 8, marginBottom: 10 },
   triggerRow: { flexWrap: "wrap", flexDirection: "row", gap: 8, marginBottom: 10 },
   triggerChip: {

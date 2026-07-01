@@ -6,8 +6,10 @@ import { queryKeys } from "@/api/queryKeys";
 import { fetchGoals } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
+import { ArrowRightIcon, CheckIcon } from "@/components/ui/icons";
 import { WeeklyScoreRing } from "@/components/goals/WeeklyScoreRing";
 import { useRelationship } from "@/context/RelationshipContext";
+import { colors } from "@/theme/tokens";
 
 export function GoalsSummaryCard() {
   const { deviceId } = useRelationship();
@@ -42,16 +44,23 @@ export function GoalsSummaryCard() {
 
         {goals.slice(0, 3).map((goal) => (
           <View key={goal.id} style={styles.goalRow}>
-            <AppText color={goal.done ? "muted" : "primary"}>
-              {goal.done ? "✓  " : "•  "}
+            {goal.done ? (
+              <CheckIcon size={16} color={colors.accent.success} />
+            ) : (
+              <View style={styles.bullet} />
+            )}
+            <AppText color={goal.done ? "muted" : "primary"} style={styles.goalText}>
               {goal.goalText}
             </AppText>
           </View>
         ))}
 
-        <AppText variant="bodySemibold" color="secondary" style={styles.link}>
-          Open in Us →
-        </AppText>
+        <View style={styles.link}>
+          <AppText variant="bodySemibold" color="secondary">
+            Open in Us
+          </AppText>
+          <ArrowRightIcon size={16} color={colors.text.secondary} />
+        </View>
       </ArtifactCard>
     </Pressable>
   );
@@ -67,6 +76,24 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   intro: { flex: 1 },
-  goalRow: { marginBottom: 6 },
-  link: { marginTop: 10 },
+  goalRow: {
+    marginBottom: 6,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  goalText: { flex: 1 },
+  bullet: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    marginHorizontal: 5.5,
+    backgroundColor: colors.text.muted,
+  },
+  link: {
+    marginTop: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
 });

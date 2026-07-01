@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
+import { CloseIcon } from "@/components/ui/icons";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { queryKeys } from "@/api/queryKeys";
@@ -177,7 +178,7 @@ export function SharedListSection({
                 ) : null}
               </View>
               <TouchableOpacity onPress={() => removeItem.mutate(item.id)}>
-                <AppText color="accent">✕</AppText>
+                <CloseIcon size={18} color={theme.colors.accent.primary} />
               </TouchableOpacity>
             </View>
           ))

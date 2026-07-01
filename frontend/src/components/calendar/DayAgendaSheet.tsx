@@ -11,6 +11,7 @@ import { router } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/ui/AppText";
+import { CloseIcon } from "@/components/ui/icons";
 import { useCoupleNames } from "@/hooks/useCoupleNames";
 import { useProfile } from "@/hooks/useProfile";
 import { useTheme } from "@/theme/useTheme";
@@ -163,7 +164,7 @@ export function DayAgendaSheet({
                           </AppText>
                         </TouchableOpacity>
                         <TouchableOpacity onPress={() => onDelete(item.id)}>
-                          <AppText color="accent">✕</AppText>
+                          <CloseIcon size={18} color={theme.colors.accent.primary} />
                         </TouchableOpacity>
                       </View>
                     </View>

@@ -6,20 +6,30 @@ import { fetchPartnerPresence } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { AvatarImage } from "@/components/ui/AvatarImage";
+import {
+  CloudIcon,
+  PartlyCloudyIcon,
+  RainIcon,
+  SnowIcon,
+  StormIcon,
+  SunIcon,
+  ThermometerIcon,
+  type IconProps,
+} from "@/components/ui/icons";
 import { useRelationship } from "@/context/RelationshipContext";
 import { useProfile } from "@/hooks/useProfile";
 import { colors } from "@/theme/tokens";
 import { initialFromName } from "@/utils/coupleNames";
 
-function weatherEmoji(summary?: string): string {
-  if (!summary) return "🌡️";
+function WeatherIcon({ summary, ...rest }: { summary?: string } & IconProps) {
+  if (!summary) return <ThermometerIcon {...rest} />;
   const s = summary.toLowerCase();
-  if (s.includes("clear")) return "☀️";
-  if (s.includes("cloud")) return "☁️";
-  if (s.includes("rain")) return "🌧️";
-  if (s.includes("snow")) return "❄️";
-  if (s.includes("storm")) return "⛈️";
-  return "🌤️";
+  if (s.includes("clear")) return <SunIcon {...rest} />;
+  if (s.includes("cloud")) return <CloudIcon {...rest} />;
+  if (s.includes("rain")) return <RainIcon {...rest} />;
+  if (s.includes("snow")) return <SnowIcon {...rest} />;
+  if (s.includes("storm")) return <StormIcon {...rest} />;
+  return <PartlyCloudyIcon {...rest} />;
 }
 
 function formatStatusAge(iso?: string): string | null {
@@ -130,9 +140,13 @@ export function PartnerPresenceCard() {
             </AppText>
             {hasWeather ? (
               <>
-                <AppText style={styles.weatherEmoji}>
-                  {weatherEmoji(data.weatherSummary)}
-                </AppText>
+                <View style={styles.weatherEmoji}>
+                  <WeatherIcon
+                    summary={data.weatherSummary}
+                    size={24}
+                    color={colors.text.primary}
+                  />
+                </View>
                 <AppText variant="bodySemibold">{weatherLine}</AppText>
               </>
             ) : (

@@ -7,6 +7,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { fetchPhotoToday } from "@/api/fetchers";
 import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
+import { ArrowRightIcon, SwapIcon } from "@/components/ui/icons";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { CouplePhotoImage } from "@/components/photos/CouplePhotoImage";
@@ -91,7 +92,7 @@ export function DailyPhotoCard() {
               </AppText>
             )}
           </View>
-          <AppText color="muted">↔</AppText>
+          <SwapIcon size={18} color={theme.colors.text.muted} />
           <View style={styles.thumbBox}>
             {data?.partner ? (
               <CouplePhotoImage url={data.partner.imageUrl} style={styles.thumb} />
@@ -142,8 +143,9 @@ export function DailyPhotoCard() {
 
         <Pressable onPress={() => router.push("/photos/memories")} style={styles.memories}>
           <AppText variant="bodySemibold" color="secondary">
-            View memories →
+            View memories
           </AppText>
+          <ArrowRightIcon size={16} color={theme.colors.text.secondary} />
         </Pressable>
       </ArtifactCard>
     </View>
@@ -179,5 +181,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   libraryBtn: { marginTop: 8 },
-  memories: { marginTop: 14, alignSelf: "flex-start" },
+  memories: {
+    marginTop: 14,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
 });

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
+import { BackspaceIcon } from "@/components/ui/icons";
 import { registerGameRenderer } from "@/games/registry";
 import { useTheme } from "@/theme/useTheme";
 import type { WordGuessBoardState } from "@/types";
@@ -155,7 +156,7 @@ export function WordGuessBoard({ state, isMyTurn, onMove, disabled }: Props) {
                 disabled={locked}
                 onPress={handleBackspace}
               >
-                <AppText style={styles.keyText}>⌫</AppText>
+                <BackspaceIcon size={20} color="#F5F0F1" />
               </Pressable>
             ) : null}
           </View>

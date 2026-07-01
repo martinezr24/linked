@@ -11,6 +11,7 @@ import { AppMark } from "@/components/ui/AppMark";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { StreakPill } from "@/components/ui/StreakPill";
+import { ChevronLeftIcon } from "@/components/ui/icons";
 import { GameResultOverlay } from "@/components/games/GameResultOverlay";
 import { getGameMeta } from "@/games/catalog";
 import "@/games/register";
@@ -71,7 +72,7 @@ export function GameScreen({ gameType }: Props) {
     <>
       <View style={styles.topRow}>
         <Pressable onPress={() => router.back()} hitSlop={12} style={styles.back}>
-          <AppText style={styles.backChevron}>‹</AppText>
+          <ChevronLeftIcon size={30} color={theme.colors.text.primary} />
         </Pressable>
         <AppMark size={28} />
         <View style={styles.topRight}>

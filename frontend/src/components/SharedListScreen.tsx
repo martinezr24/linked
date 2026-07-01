@@ -14,6 +14,7 @@ import { router } from "expo-router";
 import { AppTextInput } from "@/components/AppTextInput";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 import { AppText } from "@/components/ui/AppText";
+import { ArrowLeftIcon, CloseIcon } from "@/components/ui/icons";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
@@ -121,8 +122,9 @@ export function SharedListScreen({
         <DismissKeyboardView scroll={false} style={styles.flex}>
           {showBack ? (
             <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+              <ArrowLeftIcon size={18} color={theme.colors.accent.primary} />
               <AppText variant="bodySemibold" color="accent">
-                ← Back
+                Back
               </AppText>
             </TouchableOpacity>
           ) : null}
@@ -191,7 +193,7 @@ export function SharedListScreen({
                   ) : null}
                 </View>
                 <TouchableOpacity onPress={() => removeItem.mutate(item.id)}>
-                  <AppText color="accent">✕</AppText>
+                  <CloseIcon size={18} color={theme.colors.accent.primary} />
                 </TouchableOpacity>
               </View>
             )}
@@ -208,7 +210,13 @@ const styles = StyleSheet.create({
   safe: { flex: 1, padding: 20 },
   flex: { flex: 1 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
-  backButton: { marginBottom: 12, alignSelf: "flex-start" },
+  backButton: {
+    marginBottom: 12,
+    alignSelf: "flex-start",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
   header: { marginBottom: 16, fontFamily: "DMSans_700Bold" },
   errorText: { marginBottom: 12 },
   inputBlock: { marginBottom: 16 },

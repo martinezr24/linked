@@ -15,6 +15,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { fetchPhotoHistory } from "@/api/fetchers";
 import { CouplePhotoImage } from "@/components/photos/CouplePhotoImage";
 import { AppText } from "@/components/ui/AppText";
+import { ArrowLeftIcon } from "@/components/ui/icons";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { useRelationship } from "@/context/RelationshipContext";
 import { formatMMDDYYYY } from "@/utils/dates";
@@ -100,9 +101,10 @@ export default function PhotoMemoriesScreen() {
     <ScreenBackground>
       <SafeAreaView style={styles.safe}>
         <View style={styles.header}>
-          <Pressable onPress={() => router.back()}>
+          <Pressable onPress={() => router.back()} style={styles.backBtn}>
+            <ArrowLeftIcon size={18} color={theme.colors.accent.primary} />
             <AppText variant="bodySemibold" color="accent">
-              ← Back
+              Back
             </AppText>
           </Pressable>
           <AppText variant="h2">Memories</AppText>
@@ -166,6 +168,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
     gap: 8,
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
   },
   loader: { marginTop: 40 },
   emptyList: { padding: 20, textAlign: "center" },

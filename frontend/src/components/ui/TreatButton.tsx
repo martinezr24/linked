@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet } from "react-native";
 
 import { AppText } from "./AppText";
+import { GiftIcon } from "./icons";
 import { hapticLight } from "@/utils/haptics";
 import { useTheme } from "@/theme/useTheme";
 
@@ -28,9 +29,7 @@ export function TreatButton({ onPress }: Props) {
       accessibilityRole="button"
       accessibilityLabel="Treat your partner"
     >
-      <AppText variant="caption" style={styles.emoji}>
-        🎁
-      </AppText>
+      <GiftIcon size={14} color={theme.colors.accent.primary} />
       <AppText variant="caption" color="accent" style={styles.label}>
         TREAT
       </AppText>

@@ -14,6 +14,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { AppText } from "@/components/ui/AppText";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
+import { BackspaceIcon, ChevronLeftIcon, UndoIcon } from "@/components/ui/icons";
 import { queryKeys } from "@/api/queryKeys";
 import { createDrawing } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
@@ -127,7 +128,7 @@ export default function DrawScreen() {
             accessibilityRole="button"
             accessibilityLabel="Go back"
           >
-            <AppText style={styles.back}>‹</AppText>
+            <ChevronLeftIcon size={28} color={colors.text.primary} />
           </Pressable>
           <AppText variant="h2">Draw</AppText>
           <Pressable onPress={clear} hitSlop={12}>
@@ -219,7 +220,7 @@ export default function DrawScreen() {
               accessibilityRole="button"
               accessibilityLabel="Undo"
             >
-              <AppText variant="bodySemibold">↩</AppText>
+              <UndoIcon size={20} color={colors.text.primary} />
             </Pressable>
             <Pressable
               onPress={() => setIsEraser((v) => !v)}
@@ -227,7 +228,7 @@ export default function DrawScreen() {
               accessibilityRole="button"
               accessibilityLabel="Eraser"
             >
-              <AppText variant="bodySemibold">⌫</AppText>
+              <BackspaceIcon size={20} color={colors.text.primary} />
             </Pressable>
           </View>
 

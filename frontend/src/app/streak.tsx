@@ -9,6 +9,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { fetchPhotoToday } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { FlameIcon } from "@/components/ui/FlameIcon";
+import { ArrowLeftIcon, ArrowRightIcon } from "@/components/ui/icons";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { WeekStreakTracker } from "@/components/ui/WeekStreakTracker";
 import { useRelationship } from "@/context/RelationshipContext";
@@ -61,7 +62,7 @@ export default function StreakScreen() {
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
         <Pressable onPress={() => router.back()} style={styles.back}>
-          <AppText variant="h2">←</AppText>
+          <ArrowLeftIcon size={24} color={theme.colors.text.primary} />
         </Pressable>
 
         <ScrollView
@@ -130,8 +131,9 @@ export default function StreakScreen() {
 
           <Pressable onPress={() => router.push("/photos/memories")} style={styles.memories}>
             <AppText variant="bodySemibold" color="accent">
-              View our photos →
+              View our photos
             </AppText>
+            <ArrowRightIcon size={18} color={theme.colors.accent.primary} />
           </Pressable>
 
           <View
@@ -205,5 +207,10 @@ const styles = StyleSheet.create({
   timerLabel: { marginBottom: 8 },
   timer: { letterSpacing: 2, marginBottom: 6 },
   longest: { marginTop: 20 },
-  memories: { marginTop: 16 },
+  memories: {
+    marginTop: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
 });

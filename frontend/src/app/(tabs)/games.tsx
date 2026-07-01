@@ -72,7 +72,7 @@ function GameCard({
           { backgroundColor: theme.colors.surface.cardElevated },
         ]}
       >
-        <AppText style={styles.emoji}>{meta.emoji}</AppText>
+        <meta.icon size={26} color={theme.colors.accent.primary} />
       </View>
       <View style={styles.cardBody}>
         <AppText variant="bodySemibold">{meta.title}</AppText>
@@ -234,7 +234,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  emoji: { fontSize: 26 },
   cardBody: { flex: 1 },
   cardSub: { marginTop: 2 },
   record: { marginTop: 4 },
