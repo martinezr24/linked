@@ -8,6 +8,7 @@ import { AsyncNotesCard } from "@/components/AsyncNotesCard";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
 import { SharedListSection } from "@/components/SharedListSection";
 import { WeeklyGoalsCard } from "@/components/goals/WeeklyGoalsCard";
+import { WeeklyGoalsTile } from "@/components/goals/WeeklyGoalsTile";
 import { MyStatusCard } from "@/components/presence/MyStatusCard";
 import { AppText } from "@/components/ui/AppText";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
@@ -27,6 +28,8 @@ export default function PlayScreen() {
     queryFn: () => fetchGoals(deviceId!),
     enabled: Boolean(deviceId),
   });
+
+  const completedGoals = goals.filter((g) => g.done).length;
 
   return (
     <ScreenBackground>
@@ -54,13 +57,21 @@ export default function PlayScreen() {
               </AppText>
             </View>
 
-            <MyStatusCard />
+            <View style={styles.bentoRow}>
+              <View style={styles.heroCol}>
+                <MyStatusCard />
+              </View>
+              <View style={styles.sideCol}>
+                <WeeklyGoalsTile
+                  completed={completedGoals}
+                  total={goals.length}
+                />
+              </View>
+            </View>
 
             <WeeklyGoalsCard goals={goals} />
 
-            <View style={styles.cardWrap}>
-              <AsyncNotesCard />
-            </View>
+            <AsyncNotesCard />
 
             <SharedListSection
               listType="reunion"
@@ -79,9 +90,16 @@ export default function PlayScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  scroll: { paddingTop: 8, paddingBottom: 100 },
-  intro: { paddingHorizontal: 20, marginBottom: 16 },
+  scroll: {
+    paddingTop: 8,
+    paddingHorizontal: 20,
+    rowGap: 16,
+    paddingBottom: 100,
+  },
+  intro: { marginBottom: 0 },
   title: { marginBottom: 8 },
-  cardWrap: { marginHorizontal: 20 },
+  bentoRow: { flexDirection: "row", gap: 12 },
+  heroCol: { flex: 3 },
+  sideCol: { flex: 2 },
 });
 

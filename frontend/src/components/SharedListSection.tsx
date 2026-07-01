@@ -107,7 +107,7 @@ export function SharedListSection({
   if (isLoading) {
     return (
       <View style={styles.wrap}>
-        <ArtifactCard title={title} stacked={stacked}>
+        <ArtifactCard title={title} stacked={stacked} style={styles.card}>
           <ActivityIndicator color={theme.colors.accent.primary} />
         </ArtifactCard>
       </View>
@@ -116,7 +116,7 @@ export function SharedListSection({
 
   return (
     <View style={styles.wrap}>
-      <ArtifactCard title={title} stacked={stacked}>
+      <ArtifactCard title={title} stacked={stacked} style={styles.card}>
         {description ? (
           <AppText variant="body" color="secondary" style={styles.description}>
             {description}
@@ -189,7 +189,8 @@ export function SharedListSection({
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginHorizontal: 20, marginBottom: 8 },
+  wrap: { marginHorizontal: 0, marginBottom: 0 },
+  card: { marginBottom: 0 },
   description: { marginBottom: 12, marginTop: -4 },
   errorText: { marginBottom: 12 },
   inputRow: { flexDirection: "row", marginBottom: 10, gap: 8 },

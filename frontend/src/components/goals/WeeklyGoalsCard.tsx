@@ -7,7 +7,6 @@ import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { GoalRow } from "@/components/goals/GoalRow";
-import { WeeklyScoreRing } from "@/components/goals/WeeklyScoreRing";
 import { queryKeys } from "@/api/queryKeys";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
@@ -78,14 +77,11 @@ export function WeeklyGoalsCard({ goals }: Props) {
 
   return (
     <View style={styles.section}>
-      <ArtifactCard category="This week" title="Connection goals">
+      <ArtifactCard category="This week" title="Connection goals" style={styles.card}>
         <View style={styles.introRow}>
           <AppText variant="body" color="secondary" style={styles.intro}>
             Little things to grow closer this week.
           </AppText>
-          {total > 0 ? (
-            <WeeklyScoreRing completed={completed} total={total} />
-          ) : null}
         </View>
         {total > 0 ? (
           <AppText variant="caption" color="secondary" style={styles.scoreHint}>
@@ -137,7 +133,8 @@ export function WeeklyGoalsCard({ goals }: Props) {
 }
 
 const styles = StyleSheet.create({
-  section: { paddingHorizontal: 20 },
+  section: {},
+  card: { marginBottom: 0 },
   introRow: {
     flexDirection: "row",
     alignItems: "center",

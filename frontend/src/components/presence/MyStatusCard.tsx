@@ -58,7 +58,7 @@ export function MyStatusCard() {
 
   return (
     <View style={styles.wrap}>
-      <ArtifactCard category="Your status" title={mineName?.trim() || "You"}>
+      <ArtifactCard category="Your status" title={mineName?.trim() || "You"} style={styles.card}>
         {!editing ? (
           <>
             <Pressable onPress={() => setEditing(true)} style={styles.statusTap}>
@@ -150,7 +150,8 @@ export function MyStatusCard() {
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginHorizontal: 20, marginBottom: 12 },
+  wrap: { flex: 1 },
+  card: { flex: 1, marginBottom: 0 },
   statusTap: { gap: 6, marginBottom: 12 },
   updateRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   statusLine: { lineHeight: 22 },
@@ -179,8 +180,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   actions: {
-    flexDirection: "row",
     gap: 8,
   },
-  actionBtn: { flex: 1 },
+  actionBtn: { flex: 0 },
 });

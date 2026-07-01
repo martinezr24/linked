@@ -144,7 +144,7 @@ export function AsyncNotesCard() {
   }
 
   return (
-    <ArtifactCard category="Open when">
+    <ArtifactCard category="Open when" style={styles.card}>
       <Pressable
         style={styles.headerRow}
         onPress={() => setExpanded((e) => !e)}
@@ -404,6 +404,7 @@ export function AsyncNotesCard() {
 }
 
 const styles = StyleSheet.create({
+  card: { marginBottom: 0 },
   loader: { padding: 24, alignItems: "center" },
   headerRow: {
     flexDirection: "row",
