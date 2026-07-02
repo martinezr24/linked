@@ -159,6 +159,8 @@ export type BattleshipBoardState = {
     shots: number[][];
   }[];
   turn: number;
+  phase?: "setup" | "play";
+  placed?: boolean[];
 };
 
 export type AsyncNote = {

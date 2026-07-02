@@ -3,7 +3,6 @@ package games
 import (
 	"encoding/json"
 	"errors"
-	"math/rand"
 )
 
 const BattleshipType = "battleship"
@@ -21,11 +20,23 @@ type BattleshipState struct {
 	Size   int                `json:"size"`
 	Boards [2]battleshipBoard `json:"boards"` // [0]=player1, [1]=player2
 	Turn   int                `json:"turn"`   // current player number (1 or 2)
+	Phase  string             `json:"phase"`  // "setup" (placing ships) or "play"
+	Placed [2]bool            `json:"placed"` // whether each player committed their fleet
+}
+
+// shipPlacement is one ship in a player's committed fleet.
+type shipPlacement struct {
+	Row        int  `json:"row"`
+	Col        int  `json:"col"`
+	Length     int  `json:"length"`
+	Horizontal bool `json:"horizontal"`
 }
 
 type BattleshipMove struct {
-	Row int `json:"row"`
-	Col int `json:"col"`
+	Type  string          `json:"type"`  // "place" during setup, "fire" during play
+	Ships []shipPlacement `json:"ships"` // used when Type == "place"
+	Row   int             `json:"row"`   // used when firing
+	Col   int             `json:"col"`
 }
 
 type BattleshipEngine struct{}
@@ -40,48 +51,51 @@ func newGrid(n int) [][]int {
 	return g
 }
 
-func placeBattleshipFleet(n int) [][]int {
-	ships := newGrid(n)
-	for _, length := range battleshipShips {
-		for {
-			horizontal := rand.Intn(2) == 0
-			var r, c int
-			if horizontal {
-				r = rand.Intn(n)
-				c = rand.Intn(n - length + 1)
+// buildFleet validates a set of ship placements and returns the ships grid.
+// It enforces the standard fleet composition, keeping ships in bounds, straight,
+// and non-overlapping.
+func buildFleet(n int, ships []shipPlacement) ([][]int, error) {
+	if len(ships) != len(battleshipShips) {
+		return nil, errors.New("wrong number of ships")
+	}
+	want := map[int]int{}
+	for _, l := range battleshipShips {
+		want[l]++
+	}
+	got := map[int]int{}
+	grid := newGrid(n)
+	for _, p := range ships {
+		if p.Length < 1 {
+			return nil, errors.New("invalid ship length")
+		}
+		got[p.Length]++
+		for i := 0; i < p.Length; i++ {
+			r, c := p.Row, p.Col
+			if p.Horizontal {
+				c += i
 			} else {
-				r = rand.Intn(n - length + 1)
-				c = rand.Intn(n)
+				r += i
 			}
-			ok := true
-			for i := 0; i < length; i++ {
-				rr, cc := r, c
-				if horizontal {
-					cc += i
-				} else {
-					rr += i
-				}
-				if ships[rr][cc] != 0 {
-					ok = false
-					break
-				}
+			if r < 0 || r >= n || c < 0 || c >= n {
+				return nil, errors.New("ship out of bounds")
 			}
-			if !ok {
-				continue
+			if grid[r][c] != 0 {
+				return nil, errors.New("ships overlap")
 			}
-			for i := 0; i < length; i++ {
-				rr, cc := r, c
-				if horizontal {
-					cc += i
-				} else {
-					rr += i
-				}
-				ships[rr][cc] = length
-			}
-			break
+			grid[r][c] = p.Length
 		}
 	}
-	return ships
+	for l, cnt := range want {
+		if got[l] != cnt {
+			return nil, errors.New("fleet does not match required ships")
+		}
+	}
+	for l := range got {
+		if want[l] == 0 {
+			return nil, errors.New("unexpected ship length")
+		}
+	}
+	return grid, nil
 }
 
 func (BattleshipEngine) InitialState(playerX, playerO string) ([]byte, error) {
@@ -89,11 +103,12 @@ func (BattleshipEngine) InitialState(playerX, playerO string) ([]byte, error) {
 	_ = playerO
 	n := battleshipSize
 	state := BattleshipState{
-		Size: n,
-		Turn: 1,
+		Size:  n,
+		Turn:  1,
+		Phase: "setup",
 		Boards: [2]battleshipBoard{
-			{Ships: placeBattleshipFleet(n), Shots: newGrid(n)},
-			{Ships: placeBattleshipFleet(n), Shots: newGrid(n)},
+			{Ships: newGrid(n), Shots: newGrid(n)},
+			{Ships: newGrid(n), Shots: newGrid(n)},
 		},
 	}
 	return json.Marshal(state)
@@ -112,6 +127,35 @@ func (BattleshipEngine) ApplyMove(state []byte, move json.RawMessage, actorUserI
 	if err := json.Unmarshal(move, &m); err != nil {
 		return nil, nil, false, err
 	}
+
+	// Setup phase: the active player commits their whole fleet at once.
+	if s.Phase == "setup" {
+		idx := s.Turn - 1
+		if idx < 0 || idx > 1 {
+			return nil, nil, false, errors.New("invalid player")
+		}
+		if s.Placed[idx] {
+			return nil, nil, false, errors.New("fleet already placed")
+		}
+		grid, err := buildFleet(s.Size, m.Ships)
+		if err != nil {
+			return nil, nil, false, err
+		}
+		s.Boards[idx].Ships = grid
+		s.Placed[idx] = true
+		if s.Placed[0] && s.Placed[1] {
+			// Both fleets ready — start firing with player 1.
+			s.Phase = "play"
+			s.Turn = 1
+		} else {
+			// Hand off to the other player to place their fleet.
+			s.Turn = 3 - s.Turn
+		}
+		newState, _ := json.Marshal(s)
+		return newState, nil, false, nil
+	}
+
+	// Play phase: fire at the opponent's board.
 	if m.Row < 0 || m.Row >= s.Size || m.Col < 0 || m.Col >= s.Size {
 		return nil, nil, false, errors.New("invalid target")
 	}
@@ -155,6 +199,22 @@ func (BattleshipEngine) ApplyMove(state []byte, move json.RawMessage, actorUserI
 	}
 	newState, _ := json.Marshal(s)
 	return newState, nil, false, nil
+}
+
+// NextActor maps the engine's internal turn (player number) to a user id so the
+// manager keeps current_turn_user_id in sync across both the setup and play
+// phases. Returning "" (e.g. the opponent hasn't joined yet) parks the turn until
+// they join.
+func (BattleshipEngine) NextActor(newState []byte, actorUserID, playerX, playerO string) (string, error) {
+	_ = actorUserID
+	var s BattleshipState
+	if err := json.Unmarshal(newState, &s); err != nil {
+		return "", err
+	}
+	if s.Turn == 2 {
+		return playerO, nil
+	}
+	return playerX, nil
 }
 
 // ViewState hides the opponent's un-hit ship positions from the viewer.
