@@ -965,7 +965,10 @@ func handleTriviaAnswer(w http.ResponseWriter, r *http.Request) {
 		updated, _ := json.Marshal(scores)
 		_, _ = db.Exec(`UPDATE trivia_games SET scores = $1 WHERE id::text = $2`, updated, gameID)
 	}
-	json.NewEncoder(w).Encode(loadTriviaGame(gameID, user.ID))
+	json.NewEncoder(w).Encode(map[string]any{
+		"correct":      body.AnswerIndex == correct,
+		"correctIndex": correct,
+	})
 	broadcastServerEvent(*user.RelationshipID, "SYNC_GAMES", map[string]any{})
 }
 

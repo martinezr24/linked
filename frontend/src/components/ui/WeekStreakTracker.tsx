@@ -88,7 +88,7 @@ export function WeekStreakTracker({ currentStreak, bothCompletedToday }: Props) 
 }
 
 const styles = StyleSheet.create({
-  wrap: { marginVertical: 16 },
+  wrap: { marginVertical: 16, width: "100%", alignSelf: "stretch" },
   daysRow: {
     flexDirection: "row",
     justifyContent: "space-between",

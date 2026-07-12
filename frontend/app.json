@@ -61,6 +61,12 @@
         {
           "locationWhenInUsePermission": "Orbit uses your location to show your partner the weather in your area."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "iosDisplayInForeground": true
+        }
       ]
     ],
     "experiments": {

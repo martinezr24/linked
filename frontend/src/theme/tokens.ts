@@ -1,19 +1,19 @@
 export const colors = {
   gradient: {
-    top: "#3D1528",
-    mid: "#1A0F14",
-    bottom: "#0A0809",
+    top: "#33202D",
+    mid: "#1C151C",
+    bottom: "#151318",
   },
   bg: {
-    canvas: "#0F0C0D",
+    canvas: "#151318",
   },
   surface: {
-    card: "#1C1819",
-    cardElevated: "#262122",
-    input: "#2A2324",
+    card: "#222026",
+    cardElevated: "#2B2831",
+    input: "#2A2731",
   },
   border: {
-    subtle: "rgba(255,255,255,0.08)",
+    subtle: "rgba(255,255,255,0.07)",
     emphasis: "#8B2942",
   },
   text: {
@@ -56,6 +56,7 @@ export const spacing = {
 export const radius = {
   sm: 10,
   md: 16,
+  card: 20,
   lg: 24,
   pill: 999,
 } as const;
@@ -83,10 +84,10 @@ export const typography = {
 export const shadow = {
   card: {
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 2,
   },
   stackLayer: {
     shadowColor: "#000",

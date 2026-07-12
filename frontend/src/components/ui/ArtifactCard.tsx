@@ -1,6 +1,7 @@
 import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { AppText } from "./AppText";
+import { PressableScale } from "./motion";
 import { useTheme } from "@/theme/useTheme";
 
 type Props = {
@@ -10,6 +11,9 @@ type Props = {
   stacked?: boolean;
   featured?: boolean;
   style?: StyleProp<ViewStyle>;
+  /** When provided, the whole card becomes a spring-pressable button. */
+  onPress?: () => void;
+  accessibilityLabel?: string;
 };
 
 export function ArtifactCard({
@@ -19,8 +23,38 @@ export function ArtifactCard({
   stacked = false,
   featured = false,
   style,
+  onPress,
+  accessibilityLabel,
 }: Props) {
   const theme = useTheme();
+
+  const cardStyle = [
+    styles.card,
+    {
+      backgroundColor: theme.colors.surface.card,
+      borderColor: featured
+        ? theme.colors.border.emphasis
+        : theme.colors.border.subtle,
+    },
+    featured && styles.featured,
+    theme.shadow.card,
+  ];
+
+  const inner = (
+    <>
+      {category ? (
+        <AppText variant="label" color="secondary" style={styles.category}>
+          {category.toUpperCase()}
+        </AppText>
+      ) : null}
+      {title ? (
+        <AppText variant="h2" style={styles.title}>
+          {title}
+        </AppText>
+      ) : null}
+      {children}
+    </>
+  );
 
   return (
     <View style={[styles.wrap, style]}>
@@ -46,31 +80,18 @@ export function ArtifactCard({
           />
         </>
       ) : null}
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: theme.colors.surface.card,
-            borderColor: featured
-              ? theme.colors.border.emphasis
-              : theme.colors.border.subtle,
-          },
-          featured && styles.featured,
-          theme.shadow.card,
-        ]}
-      >
-        {category ? (
-          <AppText variant="label" color="secondary" style={styles.category}>
-            {category.toUpperCase()}
-          </AppText>
-        ) : null}
-        {title ? (
-          <AppText variant="h2" style={styles.title}>
-            {title}
-          </AppText>
-        ) : null}
-        {children}
-      </View>
+      {onPress ? (
+        <PressableScale
+          onPress={onPress}
+          accessibilityRole="button"
+          accessibilityLabel={accessibilityLabel}
+          style={cardStyle}
+        >
+          {inner}
+        </PressableScale>
+      ) : (
+        <View style={cardStyle}>{inner}</View>
+      )}
     </View>
   );
 }
@@ -86,7 +107,7 @@ const styles = StyleSheet.create({
     right: -6,
     top: 6,
     bottom: -6,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
   },
   stackLayer2: {
@@ -95,13 +116,13 @@ const styles = StyleSheet.create({
     right: -3,
     top: 3,
     bottom: -3,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    padding: 16,
+    padding: 20,
     position: "relative",
   },
   featured: {

@@ -1,4 +1,4 @@
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from "react-native";
+import { RefreshControl, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router, type Href } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -6,6 +6,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/api/queryKeys";
 import { fetchGridGame, fetchGridStats, fetchPhotoToday } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
+import { MountFade, PressableScale } from "@/components/ui/motion";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { StreakPill } from "@/components/ui/StreakPill";
 import { GAMES, type GameMeta } from "@/games/catalog";
@@ -55,15 +56,14 @@ function GameCard({
 }) {
   const theme = useTheme();
   return (
-    <Pressable
+    <PressableScale
       onPress={() => router.push(meta.route as Href)}
-      style={({ pressed }) => [
+      style={[
         styles.card,
         {
           backgroundColor: theme.colors.surface.card,
           borderColor: theme.colors.border.subtle,
         },
-        pressed && styles.pressed,
       ]}
     >
       <View
@@ -86,7 +86,7 @@ function GameCard({
         ) : null}
       </View>
       <StatusBadge status={status} />
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -194,13 +194,15 @@ export default function GamesScreen() {
             <StreakPill count={streak} />
           </View>
 
-          {GAMES.map((meta) =>
-            meta.kind === "trivia" ? (
-              <TriviaGameCard key={meta.type} meta={meta} />
-            ) : (
-              <GridGameCard key={meta.type} meta={meta} />
-            ),
-          )}
+          {GAMES.map((meta, i) => (
+            <MountFade key={meta.type} index={i}>
+              {meta.kind === "trivia" ? (
+                <TriviaGameCard meta={meta} />
+              ) : (
+                <GridGameCard meta={meta} />
+              )}
+            </MountFade>
+          ))}
         </ScrollView>
       </SafeAreaView>
     </ScreenBackground>
@@ -223,10 +225,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 14,
     padding: 16,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
   },
-  pressed: { opacity: 0.85 },
   emojiWrap: {
     width: 48,
     height: 48,

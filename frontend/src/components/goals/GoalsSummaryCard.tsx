@@ -45,7 +45,9 @@ export function GoalsSummaryCard() {
         {goals.slice(0, 3).map((goal) => (
           <View key={goal.id} style={styles.goalRow}>
             {goal.done ? (
-              <CheckIcon size={16} color={colors.accent.success} />
+              <View style={styles.doneBadge}>
+                <CheckIcon size={11} color={colors.text.onAccent} />
+              </View>
             ) : (
               <View style={styles.bullet} />
             )}
@@ -84,6 +86,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   goalText: { flex: 1 },
+  doneBadge: {
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.accent.success,
+  },
   bullet: {
     width: 5,
     height: 5,

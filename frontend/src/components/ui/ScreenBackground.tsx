@@ -29,6 +29,6 @@ export function ScreenBackground({ children, style, ...rest }: Props) {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#0F0C0D",
+    backgroundColor: "#151318",
   },
 });

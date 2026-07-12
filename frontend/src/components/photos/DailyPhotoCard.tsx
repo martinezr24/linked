@@ -74,12 +74,15 @@ export function DailyPhotoCard() {
 
   const mineSent = Boolean(data?.mine);
   const partnerSent = Boolean(data?.partner);
+  const streakCount = data?.currentStreak ?? 0;
 
   return (
     <View style={styles.wrap}>
       <ArtifactCard category="Daily photo" title="Send today's moment" featured style={styles.card}>
         <AppText variant="body" color="secondary" style={styles.hint}>
-          Both send a photo to grow your streak ({data?.currentStreak ?? 0} days).
+          {streakCount > 0
+            ? `Send today's photo together to keep your ${streakCount}-day streak going.`
+            : "Send a photo together each day to start your streak."}
         </AppText>
 
         <View style={styles.previewRow}>
@@ -134,7 +137,11 @@ export function DailyPhotoCard() {
             />
           </>
         ) : (
-          <AppText variant="bodySemibold" color="accent">
+          <AppText
+            variant="body"
+            color={partnerSent ? "accent" : "secondary"}
+            style={styles.status}
+          >
             {partnerSent
               ? "You're both in today — streak secured."
               : "Waiting for your partner's photo…"}
@@ -157,6 +164,7 @@ const styles = StyleSheet.create({
   card: { marginBottom: 0 },
   loader: { padding: 24, alignItems: "center" },
   hint: { marginBottom: 12 },
+  status: { marginTop: 2 },
   previewRow: {
     flexDirection: "row",
     alignItems: "center",

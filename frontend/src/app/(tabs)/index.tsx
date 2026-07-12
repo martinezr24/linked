@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Platform,
@@ -27,7 +27,13 @@ import { useDailyCheckIn } from "@/hooks/useDailyCheckIn";
 import { useProfile } from "@/hooks/useProfile";
 import { useTabReload } from "@/hooks/useTabReload";
 import { initialFromName } from "@/utils/coupleNames";
+import {
+  markStreakBannerSeen,
+  wasStreakBannerSeenToday,
+} from "@/utils/streakBannerStorage";
 import { AppText } from "@/components/ui/AppText";
+import { StreakBanner } from "@/components/ui/StreakBanner";
+import { MountFade } from "@/components/ui/motion";
 import { TreatsModal } from "@/components/treats/TreatsModal";
 import { ConnectedHeader } from "@/components/ui/ConnectedHeader";
 import { TreatButton } from "@/components/ui/TreatButton";
@@ -103,6 +109,45 @@ export default function HomeScreen() {
   const loading = relLoading || photoLoading;
   const streakCount = photoToday?.currentStreak ?? 0;
   const bothSentPhotoToday = photoToday?.bothSentToday ?? false;
+
+  const [streakBannerDismissed, setStreakBannerDismissed] = useState(true);
+  const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const dismissStreakBanner = () => {
+    if (bannerTimer.current) clearTimeout(bannerTimer.current);
+    setStreakBannerDismissed(true);
+    void markStreakBannerSeen();
+  };
+
+  useEffect(() => {
+    let active = true;
+    if (bannerTimer.current) clearTimeout(bannerTimer.current);
+
+    if (!bothSentPhotoToday) {
+      setStreakBannerDismissed(true);
+      return;
+    }
+
+    void wasStreakBannerSeenToday().then((seen) => {
+      if (!active) return;
+      if (seen) {
+        setStreakBannerDismissed(true);
+        return;
+      }
+      setStreakBannerDismissed(false);
+      bannerTimer.current = setTimeout(() => {
+        setStreakBannerDismissed(true);
+        void markStreakBannerSeen();
+      }, 6000);
+    });
+
+    return () => {
+      active = false;
+      if (bannerTimer.current) clearTimeout(bannerTimer.current);
+    };
+  }, [bothSentPhotoToday]);
+
+  const showStreakBanner = bothSentPhotoToday && !streakBannerDismissed;
 
   const invalidateRelationship = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.relationship });
@@ -190,25 +235,19 @@ export default function HomeScreen() {
               />
             }
           >
-            {bothSentPhotoToday ? (
-              <View
-                style={[
-                  styles.celebration,
-                  {
-                    backgroundColor: "rgba(230,57,70,0.12)",
-                    borderColor: theme.colors.border.emphasis,
-                  },
-                ]}
-              >
-                <AppText variant="bodySemibold" color="accent">
-                  Both sent today&apos;s photo — streak secured!
-                </AppText>
-              </View>
+            {showStreakBanner ? (
+              <StreakBanner
+                title="Streak secured"
+                subtitle="You both sent today’s photo — nice work."
+                onDismiss={dismissStreakBanner}
+              />
             ) : null}
 
-            <PartnerPresenceCard />
+            <MountFade index={0}>
+              <PartnerPresenceCard />
+            </MountFade>
 
-            <View style={styles.bentoRow}>
+            <MountFade index={1} style={styles.bentoRow}>
               <View style={styles.heroCol}>
                 <VisitCountdownHero
                   nextVisitAt={nextVisitAt}
@@ -222,29 +261,33 @@ export default function HomeScreen() {
                 <DoodlesTile />
                 <PlayTile />
               </View>
-            </View>
+            </MountFade>
 
-            <DailyPhotoCard />
+            <MountFade index={2}>
+              <DailyPhotoCard />
+            </MountFade>
 
             {!checkInLoading ? (
-              <CoupleProgressCard
-                checkIns={checkIns}
-                note={note}
-                onChangeNote={setNote}
-                onSend={sendCheckIn}
-                sending={sending}
-                tzLabel={tzLabel}
-              />
+              <MountFade index={3}>
+                <CoupleProgressCard
+                  checkIns={checkIns}
+                  note={note}
+                  onChangeNote={setNote}
+                  onSend={sendCheckIn}
+                  sending={sending}
+                  tzLabel={tzLabel}
+                />
+              </MountFade>
             ) : null}
 
-            <View style={styles.bentoRow}>
+            <MountFade index={4} style={styles.bentoRow}>
               <View style={styles.heroCol}>
                 <GoalsSummaryCard />
               </View>
               <View style={styles.sideCol}>
                 <StreakTile streak={streakCount} />
               </View>
-            </View>
+            </MountFade>
           </ScrollView>
 
           <VisitEditSheet
@@ -281,9 +324,4 @@ const styles = StyleSheet.create({
   bentoRow: { flexDirection: "row", gap: 12 },
   heroCol: { flex: 3 },
   sideCol: { flex: 2, gap: 12 },
-  celebration: {
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
 });

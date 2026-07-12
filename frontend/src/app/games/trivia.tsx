@@ -20,7 +20,7 @@ import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { StreakPill } from "@/components/ui/StreakPill";
-import { CheckIcon, ChevronLeftIcon } from "@/components/ui/icons";
+import { CheckIcon, ChevronLeftIcon, CloseIcon } from "@/components/ui/icons";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { showMutationError } from "@/utils/errors";
@@ -50,6 +50,12 @@ export default function TriviaScreen() {
   const [prompt, setPrompt] = useState("");
   const [options, setOptions] = useState(["", "", "", ""]);
   const [correctIndex, setCorrectIndex] = useState(0);
+  const [feedback, setFeedback] = useState<{
+    roundId: string;
+    selected: number;
+    correct: boolean;
+    correctIndex: number;
+  } | null>(null);
 
   const { data: photoToday } = useQuery({
     queryKey: queryKeys.photoToday,
@@ -116,7 +122,7 @@ export default function TriviaScreen() {
       roundId: string;
       answerIndex: number;
     }) => {
-      if (!game?.id) return;
+      if (!game?.id) throw new Error("No active game");
       const res = await apiFetch(
         `/api/games/trivia/${game.id}/rounds/${roundId}/answer`,
         deviceId!,
@@ -127,11 +133,33 @@ export default function TriviaScreen() {
         },
       );
       if (!res.ok) throw new Error("Failed to answer");
+      return (await res.json()) as { correct: boolean; correctIndex: number };
     },
-    onSuccess: () =>
-      void queryClient.invalidateQueries({ queryKey: queryKeys.triviaGame }),
     onError: () => showMutationError("Could not submit answer."),
   });
+
+  const handleAnswer = (roundId: string, answerIndex: number) => {
+    if (feedback || answerRound.isPending) return;
+    answerRound.mutate(
+      { roundId, answerIndex },
+      {
+        onSuccess: (result) => {
+          setFeedback({
+            roundId,
+            selected: answerIndex,
+            correct: result.correct,
+            correctIndex: result.correctIndex,
+          });
+          setTimeout(() => {
+            setFeedback(null);
+            void queryClient.invalidateQueries({
+              queryKey: queryKeys.triviaGame,
+            });
+          }, 1600);
+        },
+      },
+    );
+  };
 
   const pendingPartnerRound = game?.rounds.find((r) => !r.isMine && !r.answered);
 
@@ -172,20 +200,58 @@ export default function TriviaScreen() {
                   category="Your turn"
                   title={pendingPartnerRound.prompt}
                 >
-                  {pendingPartnerRound.options.map((opt, i) => (
-                    <PrimaryButton
-                      key={i}
-                      label={opt}
-                      onPress={() =>
-                        answerRound.mutate({
-                          roundId: pendingPartnerRound.id,
-                          answerIndex: i,
-                        })
-                      }
-                      style={styles.optBtn}
-                      variant="ghost"
-                    />
-                  ))}
+                  {pendingPartnerRound.options.map((opt, i) => {
+                    const showing = feedback?.roundId === pendingPartnerRound.id;
+                    const isCorrect = showing && i === feedback.correctIndex;
+                    const isWrongPick =
+                      showing && i === feedback.selected && !feedback.correct;
+                    let backgroundColor: string = theme.colors.surface.input;
+                    let borderColor: string = theme.colors.border.subtle;
+                    if (isCorrect) {
+                      backgroundColor = "rgba(74,222,128,0.16)";
+                      borderColor = theme.colors.accent.success;
+                    } else if (isWrongPick) {
+                      backgroundColor = "rgba(230,57,70,0.16)";
+                      borderColor = theme.colors.accent.primary;
+                    }
+                    return (
+                      <Pressable
+                        key={i}
+                        disabled={showing || answerRound.isPending}
+                        onPress={() => handleAnswer(pendingPartnerRound.id, i)}
+                        style={[
+                          styles.answerOption,
+                          { backgroundColor, borderColor },
+                        ]}
+                      >
+                        <AppText variant="bodySemibold" style={styles.answerText}>
+                          {opt}
+                        </AppText>
+                        {isCorrect ? (
+                          <CheckIcon
+                            size={18}
+                            color={theme.colors.accent.success}
+                          />
+                        ) : isWrongPick ? (
+                          <CloseIcon
+                            size={18}
+                            color={theme.colors.accent.primary}
+                          />
+                        ) : null}
+                      </Pressable>
+                    );
+                  })}
+                  {feedback?.roundId === pendingPartnerRound.id ? (
+                    <AppText
+                      variant="caption"
+                      color="secondary"
+                      style={styles.feedbackText}
+                    >
+                      {feedback.correct
+                        ? "Nice — you got it right!"
+                        : "Not quite — the right answer is highlighted."}
+                    </AppText>
+                  ) : null}
                 </ArtifactCard>
               ) : null}
 
@@ -309,6 +375,19 @@ const styles = StyleSheet.create({
     fontSize: 15,
   },
   optBtn: { marginTop: 8 },
+  answerOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 8,
+  },
+  answerText: { flex: 1 },
+  feedbackText: { marginTop: 10, textAlign: "center" },
   history: { marginTop: 8 },
   roundLine: {
     marginTop: 6,

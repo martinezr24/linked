@@ -27,6 +27,30 @@ export async function fetchRelationship(deviceId: string) {
   }>;
 }
 
+export async function registerPushToken(
+  deviceId: string,
+  token: string,
+  platform: string,
+) {
+  const res = await apiFetch("/api/profile/push-token", deviceId, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, platform }),
+  });
+  if (!res.ok) throw new Error("Failed to register push token");
+  return res.json() as Promise<{ ok: boolean }>;
+}
+
+export async function sendNudge(deviceId: string, type: string) {
+  const res = await apiFetch("/api/nudges", deviceId, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ type }),
+  });
+  if (!res.ok) throw new Error("Failed to send nudge");
+  return res.json() as Promise<{ ok: boolean }>;
+}
+
 export async function fetchGoals(deviceId: string) {
   const res = await apiFetch("/api/goals/current", deviceId);
   if (!res.ok) throw new Error("Failed to load goals");

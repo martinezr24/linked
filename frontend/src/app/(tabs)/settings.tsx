@@ -7,6 +7,7 @@ import { AnniversaryCard } from "@/components/AnniversaryCard";
 import { AppText } from "@/components/ui/AppText";
 import { CoupleMilestones } from "@/components/CoupleMilestones";
 import { ConnectedHeader } from "@/components/ui/ConnectedHeader";
+import { MountFade } from "@/components/ui/motion";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { TabSettingsIcon } from "@/components/ui/TabIcons";
 import { queryKeys } from "@/api/queryKeys";
@@ -99,18 +100,22 @@ export default function CoupleScreen() {
             />
           }
         >
-          <AnniversaryCard />
+          <MountFade index={0}>
+            <AnniversaryCard />
+          </MountFade>
 
-          <View style={styles.statsRow}>
+          <MountFade index={1} style={styles.statsRow}>
             <StatTile
               value={daysTogether != null ? daysTogether.toLocaleString() : "–"}
               label="Days together"
             />
             <StatTile value={String(streakCount)} label="Day streak" />
             <StatTile value={String(longestStreak)} label="Best streak" />
-          </View>
+          </MountFade>
 
-          <CoupleMilestones />
+          <MountFade index={2}>
+            <CoupleMilestones />
+          </MountFade>
         </ScrollView>
       </SafeAreaView>
     </ScreenBackground>

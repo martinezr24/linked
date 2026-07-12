@@ -5,7 +5,7 @@ import { AppMark } from "./AppMark";
 import { AppText } from "./AppText";
 import { AvatarImage } from "./AvatarImage";
 import { ConnectionLink } from "./ConnectionLink";
-import { CheckIcon } from "./icons";
+import { HeartIcon } from "./icons";
 import { StreakPill } from "./StreakPill";
 import { useTheme } from "@/theme/useTheme";
 
@@ -48,10 +48,13 @@ function AvatarCircle({
         <View
           style={[
             styles.checkBadge,
-            { backgroundColor: theme.colors.accent.primary },
+            {
+              backgroundColor: theme.colors.accent.primary,
+              borderColor: theme.colors.surface.card,
+            },
           ]}
         >
-          <CheckIcon size={12} color={theme.colors.text.onAccent} />
+          <HeartIcon size={9} color={theme.colors.text.onAccent} />
         </View>
       ) : null}
     </View>
@@ -117,9 +120,10 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: -2,
     right: -2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 17,
+    height: 17,
+    borderRadius: 8.5,
+    borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
   },

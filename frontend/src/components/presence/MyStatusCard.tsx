@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
 import { updateProfile } from "@/api/fetchers";
+import type { ProfileResponse } from "@/types";
 import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
 import { ArrowRightIcon } from "@/components/ui/icons";
@@ -35,14 +36,41 @@ export function MyStatusCard() {
       await updateProfile(deviceId!, {
         statusMessage: trimmed || undefined,
       });
-      await syncMyPresence(deviceId!, trimmed || undefined);
+      // Presence sync pulls GPS/battery/weather and can take a few seconds — run
+      // it in the background so the status change itself lands instantly.
+      void syncMyPresence(deviceId!, trimmed || undefined)
+        .then(() => {
+          void queryClient.invalidateQueries({
+            queryKey: queryKeys.partnerPresence,
+          });
+        })
+        .catch(() => {
+          // presence sync is best-effort
+        });
     },
-    onSuccess: () => {
+    onMutate: async (message: string) => {
+      const trimmed = message.trim();
       setEditing(false);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.profile });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.partnerPresence });
+      await queryClient.cancelQueries({ queryKey: queryKeys.profile });
+      const previous = queryClient.getQueryData<ProfileResponse>(
+        queryKeys.profile,
+      );
+      queryClient.setQueryData<ProfileResponse>(queryKeys.profile, (old) =>
+        old
+          ? { ...old, mine: { ...old.mine, statusMessage: trimmed || undefined } }
+          : old,
+      );
+      return { previous };
     },
-    onError: () => showMutationError("Could not update status."),
+    onError: (_err, _message, context) => {
+      if (context?.previous) {
+        queryClient.setQueryData(queryKeys.profile, context.previous);
+      }
+      showMutationError("Could not update status.");
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.profile });
+    },
   });
 
   const inputStyle = [

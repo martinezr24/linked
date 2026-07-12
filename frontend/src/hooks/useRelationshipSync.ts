@@ -20,9 +20,12 @@ const SYNC_ACTIONS: Record<string, (readonly unknown[])[]> = {
   SYNC_PRESENCE: [queryKeys.partnerPresence],
   SYNC_PROFILE: [queryKeys.profile, queryKeys.partnerPresence],
   SYNC_DRAWINGS: [queryKeys.drawings],
-  SYNC_GAMES: [queryKeys.triviaGame, queryKeys.gridGame("connect4")],
-  GAME_STATE: [queryKeys.gridGame("connect4")],
-  GAME_OVER: [queryKeys.gridGame("connect4")],
+  // Prefix keys so every grid game (connect4, tictactoe, wordguess, dotsboxes,
+  // battleship) plus trivia and stats refresh when a partner acts — not just
+  // connect4.
+  SYNC_GAMES: [["triviaGame"], ["gridGame"], ["gridStats"]],
+  GAME_STATE: [["gridGame"]],
+  GAME_OVER: [["gridGame"], ["gridStats"]],
   RELATIONSHIP_ENDED: [],
 };
 

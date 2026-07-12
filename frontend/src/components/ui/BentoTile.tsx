@@ -1,12 +1,7 @@
-import {
-  Pressable,
-  StyleSheet,
-  View,
-  type StyleProp,
-  type ViewStyle,
-} from "react-native";
+import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
+import { PressableScale } from "@/components/ui/motion";
 import { colors } from "@/theme/tokens";
 
 type Props = {
@@ -19,8 +14,8 @@ type Props = {
 
 /**
  * Compact pressable tile for the Bento grid. Matches ArtifactCard styling
- * (surface card, subtle border, radius 16) and fills its column height so it
- * can sit beside a taller hero card.
+ * (surface card, subtle border, radius 20) and fills its column height so it
+ * can sit beside a taller hero card. Springs on press via reanimated.
  */
 export function BentoTile({
   onPress,
@@ -30,11 +25,11 @@ export function BentoTile({
   children,
 }: Props) {
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
-      style={({ pressed }) => [styles.tile, pressed && styles.pressed, style]}
+      style={[styles.tile, style]}
     >
       {category ? (
         <AppText variant="label" color="secondary" style={styles.category}>
@@ -42,7 +37,7 @@ export function BentoTile({
         </AppText>
       ) : null}
       <View style={styles.content}>{children}</View>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -50,14 +45,13 @@ const styles = StyleSheet.create({
   tile: {
     flex: 1,
     minHeight: 96,
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: colors.border.subtle,
     backgroundColor: colors.surface.card,
-    padding: 14,
+    padding: 16,
     overflow: "hidden",
   },
-  pressed: { opacity: 0.85 },
   category: { marginBottom: 8 },
   content: { flex: 1 },
 });

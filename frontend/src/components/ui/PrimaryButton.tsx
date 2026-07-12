@@ -1,7 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import {
   ActivityIndicator,
-  Pressable,
   StyleSheet,
   View,
   type StyleProp,
@@ -9,6 +8,7 @@ import {
 } from "react-native";
 
 import { AppText } from "./AppText";
+import { PressableScale } from "./motion";
 import { useTheme } from "@/theme/useTheme";
 
 type Props = {
@@ -33,13 +33,12 @@ export function PrimaryButton({
 
   if (variant === "ghost") {
     return (
-      <Pressable
+      <PressableScale
         onPress={onPress}
         disabled={isDisabled}
-        style={({ pressed }) => [
+        style={[
           styles.ghost,
           { borderColor: theme.colors.border.subtle },
-          pressed && styles.pressed,
           isDisabled && styles.ghostDisabled,
           style,
         ]}
@@ -49,88 +48,79 @@ export function PrimaryButton({
         ) : (
           <AppText variant="bodySemibold">{label}</AppText>
         )}
-      </Pressable>
+      </PressableScale>
     );
   }
 
   if (isDisabled) {
     return (
-      <Pressable
-        disabled
-        style={[styles.wrap, style]}
-      >
+      <View style={[styles.wrap, style]}>
         <View
           style={[
             styles.disabledSurface,
             { backgroundColor: theme.colors.surface.cardElevated },
           ]}
         >
-          <AppText variant="bodySemibold" color="muted">
-            {label}
-          </AppText>
+          {loading ? (
+            <ActivityIndicator color={theme.colors.text.muted} />
+          ) : (
+            <AppText variant="bodySemibold" color="muted">
+              {label}
+            </AppText>
+          )}
         </View>
-      </Pressable>
+      </View>
     );
   }
 
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={loading}
-      style={({ pressed }) => [
-        styles.wrap,
-        pressed && styles.pressed,
-        style,
-      ]}
-    >
+    <PressableScale onPress={onPress} style={[styles.wrap, style]}>
       <LinearGradient
         colors={[theme.colors.accent.primary, theme.colors.accent.primaryMuted]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={styles.gradient}
       >
-        {loading ? (
-          <ActivityIndicator color={theme.colors.text.onAccent} />
-        ) : (
-          <AppText
-            variant="bodySemibold"
-            style={{ color: theme.colors.text.onAccent, fontFamily: "DMSans_700Bold" }}
-          >
-            {label}
-          </AppText>
-        )}
+        <AppText
+          variant="bodySemibold"
+          style={{
+            color: theme.colors.text.onAccent,
+            fontFamily: "DMSans_700Bold",
+          }}
+        >
+          {label}
+        </AppText>
       </LinearGradient>
-    </Pressable>
+    </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   wrap: {
-    borderRadius: 12,
+    borderRadius: 999,
     overflow: "hidden",
   },
   gradient: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: 15,
+    paddingHorizontal: 22,
     alignItems: "center",
     justifyContent: "center",
   },
   disabledSurface: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: 15,
+    paddingHorizontal: 22,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.08)",
+    borderColor: "rgba(255,255,255,0.07)",
   },
   ghost: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: 15,
+    paddingHorizontal: 22,
     alignItems: "center",
-    borderRadius: 12,
+    borderRadius: 999,
     borderWidth: 1,
   },
   ghostDisabled: { opacity: 0.45 },
-  pressed: { opacity: 0.85 },
 });

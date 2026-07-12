@@ -1,6 +1,6 @@
 import { FlatList, Pressable, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { type Href, router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { AppText } from "@/components/ui/AppText";
@@ -51,7 +51,14 @@ export default function DrawingsScreen() {
             </AppText>
           }
           renderItem={({ item }) => (
-            <View style={styles.item}>
+            <Pressable
+              style={styles.item}
+              onPress={() =>
+                router.push(`/drawings/${item.id}` as Href)
+              }
+              accessibilityRole="button"
+              accessibilityLabel="View doodle"
+            >
               <DrawingCanvas data={item.data} />
               <View style={styles.metaRow}>
                 <AppText variant="bodySemibold">
@@ -65,7 +72,7 @@ export default function DrawingsScreen() {
                   })}
                 </AppText>
               </View>
-            </View>
+            </Pressable>
           )}
         />
       </SafeAreaView>

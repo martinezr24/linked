@@ -87,7 +87,7 @@ export function CoupleProgressCard({
           </View>
         ) : (
           <>
-            <AppText display variant="h2" style={styles.prompt}>
+            <AppText variant="h2" style={styles.prompt}>
               {prompt}
             </AppText>
             {!mineDone ? (
@@ -157,8 +157,6 @@ const styles = StyleSheet.create({
   card: { marginBottom: 0 },
   prompt: {
     marginBottom: 12,
-    fontFamily: "Fraunces_600SemiBold",
-    lineHeight: 28,
   },
   doneBlock: { marginBottom: 8 },
   doneTitle: { marginBottom: 10, fontFamily: "DMSans_700Bold" },

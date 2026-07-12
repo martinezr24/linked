@@ -1,19 +1,21 @@
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
-import { fetchPhotoToday } from "@/api/fetchers";
+import { fetchPhotoToday, sendNudge } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { FlameIcon } from "@/components/ui/FlameIcon";
 import { ArrowLeftIcon, ArrowRightIcon } from "@/components/ui/icons";
+import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { WeekStreakTracker } from "@/components/ui/WeekStreakTracker";
 import { useRelationship } from "@/context/RelationshipContext";
+import { useProfile } from "@/hooks/useProfile";
 import { getDeviceTimezoneLabel } from "@/utils/dates";
+import { showMutationError } from "@/utils/errors";
 import { useTheme } from "@/theme/useTheme";
 
 function msUntilMidnight(): number {
@@ -34,6 +36,7 @@ function formatTimer(ms: number): string {
 export default function StreakScreen() {
   const theme = useTheme();
   const { deviceId } = useRelationship();
+  const { partnerName } = useProfile();
   const { celebrate, streak: streakParam } = useLocalSearchParams<{
     celebrate?: string;
     streak?: string;
@@ -46,6 +49,19 @@ export default function StreakScreen() {
     queryKey: queryKeys.photoToday,
     queryFn: () => fetchPhotoToday(deviceId!),
     enabled: Boolean(deviceId),
+  });
+
+  const partner = partnerName?.trim() || "Your partner";
+
+  const nudge = useMutation({
+    mutationFn: () => sendNudge(deviceId!, "send_photo"),
+    onSuccess: () => {
+      Alert.alert(
+        `${partner} has been notified!`,
+        "They'll get a reminder to send today's photo.",
+      );
+    },
+    onError: () => showMutationError("Could not send that nudge."),
   });
 
   useEffect(() => {
@@ -129,6 +145,19 @@ export default function StreakScreen() {
                 : "Start your streak by sending today's photo on Home."}
           </AppText>
 
+          {!bothSent ? (
+            <PrimaryButton
+              label={`Nudge ${partner}`}
+              onPress={() => {
+                if (!deviceId || nudge.isPending) return;
+                nudge.mutate();
+              }}
+              loading={nudge.isPending}
+              disabled={!deviceId}
+              style={styles.nudge}
+            />
+          ) : null}
+
           <Pressable onPress={() => router.push("/photos/memories")} style={styles.memories}>
             <AppText variant="bodySemibold" color="accent">
               View our photos
@@ -196,6 +225,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   copy: { textAlign: "center", marginTop: 8, paddingHorizontal: 12 },
+  nudge: { marginTop: 20, width: "100%" },
   timerBox: {
     marginTop: 28,
     width: "100%",

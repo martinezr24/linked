@@ -5,12 +5,14 @@ import { useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/api/queryKeys";
 import { fetchWidgetSummary } from "@/api/fetchers";
 import { useRelationshipSync } from "@/hooks/useRelationshipSync";
+import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { useRelationship } from "@/context/RelationshipContext";
 import { syncWidgetData } from "@/services/widgetSync";
 import { syncMyPresence } from "@/utils/presenceSync";
 
 export function SyncBootstrap() {
   useRelationshipSync();
+  usePushRegistration();
   const { deviceId, relationshipId } = useRelationship();
   const queryClient = useQueryClient();
 

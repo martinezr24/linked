@@ -11,6 +11,7 @@ import { WeeklyGoalsCard } from "@/components/goals/WeeklyGoalsCard";
 import { WeeklyGoalsTile } from "@/components/goals/WeeklyGoalsTile";
 import { MyStatusCard } from "@/components/presence/MyStatusCard";
 import { AppText } from "@/components/ui/AppText";
+import { MountFade } from "@/components/ui/motion";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { useRelationship } from "@/context/RelationshipContext";
 import { useTabReload } from "@/hooks/useTabReload";
@@ -57,7 +58,7 @@ export default function PlayScreen() {
               </AppText>
             </View>
 
-            <View style={styles.bentoRow}>
+            <MountFade index={0} style={styles.bentoRow}>
               <View style={styles.heroCol}>
                 <MyStatusCard />
               </View>
@@ -67,20 +68,26 @@ export default function PlayScreen() {
                   total={goals.length}
                 />
               </View>
-            </View>
+            </MountFade>
 
-            <WeeklyGoalsCard goals={goals} />
+            <MountFade index={1}>
+              <WeeklyGoalsCard goals={goals} />
+            </MountFade>
 
-            <AsyncNotesCard />
+            <MountFade index={2}>
+              <AsyncNotesCard />
+            </MountFade>
 
-            <SharedListSection
-              listType="reunion"
-              title="When we're together"
-              description="A shared bucket list for your next reunion."
-              placeholder="Something to do together..."
-              notePlaceholder="Optional note..."
-              stacked={false}
-            />
+            <MountFade index={3}>
+              <SharedListSection
+                listType="reunion"
+                title="When we're together"
+                description="A shared bucket list for your next reunion."
+                placeholder="Something to do together..."
+                notePlaceholder="Optional note..."
+                stacked={false}
+              />
+            </MountFade>
           </ScrollView>
         </DismissKeyboardView>
       </SafeAreaView>

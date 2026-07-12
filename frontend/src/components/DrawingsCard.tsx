@@ -1,4 +1,4 @@
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { type Href, router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
@@ -46,7 +46,13 @@ export function DrawingsCard() {
     <ArtifactCard category="Doodles">
       {latest ? (
         <View style={styles.body}>
-          <DrawingCanvas data={latest.data} style={styles.preview} />
+          <Pressable
+            onPress={() => router.push(`/drawings/${latest.id}` as Href)}
+            accessibilityRole="button"
+            accessibilityLabel="View doodle"
+          >
+            <DrawingCanvas data={latest.data} style={styles.preview} />
+          </Pressable>
           <View style={styles.metaRow}>
             <AppText variant="bodySemibold">
               {latest.isMine ? "From you" : `From ${partner}`}

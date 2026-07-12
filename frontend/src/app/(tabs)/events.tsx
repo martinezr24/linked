@@ -3,8 +3,6 @@ import {
   ActivityIndicator,
   StyleSheet,
   Text,
-  TouchableOpacity,
-  View,
 } from "react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,6 +14,7 @@ import { EventFormSheet } from "@/components/calendar/EventFormSheet";
 import { OwnerFilterChips } from "@/components/calendar/OwnerFilterChips";
 import { PillMonthGrid } from "@/components/calendar/PillMonthGrid";
 import { AppText } from "@/components/ui/AppText";
+import { MountFade, PressableScale } from "@/components/ui/motion";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
 import {
@@ -117,7 +116,7 @@ export default function EventsScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        <View style={styles.header}>
+        <MountFade index={0} style={styles.header}>
           <AppText variant="h1" style={styles.title}>
             Calendar
           </AppText>
@@ -134,20 +133,22 @@ export default function EventsScreen() {
             onModeChange={calendarTz.setMode}
             onCustomTzChange={calendarTz.setCustomTz}
           />
-        </View>
+        </MountFade>
 
-        <PillMonthGrid
-          visibleMonth={visibleMonth}
-          events={events}
-          ownerFilter={ownerFilter}
-          timeZone={activeTimezone}
-          selectedDay={agendaDay}
-          onMonthChange={setVisibleMonth}
-          onDayPress={setAgendaDay}
-          onEventPress={openEdit}
-        />
+        <MountFade index={1} style={styles.gridFade}>
+          <PillMonthGrid
+            visibleMonth={visibleMonth}
+            events={events}
+            ownerFilter={ownerFilter}
+            timeZone={activeTimezone}
+            selectedDay={agendaDay}
+            onMonthChange={setVisibleMonth}
+            onDayPress={setAgendaDay}
+            onEventPress={openEdit}
+          />
+        </MountFade>
 
-        <TouchableOpacity
+        <PressableScale
           style={[
             styles.fab,
             {
@@ -156,12 +157,11 @@ export default function EventsScreen() {
             },
           ]}
           onPress={() => openCreate()}
-          activeOpacity={0.85}
           accessibilityLabel="Add event"
           accessibilityRole="button"
         >
           <Text style={styles.fabIcon}>+</Text>
-        </TouchableOpacity>
+        </PressableScale>
 
         <DayAgendaSheet
           visible={agendaDay !== null}
@@ -205,6 +205,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 8,
+  },
+  gridFade: {
+    flex: 1,
+    paddingHorizontal: 20,
   },
   title: { marginBottom: 4, fontFamily: "DMSans_700Bold" },
   fab: {

@@ -203,6 +203,17 @@ export function BrokenHeartIcon({ size = 24, color }: IconProps) {
   );
 }
 
+export function HeartIcon({ size = 24, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox={V} fill="none">
+      <Path
+        d="M12 20.5S3.5 15.2 3.5 9A4.4 4.4 0 0 1 12 6.1 4.4 4.4 0 0 1 20.5 9c0 6.2-8.5 11.5-8.5 11.5z"
+        fill={color}
+      />
+    </Svg>
+  );
+}
+
 export function HandshakeIcon({ size = 24, color }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox={V} fill="none">

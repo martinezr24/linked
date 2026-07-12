@@ -208,7 +208,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     gap: 12,
-    marginBottom: 14,
+    marginBottom: 8,
   },
   name: { flex: 1 },
   divider: {

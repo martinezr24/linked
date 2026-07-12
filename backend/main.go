@@ -2009,6 +2009,8 @@ func main() {
 	http.HandleFunc("/api/pairing/status", handlePairingStatus)
 	http.HandleFunc("/api/pairing/unlink", handlePairingUnlink)
 	http.HandleFunc("/api/account/delete", handleAccountDelete)
+	http.HandleFunc("/api/profile/push-token", handlePushToken)
+	http.HandleFunc("/api/nudges", handleNudge)
 
 	fmt.Println("Linked engine running with persistence on :8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))
