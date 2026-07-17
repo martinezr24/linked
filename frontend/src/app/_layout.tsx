@@ -33,6 +33,7 @@ export default function RootLayout() {
                 name="drawings/index"
                 options={{ headerShown: false }}
               />
+              <Stack.Screen name="distance" options={{ headerShown: false }} />
             </Stack>
           </RelationshipProvider>
         </QueryProvider>

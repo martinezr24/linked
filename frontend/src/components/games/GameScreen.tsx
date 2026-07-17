@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -57,6 +57,21 @@ export function GameScreen({ gameType }: Props) {
   // The creator is in an active game but the partner hasn't joined yet.
   const awaitingOpponent =
     Boolean(game) && active && isPlayer && !hasOpponent;
+
+  // Hold the result overlay until the final piece finishes animating so the
+  // winning move is visible before the win screen appears.
+  const [resultVisible, setResultVisible] = useState(false);
+  useEffect(() => {
+    if (!finished) {
+      setResultVisible(false);
+      return;
+    }
+    const timer = setTimeout(() => setResultVisible(true), 750);
+    return () => clearTimeout(timer);
+  }, [finished]);
+  const finishing = finished && !resultVisible;
+  const showBoard =
+    Boolean(game) && isPlayer && Boolean(Renderer) && (active || finishing);
 
   // Auto-join once per game id.
   const joinedRef = useRef<string | null>(null);
@@ -120,7 +135,7 @@ export function GameScreen({ gameType }: Props) {
             </AppText>
           ) : null}
 
-          {!active && stats ? (
+          {!active && !finishing && stats ? (
             <View
               style={[
                 styles.scoreCard,
@@ -180,13 +195,14 @@ export function GameScreen({ gameType }: Props) {
             />
           ) : null}
 
-          {active && game && isPlayer && Renderer ? (
+          {showBoard && game && Renderer ? (
             <View style={styles.boardWrap}>
               <Renderer
                 state={game.boardState}
                 isMyTurn={game.isMyTurn}
                 myPlayerNumber={game.myPlayerNumber}
                 onMove={makeMove}
+                disabled={!active}
               />
             </View>
           ) : null}
@@ -202,7 +218,7 @@ export function GameScreen({ gameType }: Props) {
           ) : null}
         </ScrollView>
 
-        {finished && game ? (
+        {resultVisible && game ? (
           <GameResultOverlay
             gameType={gameType}
             game={game}

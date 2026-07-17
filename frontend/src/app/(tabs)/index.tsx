@@ -15,6 +15,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { DailyPhotoCard } from "@/components/photos/DailyPhotoCard";
 import { DoodlesTile } from "@/components/home/DoodlesTile";
+import { DistanceCard } from "@/components/distance/DistanceCard";
 import { PlayTile } from "@/components/home/PlayTile";
 import { StreakTile } from "@/components/home/StreakTile";
 import { GoalsSummaryCard } from "@/components/goals/GoalsSummaryCard";
@@ -245,6 +246,10 @@ export default function HomeScreen() {
 
             <MountFade index={0}>
               <PartnerPresenceCard />
+            </MountFade>
+
+            <MountFade index={1}>
+              <DistanceCard />
             </MountFade>
 
             <MountFade index={1} style={styles.bentoRow}>

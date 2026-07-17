@@ -85,6 +85,20 @@ export type PartnerPresence = {
   statusUpdatedAt?: string;
 };
 
+export type CoupleLocation = {
+  lat?: number;
+  lon?: number;
+  city?: string;
+  displayName?: string;
+  profilePictureUrl?: string;
+};
+
+export type CoupleDistance = {
+  me: CoupleLocation;
+  partner: CoupleLocation;
+  updatedAt?: string;
+};
+
 export type UserProfile = {
   displayName?: string;
   profilePictureUrl?: string;

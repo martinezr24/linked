@@ -1,6 +1,7 @@
 import { apiFetch } from "@/utils/api";
 import type {
   AsyncNote,
+  CoupleDistance,
   Drawing,
   DrawingData,
   GridGame,
@@ -124,6 +125,12 @@ export async function fetchPartnerPresence(deviceId: string) {
   const res = await apiFetch("/api/partner/presence", deviceId);
   if (!res.ok) throw new Error("Failed to load partner presence");
   return res.json() as Promise<PartnerPresence>;
+}
+
+export async function fetchCoupleDistance(deviceId: string) {
+  const res = await apiFetch("/api/couple/distance", deviceId);
+  if (!res.ok) throw new Error("Failed to load distance");
+  return res.json() as Promise<CoupleDistance>;
 }
 
 export async function fetchProfile(deviceId: string) {

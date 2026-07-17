@@ -250,6 +250,100 @@ func fetchPartnerWeather(userID string) (string, *int) {
 	return "", nil
 }
 
+// CoupleLocation is one partner's shareable location for the "Distance apart"
+// feature. All fields are optional so the client can render partial states.
+type CoupleLocation struct {
+	Lat               *float64 `json:"lat,omitempty"`
+	Lon               *float64 `json:"lon,omitempty"`
+	City              *string  `json:"city,omitempty"`
+	DisplayName       *string  `json:"displayName,omitempty"`
+	ProfilePictureUrl *string  `json:"profilePictureUrl,omitempty"`
+}
+
+type CoupleDistanceResponse struct {
+	Me        CoupleLocation `json:"me"`
+	Partner   CoupleLocation `json:"partner"`
+	UpdatedAt *string        `json:"updatedAt,omitempty"`
+}
+
+func loadCoupleLocation(userID string) (CoupleLocation, *string, error) {
+	var lat, lon sql.NullFloat64
+	var city, displayName, pictureKey sql.NullString
+	var lastPresence sql.NullTime
+	err := db.QueryRow(
+		`SELECT weather_lat, weather_lon, weather_city, display_name, profile_picture_url, last_presence_at
+         FROM users WHERE id::text = $1`, userID,
+	).Scan(&lat, &lon, &city, &displayName, &pictureKey, &lastPresence)
+	if err != nil {
+		return CoupleLocation{}, nil, err
+	}
+	loc := CoupleLocation{}
+	if lat.Valid && lon.Valid {
+		la, lo := lat.Float64, lon.Float64
+		loc.Lat, loc.Lon = &la, &lo
+	}
+	if city.Valid && strings.TrimSpace(city.String) != "" {
+		c := strings.TrimSpace(city.String)
+		loc.City = &c
+	}
+	if displayName.Valid && strings.TrimSpace(displayName.String) != "" {
+		n := strings.TrimSpace(displayName.String)
+		loc.DisplayName = &n
+	}
+	if pictureKey.Valid && pictureKey.String != "" && mediaStore != nil {
+		if url, err := mediaStore.SignGet(context.Background(), pictureKey.String, 15*time.Minute); err == nil {
+			loc.ProfilePictureUrl = &url
+		}
+	}
+	var updated *string
+	if lastPresence.Valid {
+		t := lastPresence.Time.UTC().Format(time.RFC3339)
+		updated = &t
+	}
+	return loc, updated, nil
+}
+
+func handleGetCoupleDistance(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) {
+		return
+	}
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+	user, err := getOrCreateUser(deviceID)
+	if err != nil || user.RelationshipID == nil {
+		http.Error(w, "not paired", http.StatusForbidden)
+		return
+	}
+
+	me, _, err := loadCoupleLocation(user.ID)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	var partnerID string
+	err = db.QueryRow(
+		`SELECT id::text FROM users WHERE relationship_id = $1 AND id != $2 LIMIT 1`,
+		*user.RelationshipID, user.ID,
+	).Scan(&partnerID)
+	if err != nil {
+		// Partner row doesn't exist yet (not joined) — return just our own side.
+		json.NewEncoder(w).Encode(CoupleDistanceResponse{Me: me})
+		return
+	}
+
+	partner, partnerUpdated, err := loadCoupleLocation(partnerID)
+	if err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	resp := CoupleDistanceResponse{Me: me, Partner: partner, UpdatedAt: partnerUpdated}
+	json.NewEncoder(w).Encode(resp)
+}
+
 func geocodeCity(name string) (float64, float64, bool) {
 	if name == "" {
 		return 0, 0, false
@@ -1077,6 +1171,7 @@ func registerFeatureRoutes() {
 	registerProfileRoutes()
 	http.HandleFunc("/api/profile/presence", handlePutProfilePresence)
 	http.HandleFunc("/api/partner/presence", handleGetPartnerPresence)
+	http.HandleFunc("/api/couple/distance", handleGetCoupleDistance)
 	http.HandleFunc("/api/photos/presign", handlePhotosPresign)
 	http.HandleFunc("/api/photos/upload-local", handlePhotosUploadLocal)
 	http.HandleFunc("/api/photos/file", handlePhotosFile)

@@ -10,6 +10,7 @@ export const queryKeys = {
   photoToday: ["photoToday"] as const,
   photoHistory: (cursor?: string) => ["photoHistory", cursor ?? ""] as const,
   partnerPresence: ["partnerPresence"] as const,
+  coupleDistance: ["coupleDistance"] as const,
   profile: ["profile"] as const,
   drawings: ["drawings"] as const,
   triviaGame: ["triviaGame"] as const,

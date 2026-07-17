@@ -34,11 +34,12 @@ const PLAYER_COLORS: Record<number, string> = {
 };
 
 function Disc({ color, dropRows }: { color: string; dropRows: number }) {
-  const translateY = useSharedValue(0);
+  // Initialise at the raised start position so the disc never flashes in its
+  // final cell before the drop animation begins.
+  const translateY = useSharedValue(dropRows > 0 ? -dropRows * STRIDE : 0);
 
   useEffect(() => {
     if (dropRows > 0) {
-      translateY.value = -dropRows * STRIDE;
       translateY.value = withSequence(
         withTiming(0, {
           duration: 120 + dropRows * 55,
@@ -115,7 +116,7 @@ export function Connect4Board({ state, isMyTurn, onMove, disabled }: Props) {
               const isNew = row === dropRow && col === dropCol;
               return (
                 <Disc
-                  key={`${row}-${col}`}
+                  key={`${row}-${col}-${cell}`}
                   color={colorFor(cell)}
                   dropRows={isNew ? row + 1 : 0}
                 />
