@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import MapView, {
   Marker,
@@ -9,7 +9,6 @@ import MapView, {
 
 import { DistanceMarker } from "./DistanceMarker";
 import { DARK_MAP_STYLE } from "./darkMapStyle";
-import { AppText } from "@/components/ui/AppText";
 import { HeartIcon } from "@/components/ui/icons";
 import { midpoint, regionForCoords, type LatLng } from "@/utils/distance";
 import { colors } from "@/theme/tokens";
@@ -33,7 +32,7 @@ type Props = {
 
 const EDGE_PADDING = { top: 64, right: 64, bottom: 64, left: 64 };
 
-export function DistanceMap({
+function DistanceMapComponent({
   me,
   partner,
   interactive = false,
@@ -41,6 +40,7 @@ export function DistanceMap({
   style,
 }: Props) {
   const mapRef = useRef<MapView>(null);
+  const fitted = useRef(false);
   // Markers render custom views (avatars + SVG heart); keep tracking briefly so
   // the async avatar images paint, then stop for performance.
   const [tracks, setTracks] = useState(true);
@@ -57,7 +57,11 @@ export function DistanceMap({
   };
   const mid = midpoint(me.coord, partner.coord);
 
+  // Frame both markers once. Guarding prevents re-fitting (which would fight
+  // the user's own pan/zoom on the interactive map).
   const fitBounds = () => {
+    if (fitted.current) return;
+    fitted.current = true;
     mapRef.current?.fitToCoordinates([meCoord, partnerCoord], {
       edgePadding: EDGE_PADDING,
       animated: false,
@@ -83,7 +87,7 @@ export function DistanceMap({
         showsCompass={false}
         showsPointsOfInterest={false}
         showsMyLocationButton={false}
-        pointerEvents={interactive ? "auto" : "none"}
+        pointerEvents={interactive ? undefined : "none"}
       >
         <Polyline
           coordinates={[meCoord, partnerCoord]}
@@ -93,16 +97,28 @@ export function DistanceMap({
           lineCap="round"
         />
 
-        <Marker coordinate={meCoord} anchor={{ x: 0.5, y: 0.5 }} tracksViewChanges={tracks}>
-          <DistanceMarker initial={me.initial} avatarUrl={me.avatarUrl} />
+        <Marker
+          coordinate={meCoord}
+          anchor={{ x: 0.5, y: showCityLabels && me.city ? 0.34 : 0.5 }}
+          tracksViewChanges={tracks}
+        >
+          <DistanceMarker
+            initial={me.initial}
+            avatarUrl={me.avatarUrl}
+            city={showCityLabels ? me.city : undefined}
+          />
         </Marker>
 
         <Marker
           coordinate={partnerCoord}
-          anchor={{ x: 0.5, y: 0.5 }}
+          anchor={{ x: 0.5, y: showCityLabels && partner.city ? 0.34 : 0.5 }}
           tracksViewChanges={tracks}
         >
-          <DistanceMarker initial={partner.initial} avatarUrl={partner.avatarUrl} />
+          <DistanceMarker
+            initial={partner.initial}
+            avatarUrl={partner.avatarUrl}
+            city={showCityLabels ? partner.city : undefined}
+          />
         </Marker>
 
         <Marker
@@ -114,40 +130,39 @@ export function DistanceMap({
             <HeartIcon size={15} color={colors.accent.primary} />
           </View>
         </Marker>
-
-        {showCityLabels && me.city ? (
-          <Marker
-            coordinate={meCoord}
-            anchor={{ x: 0.5, y: 0 }}
-            tracksViewChanges={tracks}
-            pointerEvents="none"
-          >
-            <View style={styles.cityWrap}>
-              <View style={styles.cityPill}>
-                <AppText style={styles.cityText}>{me.city}</AppText>
-              </View>
-            </View>
-          </Marker>
-        ) : null}
-
-        {showCityLabels && partner.city ? (
-          <Marker
-            coordinate={partnerCoord}
-            anchor={{ x: 0.5, y: 0 }}
-            tracksViewChanges={tracks}
-            pointerEvents="none"
-          >
-            <View style={styles.cityWrap}>
-              <View style={styles.cityPill}>
-                <AppText style={styles.cityText}>{partner.city}</AppText>
-              </View>
-            </View>
-          </Marker>
-        ) : null}
       </MapView>
     </View>
   );
 }
+
+/** Compare avatar URLs by path so periodic re-signing (new query string) does
+ *  not count as a change. */
+function baseUrl(url?: string): string | undefined {
+  return url ? url.split("?")[0] : url;
+}
+
+function samePerson(a: MapPerson, b: MapPerson): boolean {
+  return (
+    a.coord.lat === b.coord.lat &&
+    a.coord.lon === b.coord.lon &&
+    a.initial === b.initial &&
+    a.city === b.city &&
+    baseUrl(a.avatarUrl) === baseUrl(b.avatarUrl)
+  );
+}
+
+// A by-value comparator: unrelated re-renders (mi/km toggle, re-signed avatar
+// URLs, 60s refetches) keep the same values, so the map never re-renders and
+// the native markers can't jump to the corner.
+export const DistanceMap = memo(
+  DistanceMapComponent,
+  (prev, next) =>
+    prev.interactive === next.interactive &&
+    prev.showCityLabels === next.showCityLabels &&
+    prev.style === next.style &&
+    samePerson(prev.me, next.me) &&
+    samePerson(prev.partner, next.partner),
+);
 
 const styles = StyleSheet.create({
   wrap: {
@@ -163,23 +178,5 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.canvas,
     borderWidth: 1.5,
     borderColor: colors.accent.primary,
-  },
-  cityWrap: {
-    paddingTop: 32,
-    alignItems: "center",
-  },
-  cityPill: {
-    backgroundColor: "rgba(12,10,11,0.9)",
-    borderRadius: 999,
-    paddingHorizontal: 9,
-    paddingVertical: 3,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: "rgba(255,255,255,0.22)",
-  },
-  cityText: {
-    color: "#FFFFFF",
-    fontSize: 11,
-    lineHeight: 14,
-    fontFamily: "DMSans_600SemiBold",
   },
 });

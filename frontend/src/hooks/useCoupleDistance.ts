@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
@@ -49,25 +50,49 @@ export function useCoupleDistance(): CoupleDistanceView {
     data?.partner.lat != null && data?.partner.lon != null;
   const haveBoth = Boolean(meHasCoord && partnerHasCoord);
 
-  const me: MapPerson | null =
-    data && meHasCoord
-      ? {
-          coord: { lat: data.me.lat!, lon: data.me.lon! },
-          initial: initialFromName(meName, "M"),
-          avatarUrl: data.me.profilePictureUrl ?? mineAvatarUrl,
-          city: data.me.city,
-        }
-      : null;
+  const meLat = data?.me.lat ?? null;
+  const meLon = data?.me.lon ?? null;
+  const meAvatar = data?.me.profilePictureUrl ?? mineAvatarUrl;
+  const meCity = data?.me.city;
+  const partnerLat = data?.partner.lat ?? null;
+  const partnerLon = data?.partner.lon ?? null;
+  const partnerAvatar = data?.partner.profilePictureUrl ?? partnerAvatarUrl;
+  const partnerCity = data?.partner.city;
 
-  const partner: MapPerson | null =
-    data && partnerHasCoord
-      ? {
-          coord: { lat: data.partner.lat!, lon: data.partner.lon! },
-          initial: initialFromName(partnerDisplay, "P"),
-          avatarUrl: data.partner.profilePictureUrl ?? partnerAvatarUrl,
-          city: data.partner.city,
-        }
-      : null;
+  // Stable marker objects: only change when the underlying values change, so
+  // unrelated re-renders (e.g. toggling mi/km) don't remount the map markers.
+  const me = useMemo<MapPerson | null>(
+    () =>
+      meHasCoord && meLat != null && meLon != null
+        ? {
+            coord: { lat: meLat, lon: meLon },
+            initial: initialFromName(meName, "M"),
+            avatarUrl: meAvatar,
+            city: meCity,
+          }
+        : null,
+    [meHasCoord, meLat, meLon, meAvatar, meCity, meName],
+  );
+
+  const partner = useMemo<MapPerson | null>(
+    () =>
+      partnerHasCoord && partnerLat != null && partnerLon != null
+        ? {
+            coord: { lat: partnerLat, lon: partnerLon },
+            initial: initialFromName(partnerDisplay, "P"),
+            avatarUrl: partnerAvatar,
+            city: partnerCity,
+          }
+        : null,
+    [
+      partnerHasCoord,
+      partnerLat,
+      partnerLon,
+      partnerAvatar,
+      partnerCity,
+      partnerDisplay,
+    ],
+  );
 
   const meters =
     me && partner ? haversineMeters(me.coord, partner.coord) : null;
@@ -82,8 +107,8 @@ export function useCoupleDistance(): CoupleDistanceView {
     partner,
     meName,
     partnerName: partnerDisplay,
-    meCity: data?.me.city,
-    partnerCity: data?.partner.city,
+    meCity,
+    partnerCity,
     updatedAt: data?.updatedAt,
   };
 }

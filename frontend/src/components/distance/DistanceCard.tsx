@@ -1,13 +1,13 @@
-import { useEffect, useState } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 import { router } from "expo-router";
 
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
+import { SwapIcon } from "@/components/ui/icons";
 import { DistanceMap } from "@/components/distance/DistanceMap";
 import { useCoupleDistance } from "@/hooks/useCoupleDistance";
-import { formatDistance, type DistanceUnit } from "@/utils/distance";
-import { loadDistanceUnit } from "@/utils/distanceUnitStorage";
+import { useDistanceUnit } from "@/hooks/useDistanceUnit";
+import { formatDistance } from "@/utils/distance";
 import { colors } from "@/theme/tokens";
 
 function PersonRow({
@@ -47,11 +47,7 @@ export function DistanceCard() {
     partnerCity,
     meMissing,
   } = useCoupleDistance();
-  const [unit, setUnit] = useState<DistanceUnit>("mi");
-
-  useEffect(() => {
-    void loadDistanceUnit().then(setUnit);
-  }, []);
+  const { unit, toggleUnit } = useDistanceUnit();
 
   if (isLoading) return null;
 
@@ -85,9 +81,17 @@ export function DistanceCard() {
         <View style={styles.stats}>
           <View>
             <AppText style={styles.number}>{formatDistance(meters, unit)}</AppText>
-            <AppText variant="caption" color="secondary" style={styles.unit}>
-              {unit} apart
-            </AppText>
+            <Pressable
+              onPress={toggleUnit}
+              hitSlop={8}
+              style={styles.unitToggle}
+              accessibilityLabel={`Switch units, currently ${unit}`}
+            >
+              <AppText variant="caption" color="secondary">
+                {unit} apart
+              </AppText>
+              <SwapIcon size={12} color={colors.text.secondary} />
+            </Pressable>
           </View>
           <View style={styles.people}>
             <PersonRow name={meName} city={meCity} color={colors.accent.primary} />
@@ -113,7 +117,13 @@ const styles = StyleSheet.create({
     lineHeight: 44,
     color: "#F5F0F1",
   },
-  unit: { marginTop: -2 },
+  unitToggle: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginTop: 2,
+    alignSelf: "flex-start",
+  },
   people: { gap: 10 },
   person: { flexDirection: "row", alignItems: "center", gap: 8 },
   dot: { width: 8, height: 8, borderRadius: 4 },

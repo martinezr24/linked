@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Share, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
@@ -9,8 +8,8 @@ import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { ArrowLeftIcon } from "@/components/ui/icons";
 import { DistanceMap } from "@/components/distance/DistanceMap";
 import { useCoupleDistance } from "@/hooks/useCoupleDistance";
+import { useDistanceUnit } from "@/hooks/useDistanceUnit";
 import { formatDistance, type DistanceUnit } from "@/utils/distance";
-import { loadDistanceUnit, saveDistanceUnit } from "@/utils/distanceUnitStorage";
 import { useTheme } from "@/theme/useTheme";
 
 const UNITS: DistanceUnit[] = ["mi", "km"];
@@ -27,16 +26,7 @@ export default function DistanceScreen() {
     meCity,
     partnerCity,
   } = useCoupleDistance();
-  const [unit, setUnit] = useState<DistanceUnit>("mi");
-
-  useEffect(() => {
-    void loadDistanceUnit().then(setUnit);
-  }, []);
-
-  const changeUnit = (u: DistanceUnit) => {
-    setUnit(u);
-    void saveDistanceUnit(u);
-  };
+  const { unit, setUnit } = useDistanceUnit();
 
   const ready = haveBoth && me && partner && meters != null;
 
@@ -59,14 +49,18 @@ export default function DistanceScreen() {
           <ArrowLeftIcon size={24} color={theme.colors.text.primary} />
         </Pressable>
 
+        {ready ? (
+          <View style={styles.mapWrap}>
+            <DistanceMap me={me} partner={partner} interactive style={styles.map} />
+          </View>
+        ) : null}
+
         <ScrollView
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
         >
           {ready ? (
             <>
-              <DistanceMap me={me} partner={partner} interactive style={styles.map} />
-
               <AppText style={styles.number}>
                 {formatDistance(meters, unit)}
               </AppText>
@@ -85,7 +79,7 @@ export default function DistanceScreen() {
                   return (
                     <Pressable
                       key={u}
-                      onPress={() => changeUnit(u)}
+                      onPress={() => setUnit(u)}
                       style={[
                         styles.segmentBtn,
                         selected && {
@@ -154,10 +148,10 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   back: { paddingHorizontal: 20, paddingVertical: 8 },
   scroll: { paddingHorizontal: 20, paddingBottom: 40 },
+  mapWrap: { paddingHorizontal: 20, marginBottom: 20 },
   map: {
     height: 340,
     borderRadius: 24,
-    marginBottom: 20,
   },
   number: {
     fontFamily: "Fraunces_700Bold",
