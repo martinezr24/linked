@@ -155,13 +155,18 @@ export default function TriviaScreen() {
             void queryClient.invalidateQueries({
               queryKey: queryKeys.triviaGame,
             });
-          }, 1600);
+          }, 2500);
         },
       },
     );
   };
 
   const pendingPartnerRound = game?.rounds.find((r) => !r.isMine && !r.answered);
+  // While answer feedback is showing, keep that round on screen (frozen) so the
+  // correct answer stays visible instead of the next round snapping in.
+  const displayRound =
+    (feedback ? game?.rounds.find((r) => r.id === feedback.roundId) : null) ??
+    pendingPartnerRound;
 
   return (
     <ScreenBackground>
@@ -195,13 +200,13 @@ export default function TriviaScreen() {
             </ArtifactCard>
           ) : (
             <>
-              {pendingPartnerRound ? (
+              {displayRound ? (
                 <ArtifactCard
                   category="Your turn"
-                  title={pendingPartnerRound.prompt}
+                  title={displayRound.prompt}
                 >
-                  {pendingPartnerRound.options.map((opt, i) => {
-                    const showing = feedback?.roundId === pendingPartnerRound.id;
+                  {displayRound.options.map((opt, i) => {
+                    const showing = feedback?.roundId === displayRound.id;
                     const isCorrect = showing && i === feedback.correctIndex;
                     const isWrongPick =
                       showing && i === feedback.selected && !feedback.correct;
@@ -218,7 +223,7 @@ export default function TriviaScreen() {
                       <Pressable
                         key={i}
                         disabled={showing || answerRound.isPending}
-                        onPress={() => handleAnswer(pendingPartnerRound.id, i)}
+                        onPress={() => handleAnswer(displayRound.id, i)}
                         style={[
                           styles.answerOption,
                           { backgroundColor, borderColor },
@@ -241,7 +246,7 @@ export default function TriviaScreen() {
                       </Pressable>
                     );
                   })}
-                  {feedback?.roundId === pendingPartnerRound.id ? (
+                  {feedback?.roundId === displayRound.id ? (
                     <AppText
                       variant="caption"
                       color="secondary"

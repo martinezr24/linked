@@ -44,6 +44,7 @@ export function useProfile() {
     partnerName: data?.partner?.displayName ?? null,
     mineColor: data?.mine.calendarColor ?? "#C44B6E",
     partnerColor: data?.partner?.calendarColor ?? "#5B7FD4",
+    sharedColor: data?.sharedColor,
     mineAvatarUrl: data?.mine.profilePictureUrl,
     partnerAvatarUrl: data?.partner?.profilePictureUrl,
   };

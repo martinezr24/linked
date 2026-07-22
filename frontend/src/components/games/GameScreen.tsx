@@ -14,7 +14,7 @@ import { StreakPill } from "@/components/ui/StreakPill";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 import { GameResultOverlay } from "@/components/games/GameResultOverlay";
 import { getGameMeta } from "@/games/catalog";
-import { gameIdentity } from "@/games/playerIdentity";
+import { gameIdentity, GAME_YOU_COLOR, GAME_OPPONENT_COLOR } from "@/games/playerIdentity";
 import "@/games/register";
 import { getGameRenderer } from "@/games/registry";
 import { useGridGame } from "@/games/useGridGame";
@@ -27,7 +27,7 @@ type Props = { gameType: string };
 export function GameScreen({ gameType }: Props) {
   const theme = useTheme();
   const { deviceId } = useRelationship();
-  const { partnerName, mineColor, partnerColor } = useProfile();
+  const { partnerName } = useProfile();
   const meta = getGameMeta(gameType);
   const { game, isLoading, startGame, joinGame, endGame, makeMove } =
     useGridGame(gameType);
@@ -74,6 +74,10 @@ export function GameScreen({ gameType }: Props) {
   const showBoard =
     Boolean(game) && isPlayer && Boolean(Renderer) && (active || finishing);
 
+  // Let a game board (e.g. Battleship drag-to-place) pause page scrolling so
+  // the vertical scroll gesture doesn't steal an in-progress drag.
+  const [scrollEnabled, setScrollEnabled] = useState(true);
+
   // Auto-join once per game id.
   const joinedRef = useRef<string | null>(null);
   useEffect(() => {
@@ -103,29 +107,28 @@ export function GameScreen({ gameType }: Props) {
 
   const myNumber = game?.myPlayerNumber ?? 0;
   const oppNumber = myNumber === 1 ? 2 : myNumber === 2 ? 1 : 0;
-  const myIdentity = game
-    ? gameIdentity(gameType, myNumber, true, mineColor, partnerColor)
-    : null;
-  const oppIdentity = game
-    ? gameIdentity(gameType, oppNumber, false, mineColor, partnerColor)
-    : null;
+  const myIdentity = game ? gameIdentity(gameType, myNumber, true) : null;
+  const oppIdentity = game ? gameIdentity(gameType, oppNumber, false) : null;
 
   let turnLabel: string | null = null;
   let turnColor: string = theme.colors.text.muted;
   if (active && game && isPlayer) {
     if (game.isMyTurn) {
       turnLabel = "Your turn";
-      turnColor = myIdentity?.color ?? mineColor;
+      turnColor = myIdentity?.color ?? GAME_YOU_COLOR;
     } else {
       turnLabel = `${partner}'s turn`;
-      turnColor = oppIdentity?.color ?? partnerColor;
+      turnColor = oppIdentity?.color ?? GAME_OPPONENT_COLOR;
     }
   }
 
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-        <ScrollView contentContainerStyle={styles.scroll}>
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          scrollEnabled={scrollEnabled}
+        >
           {header}
 
           {turnLabel ? (
@@ -227,6 +230,7 @@ export function GameScreen({ gameType }: Props) {
                 myPlayerNumber={game.myPlayerNumber}
                 onMove={makeMove}
                 disabled={!active}
+                setScrollEnabled={setScrollEnabled}
               />
             </View>
           ) : null}

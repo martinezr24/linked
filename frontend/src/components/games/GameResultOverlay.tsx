@@ -12,7 +12,7 @@ import {
   TrophyIcon,
 } from "@/components/ui/icons";
 import { resolveOutcome, resolveResult } from "@/games/catalog";
-import { useProfile } from "@/hooks/useProfile";
+import { GAME_YOU_COLOR, GAME_OPPONENT_COLOR } from "@/games/playerIdentity";
 import { useRelationship } from "@/context/RelationshipContext";
 import { useTheme } from "@/theme/useTheme";
 import type { GridGame } from "@/types";
@@ -36,7 +36,6 @@ export function GameResultOverlay({
 }: Props) {
   const theme = useTheme();
   const { deviceId } = useRelationship();
-  const { mineColor, partnerColor } = useProfile();
 
   const outcome = resolveOutcome(game);
   const headline = resolveResult({ game, partnerName });
@@ -82,7 +81,7 @@ export function GameResultOverlay({
           stats ? (
             <View style={styles.record}>
               <View style={styles.recordSide}>
-                <AppText variant="h2" style={{ color: mineColor }}>
+                <AppText variant="h2" style={{ color: GAME_YOU_COLOR }}>
                   {stats.me.wins}
                 </AppText>
                 <AppText variant="caption" color="secondary">
@@ -93,7 +92,7 @@ export function GameResultOverlay({
                 –
               </AppText>
               <View style={styles.recordSide}>
-                <AppText variant="h2" style={{ color: partnerColor }}>
+                <AppText variant="h2" style={{ color: GAME_OPPONENT_COLOR }}>
                   {stats.partner.wins}
                 </AppText>
                 <AppText variant="caption" color="secondary">

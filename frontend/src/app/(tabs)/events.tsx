@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Pressable,
   StyleSheet,
   Text,
+  View,
 } from "react-native";
 import { useBottomTabBarHeight } from "@react-navigation/bottom-tabs";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { CalendarSettingsSheet } from "@/components/calendar/CalendarSettingsSheet";
 import { CalendarTimezonePicker } from "@/components/calendar/CalendarTimezonePicker";
 import { DayAgendaSheet } from "@/components/calendar/DayAgendaSheet";
 import { EventFormSheet } from "@/components/calendar/EventFormSheet";
@@ -16,6 +19,7 @@ import { PillMonthGrid } from "@/components/calendar/PillMonthGrid";
 import { AppText } from "@/components/ui/AppText";
 import { MountFade, PressableScale } from "@/components/ui/motion";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
+import { TabSettingsIcon } from "@/components/ui/TabIcons";
 import { queryKeys } from "@/api/queryKeys";
 import {
   createEvent,
@@ -39,6 +43,7 @@ export default function EventsScreen() {
   const [agendaDay, setAgendaDay] = useState<string | null>(null);
   const [ownerFilter, setOwnerFilter] = useState<EventOwnerType | "all">("all");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [colorSheetOpen, setColorSheetOpen] = useState(false);
   const [createDate, setCreateDate] = useState<string | undefined>();
   const [editing, setEditing] = useState<SharedEvent | null>(null);
 
@@ -117,9 +122,19 @@ export default function EventsScreen() {
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <MountFade index={0} style={styles.header}>
-          <AppText variant="h1" style={styles.title}>
-            Calendar
-          </AppText>
+          <View style={styles.titleRow}>
+            <AppText variant="h1" style={styles.title}>
+              Calendar
+            </AppText>
+            <Pressable
+              onPress={() => setColorSheetOpen(true)}
+              hitSlop={12}
+              accessibilityLabel="Calendar colors"
+              accessibilityRole="button"
+            >
+              <TabSettingsIcon color={theme.colors.text.secondary} />
+            </Pressable>
+          </View>
           <AppText variant="body" color="secondary">
             Shared dates you both should know about.
           </AppText>
@@ -193,6 +208,11 @@ export default function EventsScreen() {
           saving={saveEvent.isPending}
           deleting={removeEvent.isPending}
         />
+
+        <CalendarSettingsSheet
+          visible={colorSheetOpen}
+          onClose={() => setColorSheetOpen(false)}
+        />
       </SafeAreaView>
     </ScreenBackground>
   );
@@ -205,6 +225,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 8,
     paddingBottom: 8,
+  },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   gridFade: {
     flex: 1,

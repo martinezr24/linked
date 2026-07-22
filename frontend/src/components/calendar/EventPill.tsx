@@ -26,8 +26,8 @@ export function EventPill({
   onPress,
 }: Props) {
   const theme = useTheme();
-  const { mineColor, partnerColor } = useProfile();
-  const profileColors = { mineColor, partnerColor };
+  const { mineColor, partnerColor, sharedColor } = useProfile();
+  const profileColors = { mineColor, partnerColor, sharedColor };
   const ownerType = event.ownerType ?? "shared";
   const colors = eventColorFor(ownerType, theme, profileColors);
 

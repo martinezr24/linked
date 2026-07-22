@@ -6,6 +6,7 @@ type GameRendererProps = {
   myPlayerNumber: number;
   onMove: (move: unknown) => void;
   disabled?: boolean;
+  setScrollEnabled?: (enabled: boolean) => void;
 };
 
 const renderers: Record<string, ComponentType<GameRendererProps>> = {};

@@ -20,8 +20,9 @@ type UserProfileDTO struct {
 }
 
 type ProfileResponse struct {
-	Mine    UserProfileDTO  `json:"mine"`
-	Partner *UserProfileDTO `json:"partner,omitempty"`
+	Mine        UserProfileDTO  `json:"mine"`
+	Partner     *UserProfileDTO `json:"partner,omitempty"`
+	SharedColor *string         `json:"sharedColor,omitempty"`
 }
 
 func avatarObjectKey(relationshipID, userID, ext string) string {
@@ -95,6 +96,14 @@ func handleGetProfile(w http.ResponseWriter, r *http.Request) {
 			resp.Partner = &partner
 		}
 	}
+	var sharedColor sql.NullString
+	if err := db.QueryRow(
+		`SELECT shared_calendar_color FROM relationships WHERE id = $1`,
+		*user.RelationshipID,
+	).Scan(&sharedColor); err == nil && sharedColor.Valid && sharedColor.String != "" {
+		c := sharedColor.String
+		resp.SharedColor = &c
+	}
 	json.NewEncoder(w).Encode(resp)
 }
 
@@ -115,9 +124,10 @@ func handlePutProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
-		DisplayName   *string `json:"displayName"`
-		CalendarColor *string `json:"calendarColor"`
-		StatusMessage *string `json:"statusMessage"`
+		DisplayName         *string `json:"displayName"`
+		CalendarColor       *string `json:"calendarColor"`
+		SharedCalendarColor *string `json:"sharedCalendarColor"`
+		StatusMessage       *string `json:"statusMessage"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -154,6 +164,21 @@ func handlePutProfile(w http.ResponseWriter, r *http.Request) {
 		_, err = db.Exec(
 			`UPDATE users SET status_message = NULLIF($1,''), status_updated_at = NOW() WHERE id = $2`,
 			msg, user.ID,
+		)
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+	}
+	if body.SharedCalendarColor != nil && user.RelationshipID != nil {
+		color := strings.TrimSpace(*body.SharedCalendarColor)
+		if !hexColorRe.MatchString(color) {
+			http.Error(w, "invalid sharedCalendarColor", http.StatusBadRequest)
+			return
+		}
+		_, err = db.Exec(
+			`UPDATE relationships SET shared_calendar_color = $1 WHERE id = $2`,
+			color, *user.RelationshipID,
 		)
 		if err != nil {
 			http.Error(w, "db error", http.StatusInternalServerError)

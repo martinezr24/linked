@@ -144,6 +144,7 @@ export async function updateProfile(
   body: {
     displayName?: string;
     calendarColor?: string;
+    sharedCalendarColor?: string;
     statusMessage?: string;
   },
 ) {

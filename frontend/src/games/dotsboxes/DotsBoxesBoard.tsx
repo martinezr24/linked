@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
 import { registerGameRenderer } from "@/games/registry";
-import { useProfile } from "@/hooks/useProfile";
+import { GAME_YOU_COLOR, GAME_OPPONENT_COLOR } from "@/games/playerIdentity";
 import type { DotsBoxesBoardState } from "@/types";
 
 type Props = {
@@ -28,12 +28,11 @@ export function DotsBoxesBoard({
   disabled,
 }: Props) {
   const board = state as DotsBoxesBoardState;
-  const { mineColor, partnerColor } = useProfile();
   const { size, hEdges, vEdges, boxes, scores } = board;
   const locked = disabled || !isMyTurn;
 
   const colorForPlayer = (p: number) =>
-    p === myPlayerNumber ? mineColor : partnerColor;
+    p === myPlayerNumber ? GAME_YOU_COLOR : GAME_OPPONENT_COLOR;
   const myScore = myPlayerNumber === 2 ? scores[1] : scores[0];
   const theirScore = myPlayerNumber === 2 ? scores[0] : scores[1];
 
@@ -45,10 +44,10 @@ export function DotsBoxesBoard({
   return (
     <View style={styles.wrap}>
       <View style={styles.scoreRow}>
-        <AppText variant="bodySemibold" style={{ color: mineColor }}>
+        <AppText variant="bodySemibold" style={{ color: GAME_YOU_COLOR }}>
           You {myScore}
         </AppText>
-        <AppText variant="bodySemibold" style={{ color: partnerColor }}>
+        <AppText variant="bodySemibold" style={{ color: GAME_OPPONENT_COLOR }}>
           {theirScore} Partner
         </AppText>
       </View>

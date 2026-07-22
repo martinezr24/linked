@@ -48,8 +48,8 @@ export function DayAgendaSheet({
 }: Props) {
   const theme = useTheme();
   const { mineName, partnerName } = useCoupleNames();
-  const { mineColor, partnerColor } = useProfile();
-  const profileColors = { mineColor, partnerColor };
+  const { mineColor, partnerColor, sharedColor } = useProfile();
+  const profileColors = { mineColor, partnerColor, sharedColor };
   const label = formatDateLabelInTimezone(day, timeZone);
 
   const sorted = [...events].sort(

@@ -8,7 +8,6 @@ import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
-import { ColorSwatchPicker } from "@/components/profile/ColorSwatchPicker";
 import { ProfileAvatarPicker } from "@/components/profile/ProfileAvatarPicker";
 import { useProfile } from "@/hooks/useProfile";
 import { useRelationship } from "@/context/RelationshipContext";
@@ -39,7 +38,6 @@ export function ProfileSettingsCard() {
       }
       return updateProfile(deviceId!, {
         displayName: name || undefined,
-        calendarColor,
       });
     },
     onSuccess: () => {
@@ -68,8 +66,8 @@ export function ProfileSettingsCard() {
   return (
     <ArtifactCard category="Profile" title="Your profile">
       <AppText variant="body" color="secondary" style={styles.hint}>
-        Your nickname, avatar, and calendar color sync with your partner.
-        Update your status anytime from Us.
+        Your nickname and avatar sync with your partner. Manage event colors
+        from the Calendar tab, and your status from Us.
         {partner?.displayName ? ` Partner: ${partner.displayName}.` : ""}
       </AppText>
 
@@ -89,11 +87,6 @@ export function ProfileSettingsCard() {
         placeholder="e.g. Gio"
         placeholderTextColor={theme.colors.text.muted}
       />
-
-      <AppText variant="caption" color="secondary" style={styles.fieldLabel}>
-        CALENDAR COLOR
-      </AppText>
-      <ColorSwatchPicker value={calendarColor} onChange={setCalendarColor} />
 
       <PrimaryButton
         label={save.isPending ? "Saving…" : "Save profile"}

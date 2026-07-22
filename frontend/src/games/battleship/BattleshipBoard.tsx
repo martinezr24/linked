@@ -13,6 +13,7 @@ type Props = {
   myPlayerNumber: number;
   onMove: (move: unknown) => void;
   disabled?: boolean;
+  setScrollEnabled?: (enabled: boolean) => void;
 };
 
 type Placement = {
@@ -104,6 +105,7 @@ export function BattleshipBoard({
   myPlayerNumber,
   onMove,
   disabled,
+  setScrollEnabled,
 }: Props) {
   const theme = useTheme();
   const board = state as BattleshipBoardState;
@@ -222,6 +224,7 @@ export function BattleshipBoard({
         onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_evt, g) =>
           Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6,
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: (_evt, g) => {
           const cell = cellFromXY(
             g.x0 - gridOffset.current.x,
@@ -387,6 +390,9 @@ export function BattleshipBoard({
               gridOffset.current = { x, y };
             })
           }
+          onTouchStart={() => setScrollEnabled?.(false)}
+          onTouchEnd={() => setScrollEnabled?.(true)}
+          onTouchCancel={() => setScrollEnabled?.(true)}
           style={styles.grid}
           {...dragResponder.panHandlers}
         >

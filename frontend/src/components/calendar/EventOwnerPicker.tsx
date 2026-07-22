@@ -17,8 +17,8 @@ const OPTIONS: EventOwnerType[] = ["self", "partner", "shared"];
 export function EventOwnerPicker({ value, onChange }: Props) {
   const theme = useTheme();
   const { mineName, partnerName } = useCoupleNames();
-  const { mineColor, partnerColor } = useProfile();
-  const profileColors = { mineColor, partnerColor };
+  const { mineColor, partnerColor, sharedColor } = useProfile();
+  const profileColors = { mineColor, partnerColor, sharedColor };
 
   return (
     <View style={styles.wrap}>

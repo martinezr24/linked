@@ -34,7 +34,11 @@ export function useTabReload(onReload: () => Promise<unknown> | void) {
       "tabPress" as never,
       (() => {
         if (navigation.isFocused()) {
-          void onRefresh();
+          // Scroll to top immediately; defer the refetch so the resulting
+          // re-render doesn't interrupt the scroll-to-top animation (which
+          // otherwise makes the screen "jump" and stop partway).
+          scrollRef.current?.scrollTo({ y: 0, animated: true });
+          setTimeout(() => void onRefresh(), 400);
         }
       }) as never,
     );

@@ -13,15 +13,12 @@ import { colors } from "@/theme/tokens";
 function PersonRow({
   name,
   city,
-  color,
 }: {
   name: string;
   city?: string;
-  color: string;
 }) {
   return (
     <View style={styles.person}>
-      <View style={[styles.dot, { backgroundColor: color }]} />
       <View style={styles.personText}>
         <AppText variant="caption" color="muted" numberOfLines={1}>
           {name}
@@ -94,12 +91,8 @@ export function DistanceCard() {
             </Pressable>
           </View>
           <View style={styles.people}>
-            <PersonRow name={meName} city={meCity} color={colors.accent.primary} />
-            <PersonRow
-              name={partnerName}
-              city={partnerCity}
-              color={colors.event.partner.bg}
-            />
+            <PersonRow name={meName} city={meCity} />
+            <PersonRow name={partnerName} city={partnerCity} />
           </View>
         </View>
       </View>
@@ -126,6 +119,5 @@ const styles = StyleSheet.create({
   },
   people: { gap: 10 },
   person: { flexDirection: "row", alignItems: "center", gap: 8 },
-  dot: { width: 8, height: 8, borderRadius: 4 },
   personText: { flex: 1 },
 });

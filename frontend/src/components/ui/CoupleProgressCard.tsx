@@ -108,6 +108,15 @@ export function CoupleProgressCard({
             </AppText>
             {!mineDone ? (
               <>
+                <AppText
+                  variant="caption"
+                  color="secondary"
+                  style={styles.explainer}
+                >
+                  Your daily check-in — answer today&apos;s prompt or just leave
+                  a note. You&apos;ll each see the other&apos;s once you&apos;ve
+                  both checked in.
+                </AppText>
                 <PromptShuffleButton
                   onPress={() => setPrompt(pickRandomPrompt())}
                 />
@@ -178,6 +187,7 @@ const styles = StyleSheet.create({
   doneTitle: { marginBottom: 10, fontFamily: "DMSans_700Bold" },
   partnerLabel: { marginTop: 12 },
   promptLine: { marginTop: 2, marginBottom: 4 },
+  explainer: { marginBottom: 12 },
   partnerNote: { marginTop: 8, fontFamily: "Fraunces_600SemiBold", lineHeight: 24 },
   input: {
     borderWidth: 1,

@@ -32,6 +32,7 @@ export function hexToEventColors(hex: string) {
 export type ProfileColors = {
   mineColor?: string;
   partnerColor?: string;
+  sharedColor?: string;
 };
 
 export function blendHexColors(a: string, b: string): string {
@@ -58,6 +59,7 @@ export function sharedEventColors(
   profile: ProfileColors | undefined,
   theme: ThemeTokens,
 ) {
+  if (profile?.sharedColor) return hexToEventColors(profile.sharedColor);
   const { mine, partner } = profilePairColors(profile, theme);
   return hexToEventColors(blendHexColors(mine, partner));
 }

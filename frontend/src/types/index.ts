@@ -110,6 +110,7 @@ export type UserProfile = {
 export type ProfileResponse = {
   mine: UserProfile;
   partner?: UserProfile;
+  sharedColor?: string;
 };
 
 export type PhotoPostResponse = {
