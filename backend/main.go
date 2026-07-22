@@ -112,7 +112,11 @@ type User struct {
 	RelationshipID *string
 }
 
-func initDB() {
+// openDB opens the pool and wires up dependencies WITHOUT blocking on a live
+// connection. sql.Open never dials, so this returns instantly even if Postgres
+// is down — letting main() bind :8080 immediately so Fly can always reach the
+// machine. The actual connect + migrations happen in initDBAsync().
+func openDB() {
 	connStr := os.Getenv("DATABASE_URL")
 	if connStr == "" {
 		connStr = "dbname=linked_db sslmode=disable host=localhost"
@@ -124,25 +128,6 @@ func initDB() {
 		log.Fatalf("Failed to open database: %v", err)
 	}
 
-	// Postgres may still be waking up (e.g. Fly auto-start), so retry the
-	// initial connection with backoff instead of crashing immediately.
-	const maxAttempts = 30
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		if err = db.Ping(); err == nil {
-			break
-		}
-		log.Printf("Database not ready (attempt %d/%d): %v", attempt, maxAttempts, err)
-		if attempt == maxAttempts {
-			// Don't crash the app (and fail a health-gated deploy) if Postgres is
-			// slow to wake. Start serving anyway: the /health check keeps Fly from
-			// routing real traffic until db.Ping succeeds, and the pool reconnects
-			// once the database becomes reachable.
-			log.Printf("Warning: database unreachable after %d attempts; starting anyway", maxAttempts)
-			break
-		}
-		time.Sleep(2 * time.Second)
-	}
-
 	// Connection pool tuning. Without this, a Fly machine that suspends/idles
 	// keeps stale (dead) connections in the pool and hands them out, hanging the
 	// first requests after wake until the driver times out. Recycling idle/old
@@ -152,8 +137,29 @@ func initDB() {
 	db.SetConnMaxLifetime(5 * time.Minute)
 	db.SetConnMaxIdleTime(1 * time.Minute)
 
-	fmt.Println("Successfully connected to PostgreSQL database!")
 	hub = linkedws.NewHub()
+}
+
+// initDBAsync waits (indefinitely, with capped backoff) for Postgres to become
+// reachable, then runs migrations. Running this in the background means a slow
+// or down database can never make the whole app unroutable: the HTTP server is
+// already listening and /health reports DB readiness. It also self-heals — when
+// the database recovers, this connects and migrates without an app restart.
+func initDBAsync() {
+	backoff := 2 * time.Second
+	for {
+		if err := db.Ping(); err != nil {
+			log.Printf("Database not ready: %v", err)
+			time.Sleep(backoff)
+			if backoff < 30*time.Second {
+				backoff *= 2
+			}
+			continue
+		}
+		break
+	}
+
+	fmt.Println("Successfully connected to PostgreSQL database!")
 
 	migrationsDir := os.Getenv("MIGRATIONS_DIR")
 	if migrationsDir == "" {
@@ -1983,8 +1989,9 @@ func handleAccountDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	initDB()
+	openDB()
 	defer db.Close()
+	go initDBAsync()
 	initMediaStore()
 	initGameManager()
 	registerFeatureRoutes()
