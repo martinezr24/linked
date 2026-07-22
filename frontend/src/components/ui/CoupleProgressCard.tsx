@@ -14,6 +14,7 @@ import { AppText } from "./AppText";
 import { ArtifactCard } from "./ArtifactCard";
 import { PrimaryButton } from "./PrimaryButton";
 import { PromptShuffleButton } from "./PromptShuffleButton";
+import { useCoupleNames } from "@/hooks/useCoupleNames";
 import { useTheme } from "@/theme/useTheme";
 
 type Props = {
@@ -34,6 +35,7 @@ export function CoupleProgressCard({
   tzLabel,
 }: Props) {
   const theme = useTheme();
+  const { partnerName } = useCoupleNames();
   const [prompt, setPrompt] = useState(() => pickRandomPrompt());
   const scale = useRef(new Animated.Value(1)).current;
 
@@ -70,20 +72,24 @@ export function CoupleProgressCard({
             <AppText variant="h2" style={styles.doneTitle}>
               You&apos;re both here today
             </AppText>
-            {checkIns?.mine?.note ? (
-              <AppText variant="body" color="secondary">
-                You: “{checkIns.mine.note}”
-              </AppText>
-            ) : null}
-            {checkIns?.partner?.note ? (
-              <AppText variant="bodySemibold" style={styles.partnerNote}>
-                Partner: “{checkIns.partner.note}”
-              </AppText>
-            ) : checkIns?.partner ? (
-              <AppText variant="body" color="secondary">
-                Your partner checked in — no note today.
-              </AppText>
-            ) : null}
+
+            <AppText variant="caption" color="muted">
+              You
+            </AppText>
+            <AppText variant="body" color="secondary">
+              {checkIns?.mine?.note
+                ? `“${checkIns.mine.note}”`
+                : "Checked in — no note today."}
+            </AppText>
+
+            <AppText variant="caption" color="muted" style={styles.partnerLabel}>
+              {partnerName?.trim() || "Partner"}
+            </AppText>
+            <AppText variant="bodySemibold" style={styles.partnerNote}>
+              {checkIns?.partner?.note
+                ? `“${checkIns.partner.note}”`
+                : "Checked in — no note today."}
+            </AppText>
           </View>
         ) : (
           <>
@@ -160,6 +166,7 @@ const styles = StyleSheet.create({
   },
   doneBlock: { marginBottom: 8 },
   doneTitle: { marginBottom: 10, fontFamily: "DMSans_700Bold" },
+  partnerLabel: { marginTop: 12 },
   partnerNote: { marginTop: 8, fontFamily: "Fraunces_600SemiBold", lineHeight: 24 },
   input: {
     borderWidth: 1,

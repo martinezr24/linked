@@ -1,4 +1,4 @@
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, useRef } from "react";
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import MapView, {
   Marker,
@@ -41,14 +41,12 @@ function DistanceMapComponent({
 }: Props) {
   const mapRef = useRef<MapView>(null);
   const fitted = useRef(false);
-  // Markers render custom views (avatars + SVG heart); keep tracking briefly so
-  // the async avatar images paint, then stop for performance.
-  const [tracks, setTracks] = useState(true);
-
-  useEffect(() => {
-    const t = setTimeout(() => setTracks(false), 2500);
-    return () => clearTimeout(t);
-  }, [me.avatarUrl, partner.avatarUrl]);
+  // Keep marker views in "tracking" mode so they always re-rasterize at the
+  // correct position. The memo comparator on this component keeps re-renders
+  // rare, so this is cheap — and it prevents the react-native-maps bug where a
+  // custom marker jumps to the map's top-left corner if it re-renders (e.g. the
+  // avatar image finishing loading) while tracksViewChanges is false.
+  const tracks = true;
 
   const meCoord = { latitude: me.coord.lat, longitude: me.coord.lon };
   const partnerCoord = {

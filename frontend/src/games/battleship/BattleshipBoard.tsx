@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Pressable, StyleSheet, View } from "react-native";
+import { useMemo, useRef, useState } from "react";
+import { PanResponder, Pressable, StyleSheet, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
@@ -20,7 +20,34 @@ type Placement = {
   row: number;
   col: number;
   length: number;
-  horizontal: boolean;
+  dir: number; // 0=E, 1=S, 2=W, 3=N — ship extends from the anchor cell
+};
+
+// Cells a ship occupies given its anchor (bow) cell and direction.
+const shipCells = (
+  row: number,
+  col: number,
+  length: number,
+  dir: number,
+): [number, number][] => {
+  const cells: [number, number][] = [];
+  for (let i = 0; i < length; i++) {
+    if (dir === 0) cells.push([row, col + i]);
+    else if (dir === 1) cells.push([row + i, col]);
+    else if (dir === 2) cells.push([row, col - i]);
+    else cells.push([row - i, col]);
+  }
+  return cells;
+};
+
+// Convert a 4-direction placement to the backend's top-left + horizontal form.
+const toBackendPlacement = (p: Placement) => {
+  const horizontal = p.dir === 0 || p.dir === 2;
+  let row = p.row;
+  let col = p.col;
+  if (p.dir === 2) col = p.col - (p.length - 1);
+  if (p.dir === 3) row = p.row - (p.length - 1);
+  return { row, col, length: p.length, horizontal };
 };
 
 const FLEET = [
@@ -64,7 +91,7 @@ function randomFleet(size: number): Placement[] {
       cells.forEach(([r, c]) => {
         occ[r][c] = id + 1;
       });
-      result.push({ id, row, col, length: ship.length, horizontal });
+      result.push({ id, row, col, length: ship.length, dir: horizontal ? 0 : 1 });
       break;
     }
   });
@@ -96,30 +123,63 @@ export function BattleshipBoard({
   // ---- Placement (setup) local state ----
   const [placements, setPlacements] = useState<Placement[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [horizontal, setHorizontal] = useState(true);
+  const [dir, setDir] = useState(0);
 
   const occ = useMemo(() => {
     const g = Array.from({ length: size }, () => Array(size).fill(0));
     placements.forEach((p) => {
-      for (let i = 0; i < p.length; i++) {
-        const r = p.horizontal ? p.row : p.row + i;
-        const c = p.horizontal ? p.col + i : p.col;
+      shipCells(p.row, p.col, p.length, p.dir).forEach(([r, c]) => {
         if (r >= 0 && r < size && c >= 0 && c < size) g[r][c] = p.id + 1;
-      }
+      });
     });
     return g;
   }, [placements, size]);
+
+  // Latest-value refs so the drag gesture handlers avoid stale closures.
+  const dirRef = useRef(dir);
+  dirRef.current = dir;
+  const selectedIdRef = useRef(selectedId);
+  selectedIdRef.current = selectedId;
+  const occRef = useRef(occ);
+  occRef.current = occ;
+  const placementsRef = useRef(placements);
+  placementsRef.current = placements;
+  const dragIdRef = useRef<number | null>(null);
+  const gridRef = useRef<View>(null);
+  const gridOffset = useRef({ x: 0, y: 0 });
+
+  const cellFromXY = (x: number, y: number) => {
+    const step = CELL + GAP;
+    const c = Math.floor((x - 6) / step); // 6 = grid padding
+    const r = Math.floor((y - 6) / step);
+    if (r < 0 || r >= size || c < 0 || c >= size) return null;
+    return { r, c };
+  };
+
+  const fits = (
+    length: number,
+    row: number,
+    col: number,
+    d: number,
+    excludeId: number,
+  ) => {
+    const o = occRef.current;
+    for (const [r, c] of shipCells(row, col, length, d)) {
+      if (r < 0 || r >= size || c < 0 || c >= size) return false;
+      const v = o[r][c];
+      if (v !== 0 && v - 1 !== excludeId) return false;
+    }
+    return true;
+  };
 
   const canPlace = (
     length: number,
     row: number,
     col: number,
-    isH: boolean,
+    d: number,
     excludeId: number,
   ) => {
-    for (let i = 0; i < length; i++) {
-      const r = isH ? row : row + i;
-      const c = isH ? col + i : col;
+    for (const [r, c] of shipCells(row, col, length, d)) {
       if (r < 0 || r >= size || c < 0 || c >= size) return false;
       const v = occ[r][c];
       if (v !== 0 && v - 1 !== excludeId) return false;
@@ -127,24 +187,24 @@ export function BattleshipBoard({
     return true;
   };
 
-  const putShip = (id: number, row: number, col: number, isH: boolean) => {
+  const putShip = (id: number, row: number, col: number, d: number) => {
     setPlacements((prev) => [
       ...prev.filter((p) => p.id !== id),
-      { id, row, col, length: FLEET[id].length, horizontal: isH },
+      { id, row, col, length: FLEET[id].length, dir: d },
     ]);
   };
 
   const selectShip = (id: number) => {
     setSelectedId(id);
     const existing = placements.find((p) => p.id === id);
-    if (existing) setHorizontal(existing.horizontal);
+    if (existing) setDir(existing.dir);
   };
 
   const onPlacementCell = (r: number, c: number) => {
     const occupant = occ[r][c] > 0 ? occ[r][c] - 1 : null;
     if (selectedId != null) {
-      if (canPlace(FLEET[selectedId].length, r, c, horizontal, selectedId)) {
-        putShip(selectedId, r, c, horizontal);
+      if (canPlace(FLEET[selectedId].length, r, c, dir, selectedId)) {
+        putShip(selectedId, r, c, dir);
         setSelectedId(null);
         return;
       }
@@ -154,20 +214,73 @@ export function BattleshipBoard({
     if (occupant != null) selectShip(occupant);
   };
 
+  // Drag-to-place: claims the gesture only once the finger moves, so a plain
+  // tap still falls through to the Pressable cells (tap-to-place).
+  const dragResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
+        onMoveShouldSetPanResponder: (_evt, g) =>
+          Math.abs(g.dx) > 6 || Math.abs(g.dy) > 6,
+        onPanResponderGrant: (_evt, g) => {
+          const cell = cellFromXY(
+            g.x0 - gridOffset.current.x,
+            g.y0 - gridOffset.current.y,
+          );
+          let id = selectedIdRef.current;
+          if (id == null && cell) {
+            const v = occRef.current[cell.r]?.[cell.c] ?? 0;
+            if (v > 0) {
+              id = v - 1;
+              setSelectedId(id);
+              const ex = placementsRef.current.find((p) => p.id === id);
+              if (ex) setDir(ex.dir);
+            }
+          }
+          dragIdRef.current = id;
+        },
+        onPanResponderMove: (_evt, g) => {
+          const id = dragIdRef.current;
+          if (id == null) return;
+          const cell = cellFromXY(
+            g.moveX - gridOffset.current.x,
+            g.moveY - gridOffset.current.y,
+          );
+          if (!cell) return;
+          if (fits(FLEET[id].length, cell.r, cell.c, dirRef.current, id)) {
+            putShip(id, cell.r, cell.c, dirRef.current);
+          }
+        },
+        onPanResponderRelease: () => {
+          dragIdRef.current = null;
+          setSelectedId(null);
+        },
+        onPanResponderTerminate: () => {
+          dragIdRef.current = null;
+        },
+      }),
+    [],
+  );
+
   const rotateSelected = () => {
     if (selectedId == null) {
-      setHorizontal((h) => !h);
+      setDir((d) => (d + 1) % 4);
       return;
     }
     const existing = placements.find((p) => p.id === selectedId);
     if (!existing) {
-      setHorizontal((h) => !h);
+      setDir((d) => (d + 1) % 4);
       return;
     }
-    const next = !existing.horizontal;
-    if (canPlace(existing.length, existing.row, existing.col, next, selectedId)) {
-      putShip(selectedId, existing.row, existing.col, next);
-      setHorizontal(next);
+    // Advance clockwise to the next direction that still fits at this anchor.
+    for (let step = 1; step <= 4; step++) {
+      const next = (existing.dir + step) % 4;
+      if (next === existing.dir) break;
+      if (canPlace(existing.length, existing.row, existing.col, next, selectedId)) {
+        putShip(selectedId, existing.row, existing.col, next);
+        setDir(next);
+        return;
+      }
     }
   };
 
@@ -187,12 +300,7 @@ export function BattleshipBoard({
     if (!allPlaced) return;
     onMove({
       type: "place",
-      ships: placements.map(({ row, col, length, horizontal: isH }) => ({
-        row,
-        col,
-        length,
-        horizontal: isH,
-      })),
+      ships: placements.map(toBackendPlacement),
     });
   };
 
@@ -268,10 +376,20 @@ export function BattleshipBoard({
           PLACE YOUR FLEET
         </AppText>
         <AppText variant="caption" color="secondary" style={styles.placeHint}>
-          Tap a ship, then tap the grid. Tap a placed ship to move or rotate it.
+          Tap a ship then tap the grid, or drag it into place. Tap a placed ship
+          to move or rotate it.
         </AppText>
 
-        <View style={styles.grid}>
+        <View
+          ref={gridRef}
+          onLayout={() =>
+            gridRef.current?.measureInWindow((x, y) => {
+              gridOffset.current = { x, y };
+            })
+          }
+          style={styles.grid}
+          {...dragResponder.panHandlers}
+        >
           {Array.from({ length: size }).map((_, r) => (
             <View key={r} style={styles.gridRow}>
               {Array.from({ length: size }).map((__, c) => {

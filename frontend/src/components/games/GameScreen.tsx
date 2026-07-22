@@ -14,6 +14,7 @@ import { StreakPill } from "@/components/ui/StreakPill";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 import { GameResultOverlay } from "@/components/games/GameResultOverlay";
 import { getGameMeta } from "@/games/catalog";
+import { gameIdentity } from "@/games/playerIdentity";
 import "@/games/register";
 import { getGameRenderer } from "@/games/registry";
 import { useGridGame } from "@/games/useGridGame";
@@ -100,15 +101,24 @@ export function GameScreen({ gameType }: Props) {
     </>
   );
 
+  const myNumber = game?.myPlayerNumber ?? 0;
+  const oppNumber = myNumber === 1 ? 2 : myNumber === 2 ? 1 : 0;
+  const myIdentity = game
+    ? gameIdentity(gameType, myNumber, true, mineColor, partnerColor)
+    : null;
+  const oppIdentity = game
+    ? gameIdentity(gameType, oppNumber, false, mineColor, partnerColor)
+    : null;
+
   let turnLabel: string | null = null;
   let turnColor: string = theme.colors.text.muted;
   if (active && game && isPlayer) {
     if (game.isMyTurn) {
       turnLabel = "Your turn";
-      turnColor = mineColor;
+      turnColor = myIdentity?.color ?? mineColor;
     } else {
       turnLabel = `${partner}'s turn`;
-      turnColor = partnerColor;
+      turnColor = oppIdentity?.color ?? partnerColor;
     }
   }
 
@@ -128,6 +138,20 @@ export function GameScreen({ gameType }: Props) {
               {meta?.subtitle}
             </AppText>
           )}
+
+          {active && isPlayer && myIdentity ? (
+            <View style={styles.identityRow}>
+              <View
+                style={[
+                  styles.identityDot,
+                  { backgroundColor: myIdentity.color },
+                ]}
+              />
+              <AppText variant="caption" color="secondary">
+                {myIdentity.label ? `You're ${myIdentity.label}` : "Your color"}
+              </AppText>
+            </View>
+          ) : null}
 
           {awaitingOpponent ? (
             <AppText variant="caption" color="secondary" style={styles.waiting}>
@@ -256,6 +280,14 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   turnDot: { width: 16, height: 16, borderRadius: 8 },
+  identityRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    marginTop: 6,
+  },
+  identityDot: { width: 10, height: 10, borderRadius: 5 },
   loader: { marginTop: 24 },
   waiting: { textAlign: "center" },
   scoreCard: {
