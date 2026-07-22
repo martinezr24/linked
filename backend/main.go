@@ -54,6 +54,7 @@ type CheckIn struct {
 	UserID   string  `json:"userId"`
 	CheckDate string `json:"checkDate"`
 	Note     *string `json:"note,omitempty"`
+	Prompt   *string `json:"prompt,omitempty"`
 	IsMine   bool    `json:"isMine"`
 }
 
@@ -1392,20 +1393,27 @@ func handleCheckInsToday(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method == http.MethodPost {
 		var body struct {
-			Note *string `json:"note"`
+			Note   *string `json:"note"`
+			Prompt *string `json:"prompt"`
 		}
 		json.NewDecoder(r.Body).Decode(&body)
 		var note interface{}
 		if body.Note != nil && strings.TrimSpace(*body.Note) != "" {
 			note = strings.TrimSpace(*body.Note)
 		}
+		var prompt interface{}
+		if body.Prompt != nil && strings.TrimSpace(*body.Prompt) != "" {
+			prompt = strings.TrimSpace(*body.Prompt)
+		}
 		var id string
 		err = db.QueryRow(
-			`INSERT INTO daily_checkins (user_id, relationship_id, check_date, note)
-             VALUES ($1, $2, $3, $4)
-             ON CONFLICT (user_id, check_date) DO UPDATE SET note = COALESCE(EXCLUDED.note, daily_checkins.note)
+			`INSERT INTO daily_checkins (user_id, relationship_id, check_date, note, prompt)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (user_id, check_date) DO UPDATE SET
+               note = COALESCE(EXCLUDED.note, daily_checkins.note),
+               prompt = COALESCE(EXCLUDED.prompt, daily_checkins.prompt)
              RETURNING id::text`,
-			user.ID, relationshipID, today, note,
+			user.ID, relationshipID, today, note, prompt,
 		).Scan(&id)
 		if err != nil {
 			http.Error(w, "db error", http.StatusInternalServerError)
@@ -1427,7 +1435,7 @@ func handleCheckInsToday(w http.ResponseWriter, r *http.Request) {
 
 func buildTodayCheckIns(currentUserID, relationshipID, today string) (TodayCheckIns, error) {
 	rows, err := db.Query(
-		`SELECT id::text, user_id::text, check_date, note FROM daily_checkins
+		`SELECT id::text, user_id::text, check_date, note, prompt FROM daily_checkins
          WHERE relationship_id = $1 AND check_date = $2`,
 		relationshipID, today,
 	)
@@ -1440,14 +1448,19 @@ func buildTodayCheckIns(currentUserID, relationshipID, today string) (TodayCheck
 	for rows.Next() {
 		var c CheckIn
 		var note sql.NullString
+		var prompt sql.NullString
 		var checkDate time.Time
-		if err := rows.Scan(&c.ID, &c.UserID, &checkDate, &note); err != nil {
+		if err := rows.Scan(&c.ID, &c.UserID, &checkDate, &note, &prompt); err != nil {
 			continue
 		}
 		c.CheckDate = checkDate.Format("2006-01-02")
 		if note.Valid {
 			n := note.String
 			c.Note = &n
+		}
+		if prompt.Valid {
+			p := prompt.String
+			c.Prompt = &p
 		}
 		c.IsMine = c.UserID == currentUserID
 		if c.IsMine {

@@ -21,7 +21,7 @@ type Props = {
   checkIns: TodayCheckIns | undefined;
   note: string;
   onChangeNote: (text: string) => void;
-  onSend: () => void;
+  onSend: (prompt: string) => void;
   sending?: boolean;
   tzLabel: string;
 };
@@ -61,7 +61,7 @@ export function CoupleProgressCard({
         bounciness: 4,
       }),
     ]).start();
-    onSend();
+    onSend(prompt);
   };
 
   return (
@@ -76,6 +76,11 @@ export function CoupleProgressCard({
             <AppText variant="caption" color="muted">
               You
             </AppText>
+            {checkIns?.mine?.prompt ? (
+              <AppText variant="caption" color="secondary" style={styles.promptLine}>
+                {checkIns.mine.prompt}
+              </AppText>
+            ) : null}
             <AppText variant="body" color="secondary">
               {checkIns?.mine?.note
                 ? `“${checkIns.mine.note}”`
@@ -85,6 +90,11 @@ export function CoupleProgressCard({
             <AppText variant="caption" color="muted" style={styles.partnerLabel}>
               {partnerName?.trim() || "Partner"}
             </AppText>
+            {checkIns?.partner?.prompt ? (
+              <AppText variant="caption" color="secondary" style={styles.promptLine}>
+                {checkIns.partner.prompt}
+              </AppText>
+            ) : null}
             <AppText variant="bodySemibold" style={styles.partnerNote}>
               {checkIns?.partner?.note
                 ? `“${checkIns.partner.note}”`
@@ -167,6 +177,7 @@ const styles = StyleSheet.create({
   doneBlock: { marginBottom: 8 },
   doneTitle: { marginBottom: 10, fontFamily: "DMSans_700Bold" },
   partnerLabel: { marginTop: 12 },
+  promptLine: { marginTop: 2, marginBottom: 4 },
   partnerNote: { marginTop: 8, fontFamily: "Fraunces_600SemiBold", lineHeight: 24 },
   input: {
     borderWidth: 1,

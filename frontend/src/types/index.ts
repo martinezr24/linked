@@ -40,6 +40,7 @@ export type CheckIn = {
   userId: string;
   checkDate: string;
   note?: string;
+  prompt?: string;
   isMine: boolean;
 };
 

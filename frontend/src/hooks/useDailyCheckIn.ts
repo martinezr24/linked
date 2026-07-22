@@ -22,11 +22,14 @@ export function useDailyCheckIn() {
   });
 
   const sendCheckIn = useMutation({
-    mutationFn: async (checkInNote: string) => {
+    mutationFn: async (payload: { note: string; prompt: string }) => {
       const res = await apiFetch("/api/checkins/today", deviceId!, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note: checkInNote || undefined }),
+        body: JSON.stringify({
+          note: payload.note || undefined,
+          prompt: payload.prompt || undefined,
+        }),
       });
       if (!res.ok) throw new Error("Failed to check in");
     },
@@ -44,7 +47,8 @@ export function useDailyCheckIn() {
     isLoading,
     note,
     setNote,
-    sendCheckIn: () => sendCheckIn.mutate(note.trim()),
+    sendCheckIn: (prompt: string) =>
+      sendCheckIn.mutate({ note: note.trim(), prompt }),
     sending: sendCheckIn.isPending,
   };
 }

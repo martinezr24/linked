@@ -11,7 +11,11 @@ export async function syncMyPresence(
   statusMessage?: string,
 ): Promise<void> {
   const timezone = getDeviceTimezoneLabel();
-  const weatherCity = (await getWeatherCity()) ?? undefined;
+
+  // A manually-set city (if any) is the fallback; we prefer a city
+  // reverse-geocoded from the live location below so it stays accurate
+  // without the user having to type it in.
+  let weatherCity = (await getWeatherCity()) ?? undefined;
 
   let weatherLat: number | undefined;
   let weatherLon: number | undefined;
@@ -24,6 +28,18 @@ export async function syncMyPresence(
       });
       weatherLat = pos.coords.latitude;
       weatherLon = pos.coords.longitude;
+
+      try {
+        const places = await Location.reverseGeocodeAsync({
+          latitude: weatherLat,
+          longitude: weatherLon,
+        });
+        const place = places[0];
+        const city = place?.city || place?.subregion || place?.region;
+        if (city) weatherCity = city;
+      } catch {
+        // Reverse geocode unavailable — keep the stored/manual city fallback.
+      }
     }
   } catch {
     // Location unavailable — city fallback may still work
