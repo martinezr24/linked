@@ -200,18 +200,6 @@ export default function HomeScreen() {
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
         <View style={styles.flex}>
-          <ConnectedHeader
-            streakCount={streakCount}
-            mineInitial={initialFromName(mineName, "M")}
-            partnerInitial={initialFromName(partnerName, "Y")}
-            mineAvatarUrl={mineAvatarUrl}
-            partnerAvatarUrl={partnerAvatarUrl}
-            mineColor={mineColor}
-            partnerColor={partnerColor}
-            minePhotoSent={Boolean(photoToday?.mine)}
-            partnerPhotoSent={Boolean(photoToday?.partner)}
-            headerRight={<TreatButton onPress={() => setTreatsOpen(true)} />}
-          />
           <TreatsModal
             visible={treatsOpen}
             onClose={() => setTreatsOpen(false)}
@@ -236,6 +224,20 @@ export default function HomeScreen() {
               />
             }
           >
+            <View style={styles.headerScroll}>
+              <ConnectedHeader
+                streakCount={streakCount}
+                mineInitial={initialFromName(mineName, "M")}
+                partnerInitial={initialFromName(partnerName, "Y")}
+                mineAvatarUrl={mineAvatarUrl}
+                partnerAvatarUrl={partnerAvatarUrl}
+                mineColor={mineColor}
+                partnerColor={partnerColor}
+                minePhotoSent={Boolean(photoToday?.mine)}
+                partnerPhotoSent={Boolean(photoToday?.partner)}
+                headerRight={<TreatButton onPress={() => setTreatsOpen(true)} />}
+              />
+            </View>
             {showStreakBanner ? (
               <StreakBanner
                 title="Streak secured"
@@ -324,6 +326,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
+  headerScroll: { marginHorizontal: -20, marginTop: -8 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
   scroll: { paddingTop: 8, paddingHorizontal: 20, rowGap: 16 },
   bentoRow: { flexDirection: "row", gap: 12 },

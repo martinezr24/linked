@@ -2,6 +2,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 
 import { AppText } from "./AppText";
 import { PressableScale } from "./motion";
+import { SketchFrame } from "./SketchFrame";
 import { useTheme } from "@/theme/useTheme";
 
 type Props = {
@@ -31,23 +32,14 @@ export function ArtifactCard({
   const cardStyle = [
     styles.card,
     {
-      backgroundColor: theme.colors.surface.card,
-      borderColor: featured
-        ? theme.colors.border.emphasis
-        : theme.colors.border.subtle,
+      // Featured cards get a hand-drawn SketchFrame outline (below) instead of
+      // a border, so the card itself is borderless and subtly lifted.
+      backgroundColor: featured
+        ? theme.colors.surface.cardElevated
+        : theme.colors.surface.card,
+      borderColor: featured ? "transparent" : theme.colors.border.subtle,
     },
-    featured && styles.featured,
-    // Featured cards get a soft accent glow instead of the flat card shadow,
-    // so they read as premium/interactive without a hard border.
-    featured
-      ? {
-          shadowColor: theme.colors.accent.primary,
-          shadowOpacity: 0.28,
-          shadowRadius: 18,
-          shadowOffset: { width: 0, height: 8 },
-          elevation: 12,
-        }
-      : theme.shadow.card,
+    theme.shadow.card,
   ];
 
   const inner = (
@@ -64,6 +56,19 @@ export function ArtifactCard({
       ) : null}
       {children}
     </>
+  );
+
+  const cardEl = onPress ? (
+    <PressableScale
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      style={cardStyle}
+    >
+      {inner}
+    </PressableScale>
+  ) : (
+    <View style={cardStyle}>{inner}</View>
   );
 
   return (
@@ -90,18 +95,7 @@ export function ArtifactCard({
           />
         </>
       ) : null}
-      {onPress ? (
-        <PressableScale
-          onPress={onPress}
-          accessibilityRole="button"
-          accessibilityLabel={accessibilityLabel}
-          style={cardStyle}
-        >
-          {inner}
-        </PressableScale>
-      ) : (
-        <View style={cardStyle}>{inner}</View>
-      )}
+      {featured ? <SketchFrame>{cardEl}</SketchFrame> : cardEl}
     </View>
   );
 }
@@ -134,9 +128,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 20,
     position: "relative",
-  },
-  featured: {
-    borderWidth: 1.5,
   },
   category: {
     marginBottom: 8,

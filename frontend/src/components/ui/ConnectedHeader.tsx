@@ -4,8 +4,8 @@ import { StyleSheet, View } from "react-native";
 import { AppMark } from "./AppMark";
 import { AppText } from "./AppText";
 import { AvatarImage } from "./AvatarImage";
-import { ConnectionLink } from "./ConnectionLink";
 import { HeartIcon } from "./icons";
+import { SharedOrbit } from "./SharedOrbit";
 import { StreakPill } from "./StreakPill";
 import { useTheme } from "@/theme/useTheme";
 
@@ -80,21 +80,24 @@ export function ConnectedHeader({
     <View style={styles.row}>
       <AppMark size={32} />
       <View style={styles.center}>
-        <View style={styles.avatars}>
-          <AvatarCircle
-            initial={mineInitial.slice(0, 1).toUpperCase()}
-            avatarUrl={mineAvatarUrl}
-            bgColor={mineColor ?? theme.colors.avatar.mine}
-            checkedIn={minePhotoSent}
-          />
-          <ConnectionLink length={36} showBow />
-          <AvatarCircle
-            initial={partnerInitial.slice(0, 1).toUpperCase()}
-            avatarUrl={partnerAvatarUrl}
-            bgColor={partnerColor ?? theme.colors.avatar.partner}
-            checkedIn={partnerPhotoSent}
-          />
-        </View>
+        <SharedOrbit
+          left={
+            <AvatarCircle
+              initial={mineInitial.slice(0, 1).toUpperCase()}
+              avatarUrl={mineAvatarUrl}
+              bgColor={mineColor ?? theme.colors.avatar.mine}
+              checkedIn={minePhotoSent}
+            />
+          }
+          right={
+            <AvatarCircle
+              initial={partnerInitial.slice(0, 1).toUpperCase()}
+              avatarUrl={partnerAvatarUrl}
+              bgColor={partnerColor ?? theme.colors.avatar.partner}
+              checkedIn={partnerPhotoSent}
+            />
+          }
+        />
       </View>
       <View style={styles.right}>
         {headerRight}
