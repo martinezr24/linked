@@ -1,5 +1,12 @@
+import { useEffect, useRef } from "react";
 import { StyleSheet, View } from "react-native";
 import { type Href, router } from "expo-router";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withSpring,
+} from "react-native-reanimated";
 
 import { AppText } from "@/components/ui/AppText";
 import { BentoTile } from "@/components/ui/BentoTile";
@@ -29,6 +36,24 @@ export function StreakTile({ streak }: Props) {
   const jsDay = new Date().getDay();
   const todayIndex = jsDay === 0 ? 6 : jsDay - 1;
 
+  // Elastic pop when the streak ticks up (e.g. a partner's photo arrives over
+  // the WebSocket and the query refetches a higher count). Runs on the UI
+  // thread so the real-time update never drops frames.
+  const bump = useSharedValue(1);
+  const prevStreak = useRef(streak);
+  useEffect(() => {
+    if (streak > prevStreak.current) {
+      bump.value = withSequence(
+        withSpring(1.22, { damping: 7, stiffness: 220 }),
+        withSpring(1, { damping: 12, stiffness: 180 }),
+      );
+    }
+    prevStreak.current = streak;
+  }, [streak, bump]);
+  const bumpStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: bump.value }],
+  }));
+
   return (
     <BentoTile
       category="Streak"
@@ -37,12 +62,12 @@ export function StreakTile({ streak }: Props) {
     >
       <View style={styles.body}>
         <View>
-          <View style={styles.countRow}>
+          <Animated.View style={[styles.countRow, bumpStyle]}>
             <FlameIcon size={30} />
             <AppText variant="h1" style={styles.count}>
               {streak}
             </AppText>
-          </View>
+          </Animated.View>
           <AppText variant="caption" color="muted">
             day streak
           </AppText>

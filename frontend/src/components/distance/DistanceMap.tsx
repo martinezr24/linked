@@ -13,6 +13,30 @@ import { HeartIcon } from "@/components/ui/icons";
 import { midpoint, regionForCoords, type LatLng } from "@/utils/distance";
 import { colors } from "@/theme/tokens";
 
+// Two avatars rendered at (nearly) the same spot overlap and look broken. When
+// the couple is in the same area, spread the *display* positions to a minimum
+// separation — symmetrically around their midpoint, along the line between them
+// — so both stay legible with the heart between. The real distance number is
+// computed elsewhere from the true coordinates, so accuracy is unaffected.
+const MIN_SEP_DEG = 0.06; // ~4 mi of angular separation
+
+function separatedCoords(a: LatLng, b: LatLng): [LatLng, LatLng] {
+  const dLat = b.lat - a.lat;
+  const dLon = b.lon - a.lon;
+  const dist = Math.hypot(dLat, dLon);
+  if (dist >= MIN_SEP_DEG) return [a, b];
+  const midLat = (a.lat + b.lat) / 2;
+  const midLon = (a.lon + b.lon) / 2;
+  // Unit vector between them; default to vertical if the coords coincide.
+  const ux = dist === 0 ? 0 : dLon / dist;
+  const uy = dist === 0 ? 1 : dLat / dist;
+  const half = MIN_SEP_DEG / 2;
+  return [
+    { lat: midLat - uy * half, lon: midLon - ux * half },
+    { lat: midLat + uy * half, lon: midLon + ux * half },
+  ];
+}
+
 export type MapPerson = {
   coord: LatLng;
   initial: string;
@@ -48,12 +72,10 @@ function DistanceMapComponent({
   // avatar image finishing loading) while tracksViewChanges is false.
   const tracks = true;
 
-  const meCoord = { latitude: me.coord.lat, longitude: me.coord.lon };
-  const partnerCoord = {
-    latitude: partner.coord.lat,
-    longitude: partner.coord.lon,
-  };
-  const mid = midpoint(me.coord, partner.coord);
+  const [meC, partnerC] = separatedCoords(me.coord, partner.coord);
+  const meCoord = { latitude: meC.lat, longitude: meC.lon };
+  const partnerCoord = { latitude: partnerC.lat, longitude: partnerC.lon };
+  const mid = midpoint(meC, partnerC);
 
   // Frame both markers once. Guarding prevents re-fitting (which would fight
   // the user's own pan/zoom on the interactive map).
@@ -74,7 +96,7 @@ function DistanceMapComponent({
         provider={Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
         customMapStyle={Platform.OS === "android" ? [...DARK_MAP_STYLE] : undefined}
         userInterfaceStyle="dark"
-        initialRegion={regionForCoords(me.coord, partner.coord)}
+        initialRegion={regionForCoords(meC, partnerC)}
         onMapReady={fitBounds}
         onLayout={fitBounds}
         scrollEnabled={interactive}

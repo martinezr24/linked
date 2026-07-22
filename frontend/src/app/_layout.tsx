@@ -6,6 +6,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { NudgeBanner } from "@/components/NudgeBanner";
 import { SyncBootstrap } from "@/components/SyncBootstrap";
+import { AnimatedSplash } from "@/components/ui/AnimatedSplash";
 import { QueryProvider } from "@/context/QueryProvider";
 import { RelationshipProvider } from "@/context/RelationshipContext";
 import { ThemeProvider } from "@/theme/ThemeProvider";
@@ -35,6 +36,7 @@ export default function RootLayout() {
               />
               <Stack.Screen name="distance" options={{ headerShown: false }} />
             </Stack>
+            <AnimatedSplash />
           </RelationshipProvider>
         </QueryProvider>
       </ThemeProvider>

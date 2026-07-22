@@ -35,12 +35,14 @@ export default function PlayScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        <DismissKeyboardView>
+        <DismissKeyboardView scroll={false}>
           <ScrollView
             ref={scrollRef}
+            style={styles.flex}
             contentContainerStyle={styles.scroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             refreshControl={
               <RefreshControl
                 refreshing={refreshing}
@@ -97,6 +99,7 @@ export default function PlayScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scroll: {
     paddingTop: 8,
     paddingHorizontal: 20,

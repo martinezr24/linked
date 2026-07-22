@@ -37,7 +37,17 @@ export function ArtifactCard({
         : theme.colors.border.subtle,
     },
     featured && styles.featured,
-    theme.shadow.card,
+    // Featured cards get a soft accent glow instead of the flat card shadow,
+    // so they read as premium/interactive without a hard border.
+    featured
+      ? {
+          shadowColor: theme.colors.accent.primary,
+          shadowOpacity: 0.28,
+          shadowRadius: 18,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 12,
+        }
+      : theme.shadow.card,
   ];
 
   const inner = (

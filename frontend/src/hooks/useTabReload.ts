@@ -3,6 +3,8 @@ import type { ScrollView } from "react-native";
 import { useScrollToTop } from "@react-navigation/native";
 import { useNavigation } from "expo-router";
 
+import { hapticLight } from "@/utils/haptics";
+
 /**
  * Instagram-style tab reload behaviour for a tab screen's scroll view.
  *
@@ -34,9 +36,11 @@ export function useTabReload(onReload: () => Promise<unknown> | void) {
       "tabPress" as never,
       (() => {
         if (navigation.isFocused()) {
-          // Scroll to top immediately; defer the refetch so the resulting
-          // re-render doesn't interrupt the scroll-to-top animation (which
-          // otherwise makes the screen "jump" and stop partway).
+          // A light haptic bump acknowledges the re-tap, then scroll to top
+          // immediately; defer the refetch so the resulting re-render doesn't
+          // interrupt the scroll-to-top animation (which otherwise makes the
+          // screen "jump" and stop partway).
+          void hapticLight();
           scrollRef.current?.scrollTo({ y: 0, animated: true });
           setTimeout(() => void onRefresh(), 400);
         }
