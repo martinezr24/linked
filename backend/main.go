@@ -126,17 +126,31 @@ func initDB() {
 
 	// Postgres may still be waking up (e.g. Fly auto-start), so retry the
 	// initial connection with backoff instead of crashing immediately.
-	const maxAttempts = 15
-	for attempt := 1; ; attempt++ {
+	const maxAttempts = 30
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		if err = db.Ping(); err == nil {
 			break
 		}
-		if attempt >= maxAttempts {
-			log.Fatalf("Database unreachable after %d attempts: %v", attempt, err)
-		}
 		log.Printf("Database not ready (attempt %d/%d): %v", attempt, maxAttempts, err)
+		if attempt == maxAttempts {
+			// Don't crash the app (and fail a health-gated deploy) if Postgres is
+			// slow to wake. Start serving anyway: the /health check keeps Fly from
+			// routing real traffic until db.Ping succeeds, and the pool reconnects
+			// once the database becomes reachable.
+			log.Printf("Warning: database unreachable after %d attempts; starting anyway", maxAttempts)
+			break
+		}
 		time.Sleep(2 * time.Second)
 	}
+
+	// Connection pool tuning. Without this, a Fly machine that suspends/idles
+	// keeps stale (dead) connections in the pool and hands them out, hanging the
+	// first requests after wake until the driver times out. Recycling idle/old
+	// connections avoids that, and capping open connections protects Postgres.
+	db.SetMaxOpenConns(15)
+	db.SetMaxIdleConns(4)
+	db.SetConnMaxLifetime(5 * time.Minute)
+	db.SetConnMaxIdleTime(1 * time.Minute)
 
 	fmt.Println("Successfully connected to PostgreSQL database!")
 	hub = linkedws.NewHub()
