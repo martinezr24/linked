@@ -8,7 +8,9 @@ import {
 
 import { AppText } from "@/components/ui/AppText";
 import { TreatCard } from "@/components/treats/TreatCard";
+import { VenmoTreatCard } from "@/components/treats/VenmoTreatCard";
 import { TREAT_LINKS } from "@/constants/treatLinks";
+import { useProfile } from "@/hooks/useProfile";
 import { useTheme } from "@/theme/useTheme";
 
 type Props = {
@@ -19,6 +21,7 @@ type Props = {
 
 export function TreatsModal({ visible, onClose, partnerName }: Props) {
   const theme = useTheme();
+  const { partnerVenmo } = useProfile();
   const label = partnerName?.trim() || "your partner";
 
   return (
@@ -46,6 +49,7 @@ export function TreatsModal({ visible, onClose, partnerName }: Props) {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
           >
+            <VenmoTreatCard username={partnerVenmo} partnerName={label} />
             {TREAT_LINKS.map((treat) => (
               <TreatCard key={treat.id} treat={treat} />
             ))}

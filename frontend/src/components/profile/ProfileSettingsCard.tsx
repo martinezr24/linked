@@ -22,11 +22,13 @@ export function ProfileSettingsCard() {
   const { mine, partner, isLoading } = useProfile();
   const [displayName, setDisplayName] = useState("");
   const [calendarColor, setCalendarColor] = useState("#C44B6E");
+  const [venmo, setVenmo] = useState("");
 
   useEffect(() => {
     if (!mine) return;
     setDisplayName(mine.displayName ?? "");
     setCalendarColor(mine.calendarColor ?? "#C44B6E");
+    setVenmo(mine.venmoUsername ?? "");
   }, [mine]);
 
   const save = useMutation({
@@ -38,6 +40,7 @@ export function ProfileSettingsCard() {
       }
       return updateProfile(deviceId!, {
         displayName: name || undefined,
+        venmoUsername: venmo.trim(),
       });
     },
     onSuccess: () => {
@@ -66,8 +69,8 @@ export function ProfileSettingsCard() {
   return (
     <ArtifactCard category="Profile" title="Your profile">
       <AppText variant="body" color="secondary" style={styles.hint}>
-        Your nickname and avatar sync with your partner. Manage event colors
-        from the Calendar tab, and your status from Us.
+        Your nickname and avatar sync with your partner. Add your Venmo so they
+        can treat you. Manage event colors from the Calendar tab.
         {partner?.displayName ? ` Partner: ${partner.displayName}.` : ""}
       </AppText>
 
@@ -86,6 +89,19 @@ export function ProfileSettingsCard() {
         onChangeText={setDisplayName}
         placeholder="e.g. Gio"
         placeholderTextColor={theme.colors.text.muted}
+      />
+
+      <AppText variant="caption" color="secondary" style={styles.fieldLabel}>
+        VENMO USERNAME
+      </AppText>
+      <AppTextInput
+        style={inputStyle}
+        value={venmo}
+        onChangeText={setVenmo}
+        placeholder="e.g. gio-martinez"
+        placeholderTextColor={theme.colors.text.muted}
+        autoCapitalize="none"
+        autoCorrect={false}
       />
 
       <PrimaryButton

@@ -105,6 +105,7 @@ export type UserProfile = {
   profilePictureUrl?: string;
   calendarColor: string;
   statusMessage?: string;
+  venmoUsername?: string;
 };
 
 export type ProfileResponse = {

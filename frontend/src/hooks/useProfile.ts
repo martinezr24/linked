@@ -45,6 +45,8 @@ export function useProfile() {
     mineColor: data?.mine.calendarColor ?? "#C44B6E",
     partnerColor: data?.partner?.calendarColor ?? "#5B7FD4",
     sharedColor: data?.sharedColor,
+    mineVenmo: data?.mine.venmoUsername,
+    partnerVenmo: data?.partner?.venmoUsername,
     mineAvatarUrl: data?.mine.profilePictureUrl,
     partnerAvatarUrl: data?.partner?.profilePictureUrl,
   };

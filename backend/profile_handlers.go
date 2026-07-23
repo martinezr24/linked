@@ -17,6 +17,7 @@ type UserProfileDTO struct {
 	ProfilePictureUrl *string `json:"profilePictureUrl,omitempty"`
 	CalendarColor     string  `json:"calendarColor"`
 	StatusMessage     *string `json:"statusMessage,omitempty"`
+	VenmoUsername     *string `json:"venmoUsername,omitempty"`
 }
 
 type ProfileResponse struct {
@@ -34,12 +35,12 @@ func avatarObjectKey(relationshipID, userID, ext string) string {
 }
 
 func loadUserProfile(userID string) (UserProfileDTO, error) {
-	var displayName, pictureKey, calendarColor, statusMessage sql.NullString
+	var displayName, pictureKey, calendarColor, statusMessage, venmoUsername sql.NullString
 	err := db.QueryRow(
-		`SELECT display_name, profile_picture_url, calendar_color, status_message
+		`SELECT display_name, profile_picture_url, calendar_color, status_message, venmo_username
          FROM users WHERE id::text = $1`,
 		userID,
-	).Scan(&displayName, &pictureKey, &calendarColor, &statusMessage)
+	).Scan(&displayName, &pictureKey, &calendarColor, &statusMessage, &venmoUsername)
 	if err != nil {
 		return UserProfileDTO{}, err
 	}
@@ -54,6 +55,10 @@ func loadUserProfile(userID string) (UserProfileDTO, error) {
 	if statusMessage.Valid && strings.TrimSpace(statusMessage.String) != "" {
 		s := strings.TrimSpace(statusMessage.String)
 		dto.StatusMessage = &s
+	}
+	if venmoUsername.Valid && strings.TrimSpace(venmoUsername.String) != "" {
+		v := strings.TrimSpace(venmoUsername.String)
+		dto.VenmoUsername = &v
 	}
 	if pictureKey.Valid && pictureKey.String != "" && mediaStore != nil {
 		url, err := mediaStore.SignGet(context.Background(), pictureKey.String, 15*time.Minute)
@@ -128,6 +133,7 @@ func handlePutProfile(w http.ResponseWriter, r *http.Request) {
 		CalendarColor       *string `json:"calendarColor"`
 		SharedCalendarColor *string `json:"sharedCalendarColor"`
 		StatusMessage       *string `json:"statusMessage"`
+		VenmoUsername       *string `json:"venmoUsername"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		http.Error(w, "invalid body", http.StatusBadRequest)
@@ -165,6 +171,17 @@ func handlePutProfile(w http.ResponseWriter, r *http.Request) {
 			`UPDATE users SET status_message = NULLIF($1,''), status_updated_at = NOW() WHERE id = $2`,
 			msg, user.ID,
 		)
+		if err != nil {
+			http.Error(w, "db error", http.StatusInternalServerError)
+			return
+		}
+	}
+	if body.VenmoUsername != nil {
+		v := strings.TrimPrefix(strings.TrimSpace(*body.VenmoUsername), "@")
+		if len(v) > 30 {
+			v = v[:30]
+		}
+		_, err = db.Exec(`UPDATE users SET venmo_username = NULLIF($1,'') WHERE id = $2`, v, user.ID)
 		if err != nil {
 			http.Error(w, "db error", http.StatusInternalServerError)
 			return

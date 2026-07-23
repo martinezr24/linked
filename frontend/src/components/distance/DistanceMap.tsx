@@ -54,7 +54,13 @@ type Props = {
   style?: StyleProp<ViewStyle>;
 };
 
-const EDGE_PADDING = { top: 64, right: 64, bottom: 64, left: 64 };
+// The preview map is small (~130px); a large edge padding would cram both
+// markers into the center. Use a tighter inset for the non-interactive preview,
+// with extra bottom clearance so the lower avatar sits above Apple's attribution.
+const edgePaddingFor = (interactive: boolean) =>
+  interactive
+    ? { top: 56, right: 56, bottom: 56, left: 56 }
+    : { top: 22, right: 22, bottom: 40, left: 22 };
 
 function DistanceMapComponent({
   me,
@@ -71,6 +77,7 @@ function DistanceMapComponent({
   // custom marker jumps to the map's top-left corner if it re-renders (e.g. the
   // avatar image finishing loading) while tracksViewChanges is false.
   const tracks = true;
+  const markerSize = interactive ? 44 : 34;
 
   const [meC, partnerC] = separatedCoords(me.coord, partner.coord);
   const meCoord = { latitude: meC.lat, longitude: meC.lon };
@@ -83,7 +90,7 @@ function DistanceMapComponent({
     if (fitted.current) return;
     fitted.current = true;
     mapRef.current?.fitToCoordinates([meCoord, partnerCoord], {
-      edgePadding: EDGE_PADDING,
+      edgePadding: edgePaddingFor(interactive),
       animated: false,
     });
   };
@@ -126,6 +133,7 @@ function DistanceMapComponent({
             initial={me.initial}
             avatarUrl={me.avatarUrl}
             city={showCityLabels ? me.city : undefined}
+            size={markerSize}
           />
         </Marker>
 
@@ -138,6 +146,7 @@ function DistanceMapComponent({
             initial={partner.initial}
             avatarUrl={partner.avatarUrl}
             city={showCityLabels ? partner.city : undefined}
+            size={markerSize}
           />
         </Marker>
 

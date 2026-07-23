@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Share, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 
 import { AppTextInput } from "@/components/AppTextInput";
 import { DismissKeyboardView } from "@/components/DismissKeyboardView";
@@ -26,6 +26,29 @@ export default function PairScreen() {
   const [enteredCode, setEnteredCode] = useState("");
   const [linking, setLinking] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // A pairing deep link (orbit://pair?code=NNNNNN, or the https invite link)
+  // lands here with the code — prefill it and auto-connect so the invited
+  // partner doesn't have to type anything.
+  const params = useLocalSearchParams<{ code?: string }>();
+  const autoLinkedRef = useRef(false);
+
+  useEffect(() => {
+    const c =
+      typeof params.code === "string"
+        ? params.code.replace(/\D/g, "").slice(0, 6)
+        : "";
+    if (c.length === 6) setEnteredCode(c);
+  }, [params.code]);
+
+  // Auto-connect once the device is ready and a code arrived via a deep link.
+  useEffect(() => {
+    if (autoLinkedRef.current) return;
+    if (!params.code || !deviceId || enteredCode.length !== 6) return;
+    autoLinkedRef.current = true;
+    void handleLink();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deviceId, enteredCode, params.code]);
 
   useEffect(() => {
     getOrCreateDeviceId().then(setDeviceId);
@@ -95,10 +118,12 @@ export default function PairScreen() {
   async function handleShareCode() {
     if (!generatedCode) return;
     try {
+      const inviteUrl = `${getApiBase()}/i/${generatedCode}`;
       await Share.share({
         message:
-          `Join me on Orbit \u2728 Download the app, then enter pairing code ` +
-          `${generatedCode} to connect with me. (Code expires in 10 minutes.)`,
+          `Join me on Orbit ✨\n${inviteUrl}\n\n` +
+          `Tap the link to connect — or download the app and enter code ` +
+          `${generatedCode}. (Expires in 10 minutes.)`,
       });
     } catch {
       // User dismissed the share sheet — nothing to do.

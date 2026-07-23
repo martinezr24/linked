@@ -146,6 +146,7 @@ export async function updateProfile(
     calendarColor?: string;
     sharedCalendarColor?: string;
     statusMessage?: string;
+    venmoUsername?: string;
   },
 ) {
   const res = await apiFetch("/api/profile", deviceId, {
