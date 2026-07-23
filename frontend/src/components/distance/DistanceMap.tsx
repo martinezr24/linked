@@ -1,5 +1,12 @@
-import { memo, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 import MapView, {
   Marker,
   Polyline,
@@ -12,6 +19,36 @@ import { DARK_MAP_STYLE } from "./darkMapStyle";
 import { HeartIcon } from "@/components/ui/icons";
 import { midpoint, regionForCoords, type LatLng } from "@/utils/distance";
 import { colors } from "@/theme/tokens";
+
+const PULSE_SIZE = 30;
+
+// The heartbeat pulse lives OUTSIDE the native map — an overlay positioned at
+// the midpoint's screen point. Animating it here never re-rasterizes a map
+// marker (which is what made the native heart jump to the map's corner).
+function PulseHalo({ x, y }: { x: number; y: number }) {
+  const pulse = useSharedValue(0);
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withTiming(1, { duration: 2000, easing: Easing.out(Easing.ease) }),
+      -1,
+      false,
+    );
+  }, [pulse]);
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: 0.5 + pulse.value * 1.8 }],
+    opacity: (1 - pulse.value) * 0.6,
+  }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        styles.pulse,
+        { left: x - PULSE_SIZE / 2, top: y - PULSE_SIZE / 2 },
+        style,
+      ]}
+    />
+  );
+}
 
 
 // Two avatars rendered at (nearly) the same spot overlap and look broken. When
@@ -85,6 +122,20 @@ function DistanceMapComponent({
   const partnerCoord = { latitude: partnerC.lat, longitude: partnerC.lon };
   const mid = midpoint(meC, partnerC);
 
+  const [heartPt, setHeartPt] = useState<{ x: number; y: number } | null>(null);
+  const syncHeartPoint = useCallback(() => {
+    mapRef.current
+      ?.pointForCoordinate({ latitude: mid.lat, longitude: mid.lon })
+      .then(setHeartPt)
+      .catch(() => {});
+  }, [mid.lat, mid.lon]);
+
+  useEffect(() => {
+    // Re-align the pulse once the map has laid out / if the coords change.
+    const t = setTimeout(syncHeartPoint, 300);
+    return () => clearTimeout(t);
+  }, [syncHeartPoint]);
+
   // Frame both markers once. Guarding prevents re-fitting (which would fight
   // the user's own pan/zoom on the interactive map).
   const fitBounds = () => {
@@ -94,6 +145,7 @@ function DistanceMapComponent({
       edgePadding: edgePaddingFor(interactive),
       animated: false,
     });
+    syncHeartPoint();
   };
 
   return (
@@ -107,6 +159,7 @@ function DistanceMapComponent({
         initialRegion={regionForCoords(meC, partnerC)}
         onMapReady={fitBounds}
         onLayout={fitBounds}
+        onRegionChangeComplete={syncHeartPoint}
         scrollEnabled={interactive}
         zoomEnabled={interactive}
         rotateEnabled={false}
@@ -161,6 +214,7 @@ function DistanceMapComponent({
           </View>
         </Marker>
       </MapView>
+      {heartPt ? <PulseHalo x={heartPt.x} y={heartPt.y} /> : null}
     </View>
   );
 }
@@ -207,6 +261,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: colors.bg.canvas,
     borderWidth: 1.5,
+    borderColor: colors.accent.primary,
+  },
+  pulse: {
+    position: "absolute",
+    width: PULSE_SIZE,
+    height: PULSE_SIZE,
+    borderRadius: PULSE_SIZE / 2,
+    borderWidth: 2.5,
     borderColor: colors.accent.primary,
   },
 });
