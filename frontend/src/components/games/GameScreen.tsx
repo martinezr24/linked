@@ -179,7 +179,7 @@ export function GameScreen({ gameType }: Props) {
               ) : (
                 <View style={styles.scoreRow}>
                   <View style={styles.scoreSide}>
-                    <AppText variant="h1" style={{ color: mineColor }}>
+                    <AppText variant="h1" style={{ color: GAME_YOU_COLOR }}>
                       {stats.me.wins}
                     </AppText>
                     <AppText variant="caption" color="secondary">
@@ -190,7 +190,7 @@ export function GameScreen({ gameType }: Props) {
                     –
                   </AppText>
                   <View style={styles.scoreSide}>
-                    <AppText variant="h1" style={{ color: partnerColor }}>
+                    <AppText variant="h1" style={{ color: GAME_OPPONENT_COLOR }}>
                       {stats.partner.wins}
                     </AppText>
                     <AppText variant="caption" color="secondary">

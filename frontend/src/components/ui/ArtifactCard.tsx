@@ -11,6 +11,8 @@ type Props = {
   title?: string;
   stacked?: boolean;
   featured?: boolean;
+  /** Stretch the card to fill its parent's height. */
+  fill?: boolean;
   style?: StyleProp<ViewStyle>;
   /** When provided, the whole card becomes a spring-pressable button. */
   onPress?: () => void;
@@ -23,6 +25,7 @@ export function ArtifactCard({
   title,
   stacked = false,
   featured = false,
+  fill = false,
   style,
   onPress,
   accessibilityLabel,
@@ -40,6 +43,7 @@ export function ArtifactCard({
       borderColor: featured ? "transparent" : theme.colors.border.subtle,
     },
     theme.shadow.card,
+    fill && styles.grow,
   ];
 
   const inner = (
@@ -129,6 +133,7 @@ const styles = StyleSheet.create({
     padding: 20,
     position: "relative",
   },
+  grow: { flex: 1 },
   category: {
     marginBottom: 8,
   },
