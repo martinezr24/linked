@@ -1,5 +1,12 @@
 import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 
 import { queryKeys } from "@/api/queryKeys";
 import { fetchPartnerPresence } from "@/api/fetchers";
@@ -48,13 +55,26 @@ function BatteryBar({ percent }: { percent: number }) {
   const low = percent < 20;
   const fillColor = low ? colors.accent.primary : colors.accent.success;
 
+  const fill = useSharedValue(0);
+  useEffect(() => {
+    fill.value = withTiming(percent, {
+      duration: 900,
+      easing: Easing.out(Easing.cubic),
+    });
+  }, [percent, fill]);
+
+  const fillStyle = useAnimatedStyle(() => ({
+    width: `${fill.value}%`,
+  }));
+
   return (
     <View style={styles.batteryWrap}>
       <View style={styles.batteryTrack}>
-        <View
+        <Animated.View
           style={[
             styles.batteryFill,
-            { width: `${percent}%`, backgroundColor: fillColor },
+            { backgroundColor: fillColor },
+            fillStyle,
           ]}
         />
       </View>

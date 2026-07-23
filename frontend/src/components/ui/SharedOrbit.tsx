@@ -1,9 +1,18 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedProps,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 
 import { colors } from "@/theme/tokens";
 import { ellipsePoints, roughClosedPath, starPath } from "@/utils/sketch";
+
+const AnimatedPath = Animated.createAnimatedComponent(Path);
 
 type Props = {
   left: ReactNode;
@@ -28,6 +37,19 @@ export function SharedOrbit({
   gap = 26,
 }: Props) {
   const [size, setSize] = useState({ w: 0, h: 0 });
+
+  const twinkle = useSharedValue(0);
+  useEffect(() => {
+    twinkle.value = withRepeat(
+      withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true,
+    );
+  }, [twinkle]);
+
+  const starProps = useAnimatedProps(() => ({
+    opacity: 0.55 + twinkle.value * 0.45,
+  }));
 
   const onLayout = (e: LayoutChangeEvent) => {
     const { width, height } = e.nativeEvent.layout;
@@ -65,7 +87,7 @@ export function SharedOrbit({
             strokeLinejoin="round"
             opacity={0.85}
           />
-          <Path d={art.star} fill={color} />
+          <AnimatedPath d={art.star} fill={color} animatedProps={starProps} />
         </Svg>
       ) : null}
       <View style={styles.row}>
