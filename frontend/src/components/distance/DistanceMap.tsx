@@ -1,12 +1,5 @@
-import { memo, useEffect, useRef } from "react";
+import { memo, useRef } from "react";
 import { Platform, StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
-import Animated, {
-  Easing,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from "react-native-reanimated";
 import MapView, {
   Marker,
   Polyline,
@@ -20,33 +13,6 @@ import { HeartIcon } from "@/components/ui/icons";
 import { midpoint, regionForCoords, type LatLng } from "@/utils/distance";
 import { colors } from "@/theme/tokens";
 
-// A soft heartbeat at the shared midpoint: a halo ring gently expands and fades,
-// so the connection between the two markers feels alive.
-function HeartbeatMarker() {
-  const pulse = useSharedValue(0);
-
-  useEffect(() => {
-    pulse.value = withRepeat(
-      withTiming(1, { duration: 2000, easing: Easing.out(Easing.ease) }),
-      -1,
-      false,
-    );
-  }, [pulse]);
-
-  const haloStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: 0.6 + pulse.value * 1.1 }],
-    opacity: 0.5 * (1 - pulse.value),
-  }));
-
-  return (
-    <View style={styles.heartWrap}>
-      <Animated.View style={[styles.halo, haloStyle]} />
-      <View style={styles.heart}>
-        <HeartIcon size={15} color={colors.accent.primary} />
-      </View>
-    </View>
-  );
-}
 
 // Two avatars rendered at (nearly) the same spot overlap and look broken. When
 // the couple is in the same area, spread the *display* positions to a minimum
@@ -190,7 +156,9 @@ function DistanceMapComponent({
           anchor={{ x: 0.5, y: 0.5 }}
           tracksViewChanges={tracks}
         >
-          <HeartbeatMarker />
+          <View style={styles.heart}>
+            <HeartIcon size={15} color={colors.accent.primary} />
+          </View>
         </Marker>
       </MapView>
     </View>
@@ -230,19 +198,6 @@ const styles = StyleSheet.create({
   wrap: {
     overflow: "hidden",
     backgroundColor: colors.bg.canvas,
-  },
-  heartWrap: {
-    width: 52,
-    height: 52,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  halo: {
-    position: "absolute",
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.accent.primary,
   },
   heart: {
     width: 26,
