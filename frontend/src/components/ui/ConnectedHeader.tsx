@@ -23,6 +23,10 @@ type Props = {
   headerRight?: ReactNode;
   /** Tap your own avatar to change your photo. */
   onMinePress?: () => void;
+  /** Long-press your partner's avatar to send a "thinking of you" pulse. */
+  onPartnerLongPress?: () => void;
+  /** Energize the shared orbit (e.g. when you're both online right now). */
+  energized?: boolean;
 };
 
 function AvatarCircle({
@@ -31,12 +35,16 @@ function AvatarCircle({
   bgColor,
   checkedIn,
   onPress,
+  onLongPress,
+  accessibilityLabel,
 }: {
   initial: string;
   avatarUrl?: string;
   bgColor: string;
   checkedIn?: boolean;
   onPress?: () => void;
+  onLongPress?: () => void;
+  accessibilityLabel?: string;
 }) {
   const theme = useTheme();
 
@@ -64,13 +72,15 @@ function AvatarCircle({
     </View>
   );
 
-  if (onPress) {
+  if (onPress || onLongPress) {
     return (
       <Pressable
         onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={280}
         hitSlop={6}
         accessibilityRole="button"
-        accessibilityLabel="Open account settings"
+        accessibilityLabel={accessibilityLabel ?? "Open account settings"}
       >
         {content}
       </Pressable>
@@ -92,6 +102,8 @@ export function ConnectedHeader({
   showStreak = true,
   headerRight,
   onMinePress,
+  onPartnerLongPress,
+  energized = false,
 }: Props) {
   const theme = useTheme();
 
@@ -100,6 +112,7 @@ export function ConnectedHeader({
       <AppMark size={32} />
       <View style={styles.center}>
         <SharedOrbit
+          energized={energized}
           left={
             <AvatarCircle
               initial={mineInitial.slice(0, 1).toUpperCase()}
@@ -115,6 +128,8 @@ export function ConnectedHeader({
               avatarUrl={partnerAvatarUrl}
               bgColor={partnerColor ?? theme.colors.avatar.partner}
               checkedIn={partnerPhotoSent}
+              onLongPress={onPartnerLongPress}
+              accessibilityLabel="Send your partner a thinking-of-you pulse"
             />
           }
         />

@@ -136,6 +136,57 @@ func handleNudge(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
 
+// handlePulse delivers a live "thinking of you" heartbeat: a heart ripples
+// across the partner's screen (via websocket) and their phone buzzes (push).
+func handlePulse(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) || r.Method != http.MethodPost {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+	user, err := getOrCreateUser(deviceID)
+	if err != nil || user.RelationshipID == nil {
+		http.Error(w, "not paired", http.StatusForbidden)
+		return
+	}
+
+	var senderName sql.NullString
+	_ = db.QueryRow(`SELECT display_name FROM users WHERE id = $1`, user.ID).Scan(&senderName)
+	name := strings.TrimSpace(senderName.String)
+	if name == "" {
+		name = "Your partner"
+	}
+
+	var partnerID string
+	if err := db.QueryRow(
+		`SELECT id::text FROM users WHERE relationship_id = $1 AND id != $2 LIMIT 1`,
+		*user.RelationshipID, user.ID,
+	).Scan(&partnerID); err != nil {
+		http.Error(w, "partner not found", http.StatusNotFound)
+		return
+	}
+
+	// Realtime heart ripple for whoever has the app open (both see it — a shared
+	// moment). fromId lets a client tell whether it originated the pulse.
+	broadcastServerEvent(*user.RelationshipID, "PULSE", map[string]any{
+		"fromId":   user.ID,
+		"fromName": name,
+	})
+
+	if tokens := partnerPushTokens(partnerID); len(tokens) > 0 {
+		go sendExpoPush(tokens, "💗 "+name, name+" is thinking of you.", map[string]any{
+			"kind": "pulse",
+		})
+	}
+
+	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
 func partnerPushTokens(userID string) []string {
 	rows, err := db.Query(`SELECT token FROM push_tokens WHERE user_id::text = $1`, userID)
 	if err != nil {

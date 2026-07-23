@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -8,12 +8,17 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 
 import { queryKeys } from "@/api/queryKeys";
-import { fetchPhotoHistory } from "@/api/fetchers";
+import { fetchPhotoHistory, reactToPhoto } from "@/api/fetchers";
 import { CouplePhotoImage } from "@/components/photos/CouplePhotoImage";
+import {
+  ReactionPicker,
+  ReactionSticker,
+  type ReactionType,
+} from "@/components/photos/PhotoReactions";
 import { AppText } from "@/components/ui/AppText";
 import { ArrowLeftIcon } from "@/components/ui/icons";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
@@ -45,7 +50,14 @@ function PhotoTile({
         {label}
       </AppText>
       {photo ? (
-        <CouplePhotoImage url={photo.imageUrl} style={styles.tileImg} />
+        <View style={styles.tileImgWrap}>
+          <CouplePhotoImage url={photo.imageUrl} style={styles.tileImg} />
+          {photo.reaction ? (
+            <View style={styles.tileBadge}>
+              <ReactionSticker type={photo.reaction as ReactionType} size={18} />
+            </View>
+          ) : null}
+        </View>
       ) : (
         <AppText variant="caption" color="muted" style={styles.empty}>
           —
@@ -78,7 +90,28 @@ function DayRow({
 export default function PhotoMemoriesScreen() {
   const theme = useTheme();
   const { deviceId } = useRelationship();
+  const queryClient = useQueryClient();
   const [lightbox, setLightbox] = useState<DailyPhoto | null>(null);
+  const [reaction, setReaction] = useState<ReactionType | "">("");
+
+  useEffect(() => {
+    setReaction((lightbox?.reaction as ReactionType) ?? "");
+  }, [lightbox]);
+
+  const reactMutation = useMutation({
+    mutationFn: (vars: { photoId: string; reaction: ReactionType | "" }) =>
+      reactToPhoto(deviceId!, vars.photoId, vars.reaction),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.photoHistory() });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.photoToday });
+    },
+  });
+
+  const pickReaction = (next: ReactionType | "") => {
+    if (!lightbox || !deviceId) return;
+    setReaction(next);
+    reactMutation.mutate({ photoId: lightbox.id, reaction: next });
+  };
 
   const {
     data,
@@ -152,6 +185,33 @@ export default function PhotoMemoriesScreen() {
                   <AppText variant="caption" color="muted">
                     {formatMMDDYYYY(lightbox.photoDate)}
                   </AppText>
+                  {lightbox.isMine ? (
+                    lightbox.reaction ? (
+                      <View style={styles.reactionRow}>
+                        <ReactionSticker
+                          type={lightbox.reaction as ReactionType}
+                          size={30}
+                        />
+                        <AppText variant="caption" color="secondary">
+                          Your partner reacted
+                        </AppText>
+                      </View>
+                    ) : null
+                  ) : (
+                    <View style={styles.reactBlock}>
+                      <AppText
+                        variant="caption"
+                        color="muted"
+                        style={styles.reactHint}
+                      >
+                        Tap to react
+                      </AppText>
+                      <ReactionPicker
+                        value={reaction || null}
+                        onPick={pickReaction}
+                      />
+                    </View>
+                  )}
                 </>
               ) : null}
             </View>
@@ -190,7 +250,18 @@ const styles = StyleSheet.create({
     width: "100%",
     height: 80,
     borderRadius: 8,
+  },
+  tileImgWrap: {
+    position: "relative",
     marginTop: 6,
+  },
+  tileBadge: {
+    position: "absolute",
+    top: 4,
+    right: 4,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    borderRadius: 10,
+    padding: 2,
   },
   empty: { marginTop: 24, textAlign: "center" },
   modalBg: {
@@ -211,4 +282,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   caption: { marginBottom: 8, textAlign: "center" },
+  reactBlock: { marginTop: 16, alignItems: "center", gap: 8 },
+  reactHint: {},
+  reactionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 12,
+  },
 });

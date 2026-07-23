@@ -56,6 +56,7 @@ export type DailyPhoto = {
   imageUrl: string;
   isMine: boolean;
   createdAt: string;
+  reaction?: string;
 };
 
 export type PhotoToday = {

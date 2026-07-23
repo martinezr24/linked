@@ -41,11 +41,12 @@ import { TreatButton } from "@/components/ui/TreatButton";
 import { OrbitSpinner } from "@/components/ui/OrbitSpinner";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
-import { fetchRelationship, fetchPhotoToday } from "@/api/fetchers";
+import { fetchRelationship, fetchPhotoToday, sendPulse } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { dateToIso, getDeviceTimezoneLabel } from "@/utils/dates";
 import { showMutationError } from "@/utils/errors";
+import { hapticLight } from "@/utils/haptics";
 
 function formatCountdown(targetIso: string): string {
   const diff = new Date(targetIso).getTime() - Date.now();
@@ -69,7 +70,7 @@ const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 88 : 64;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { deviceId } = useRelationship();
+  const { deviceId, bothHere } = useRelationship();
   const scrollBottomPad = TAB_BAR_HEIGHT + insets.bottom + 24;
   const queryClient = useQueryClient();
   const [visitDraft, setVisitDraft] = useState<Date | null>(null);
@@ -241,6 +242,12 @@ export default function HomeScreen() {
                 minePhotoSent={Boolean(photoToday?.mine)}
                 partnerPhotoSent={Boolean(photoToday?.partner)}
                 headerRight={<TreatButton onPress={() => setTreatsOpen(true)} />}
+                energized={bothHere}
+                onPartnerLongPress={() => {
+                  if (!deviceId) return;
+                  void hapticLight();
+                  void sendPulse(deviceId).catch(() => {});
+                }}
                 onMinePress={() => router.push("/account")}
               />
             </View>

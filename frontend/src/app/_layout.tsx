@@ -6,6 +6,8 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { NudgeBanner } from "@/components/NudgeBanner";
+import { HeartPulseOverlay } from "@/components/HeartPulseOverlay";
+import { TogetherMoment } from "@/components/TogetherMoment";
 import { SyncBootstrap } from "@/components/SyncBootstrap";
 import { AnimatedSplash } from "@/components/ui/AnimatedSplash";
 import { QueryProvider } from "@/context/QueryProvider";
@@ -20,6 +22,7 @@ export default function RootLayout() {
           <RelationshipProvider>
             <SyncBootstrap />
             <NudgeBanner />
+            <TogetherMoment />
             <StatusBar style="light" />
             <Stack screenOptions={{ headerShown: false }}>
               <Stack.Screen
@@ -37,6 +40,7 @@ export default function RootLayout() {
               />
               <Stack.Screen name="distance" options={{ headerShown: false }} />
             </Stack>
+            <HeartPulseOverlay />
             <AnimatedSplash />
           </RelationshipProvider>
         </QueryProvider>

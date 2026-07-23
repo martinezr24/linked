@@ -23,6 +23,8 @@ type RelationshipContextValue = {
   relationshipId: string | null;
   isReady: boolean;
   isPaired: boolean;
+  /** True when both partners currently have the app open (live websockets). */
+  bothHere: boolean;
   setPaired: (relationshipId: string) => Promise<void>;
   clearPaired: () => Promise<void>;
   subscribe: (handler: (msg: WsMessage) => void) => () => void;
@@ -47,6 +49,7 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [relationshipId, setRelationshipId] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [bothHere, setBothHere] = useState(false);
   const socketRef = useRef<WebSocket | null>(null);
   const subscribersRef = useRef<Set<(msg: WsMessage) => void>>(new Set());
   const partnerUnlinkHandled = useRef(false);
@@ -94,6 +97,7 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
     if (!deviceId || !relationshipId) {
       socketRef.current?.close();
       socketRef.current = null;
+      setBothHere(false);
       return;
     }
 
@@ -113,14 +117,23 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
           void handlePartnerUnlinked();
           return;
         }
+        if (msg.action === "PRESENCE") {
+          const both = (msg.payload as { both?: boolean })?.both;
+          setBothHere(Boolean(both));
+        }
         notify(msg);
       } catch {
         // ignore non-json
       }
     };
 
+    ws.onclose = () => {
+      setBothHere(false);
+    };
+
     return () => {
       ws.close();
+      setBothHere(false);
       if (socketRef.current === ws) {
         socketRef.current = null;
       }
@@ -147,6 +160,7 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
     relationshipId,
     isReady,
     isPaired: Boolean(relationshipId),
+    bothHere,
     setPaired,
     clearPaired,
     subscribe,

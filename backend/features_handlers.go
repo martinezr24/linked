@@ -54,6 +54,7 @@ type DailyPhotoDTO struct {
 	ImageURL  string  `json:"imageUrl"`
 	IsMine    bool    `json:"isMine"`
 	CreatedAt string  `json:"createdAt"`
+	Reaction  *string `json:"reaction,omitempty"`
 }
 
 type PhotoPostResponse struct {
@@ -489,6 +490,7 @@ func computePhotoStreak(relationshipID, today string) (current, longest int, bot
 func photoToDTO(
 	id, photoDate, objectKey, caption, authorID, viewerID string,
 	created time.Time,
+	reaction string,
 ) (DailyPhotoDTO, error) {
 	if mediaStore == nil {
 		return DailyPhotoDTO{}, errors.New("storage unavailable")
@@ -501,6 +503,10 @@ func photoToDTO(
 	if caption != "" {
 		capPtr = &caption
 	}
+	var reactionPtr *string
+	if reaction != "" {
+		reactionPtr = &reaction
+	}
 	return DailyPhotoDTO{
 		ID:        id,
 		PhotoDate: photoDate,
@@ -508,6 +514,7 @@ func photoToDTO(
 		ImageURL:  url,
 		IsMine:    authorID == viewerID,
 		CreatedAt: created.UTC().Format(time.RFC3339),
+		Reaction:  reactionPtr,
 	}, nil
 }
 
@@ -654,7 +661,7 @@ func handlePhotosToday(w http.ResponseWriter, r *http.Request) {
 	resp.BothSentToday = both
 
 	rows, err := db.Query(
-		`SELECT id::text, user_id::text, photo_date::text, object_key, COALESCE(caption,''), created_at
+		`SELECT id::text, user_id::text, photo_date::text, object_key, COALESCE(caption,''), created_at, COALESCE(reaction,'')
          FROM daily_photos WHERE relationship_id = $1 AND photo_date = $2::date`,
 		*user.RelationshipID, today,
 	)
@@ -666,10 +673,11 @@ func handlePhotosToday(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id, uid, pdate, objectKey, caption string
 		var created time.Time
-		if rows.Scan(&id, &uid, &pdate, &objectKey, &caption, &created) != nil {
+		var reaction string
+		if rows.Scan(&id, &uid, &pdate, &objectKey, &caption, &created, &reaction) != nil {
 			continue
 		}
-		dto, err := photoToDTO(id, pdate, objectKey, caption, uid, user.ID, created)
+		dto, err := photoToDTO(id, pdate, objectKey, caption, uid, user.ID, created, reaction)
 		if err != nil {
 			continue
 		}
@@ -736,7 +744,7 @@ func handlePhotosPost(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	dto, err := photoToDTO(id, photoDate, key, cap, user.ID, user.ID, created)
+	dto, err := photoToDTO(id, photoDate, key, cap, user.ID, user.ID, created, "")
 	if err != nil {
 		http.Error(w, "storage error", http.StatusInternalServerError)
 		return
@@ -798,17 +806,18 @@ func handlePhotosHistory(w http.ResponseWriter, r *http.Request) {
 	for _, d := range dates {
 		g := PhotoDayGroup{PhotoDate: d}
 		pr, _ := db.Query(
-			`SELECT id::text, user_id::text, object_key, COALESCE(caption,''), created_at
+			`SELECT id::text, user_id::text, object_key, COALESCE(caption,''), created_at, COALESCE(reaction,'')
              FROM daily_photos WHERE relationship_id = $1 AND photo_date = $2::date`,
 			*user.RelationshipID, d,
 		)
 		for pr.Next() {
 			var id, uid, objectKey, caption string
 			var created time.Time
-			if pr.Scan(&id, &uid, &objectKey, &caption, &created) != nil {
+			var reaction string
+			if pr.Scan(&id, &uid, &objectKey, &caption, &created, &reaction) != nil {
 				continue
 			}
-			dto, err := photoToDTO(id, d, objectKey, caption, uid, user.ID, created)
+			dto, err := photoToDTO(id, d, objectKey, caption, uid, user.ID, created, reaction)
 			if err != nil {
 				continue
 			}
@@ -828,6 +837,79 @@ func handlePhotosHistory(w http.ResponseWriter, r *http.Request) {
 		nextCursor = &c
 	}
 	json.NewEncoder(w).Encode(map[string]any{"days": days, "nextCursor": nextCursor})
+}
+
+// handlePhotoReaction lets you leave a hand-drawn sticker reaction (heart, star,
+// scribble) on your partner's photo. Reactions live on the reacted-to photo, so
+// the owner sees it on their own photo.
+func handlePhotoReaction(w http.ResponseWriter, r *http.Request) {
+	if applyCORS(w, r) || r.Method != http.MethodPost {
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+	deviceID, ok := requireDeviceID(w, r)
+	if !ok {
+		return
+	}
+	user, err := getOrCreateUser(deviceID)
+	if err != nil || user.RelationshipID == nil {
+		http.Error(w, "not paired", http.StatusForbidden)
+		return
+	}
+	var body struct {
+		PhotoID  string `json:"photoId"`
+		Reaction string `json:"reaction"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid body", http.StatusBadRequest)
+		return
+	}
+	reaction := strings.TrimSpace(body.Reaction)
+	allowed := map[string]bool{"heart": true, "star": true, "scribble": true}
+	if reaction != "" && !allowed[reaction] {
+		http.Error(w, "invalid reaction", http.StatusBadRequest)
+		return
+	}
+	var ownerID string
+	err = db.QueryRow(
+		`SELECT user_id::text FROM daily_photos WHERE id = $1 AND relationship_id = $2`,
+		body.PhotoID, *user.RelationshipID,
+	).Scan(&ownerID)
+	if err != nil {
+		http.Error(w, "photo not found", http.StatusNotFound)
+		return
+	}
+	if ownerID == user.ID {
+		http.Error(w, "cannot react to your own photo", http.StatusBadRequest)
+		return
+	}
+	if _, err := db.Exec(
+		`UPDATE daily_photos SET reaction = NULLIF($1,'') WHERE id = $2`,
+		reaction, body.PhotoID,
+	); err != nil {
+		http.Error(w, "db error", http.StatusInternalServerError)
+		return
+	}
+
+	broadcastServerEvent(*user.RelationshipID, "SYNC_PHOTOS", map[string]any{})
+
+	if reaction != "" {
+		var senderName sql.NullString
+		_ = db.QueryRow(`SELECT display_name FROM users WHERE id = $1`, user.ID).Scan(&senderName)
+		name := strings.TrimSpace(senderName.String)
+		if name == "" {
+			name = "Your partner"
+		}
+		if tokens := partnerPushTokens(ownerID); len(tokens) > 0 {
+			go sendExpoPush(tokens, "New reaction", name+" reacted to your photo.", map[string]any{
+				"kind": "reaction",
+			})
+		}
+	}
+
+	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
 }
 
 func handlePhotosStreak(w http.ResponseWriter, r *http.Request) {
@@ -1184,6 +1266,7 @@ func registerFeatureRoutes() {
 	http.HandleFunc("/api/photos/today", handlePhotosToday)
 	http.HandleFunc("/api/photos", handlePhotosPost)
 	http.HandleFunc("/api/photos/history", handlePhotosHistory)
+	http.HandleFunc("/api/photos/reaction", handlePhotoReaction)
 	http.HandleFunc("/api/photos/streak", handlePhotosStreak)
 	http.HandleFunc("/api/drawings", handleDrawings)
 	http.HandleFunc("/api/games/trivia/active", handleTriviaActive)

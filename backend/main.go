@@ -178,6 +178,16 @@ func broadcastServerEvent(relationshipID, action string, payload map[string]any)
 	hub.BroadcastServerEvent(relationshipID, action, payload)
 }
 
+// broadcastPresence tells a couple whether both of them currently have the app
+// open (a live websocket), powering the "you're both here" moment.
+func broadcastPresence(relationshipID string) {
+	if hub == nil {
+		return
+	}
+	both := hub.DistinctUserCount(relationshipID) >= 2
+	broadcastServerEvent(relationshipID, "PRESENCE", map[string]any{"both": both})
+}
+
 func getOrCreateUser(deviceID string) (*User, error) {
 	var u User
 	err := db.QueryRow(
@@ -253,7 +263,8 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	hub.Register(ws, relationshipID)
+	hub.Register(ws, relationshipID, user.ID)
+	broadcastPresence(relationshipID)
 
 	defer func() {
 		if gameManager != nil {
@@ -261,6 +272,7 @@ func handleConnections(w http.ResponseWriter, r *http.Request) {
 		}
 		hub.Unregister(ws)
 		ws.Close()
+		broadcastPresence(relationshipID)
 	}()
 
 	for {
@@ -2046,6 +2058,7 @@ func main() {
 	http.HandleFunc("/api/account/delete", handleAccountDelete)
 	http.HandleFunc("/api/profile/push-token", handlePushToken)
 	http.HandleFunc("/api/nudges", handleNudge)
+	http.HandleFunc("/api/pulse", handlePulse)
 
 	fmt.Println("Linked engine running with persistence on :8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))

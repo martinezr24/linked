@@ -10,6 +10,7 @@ import (
 type Client struct {
 	Conn           *websocket.Conn
 	RelationshipID string
+	UserID         string
 }
 
 type Hub struct {
@@ -21,16 +22,31 @@ func NewHub() *Hub {
 	return &Hub{clients: make(map[*websocket.Conn]*Client)}
 }
 
-func (h *Hub) Register(conn *websocket.Conn, relationshipID string) {
+func (h *Hub) Register(conn *websocket.Conn, relationshipID, userID string) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
-	h.clients[conn] = &Client{Conn: conn, RelationshipID: relationshipID}
+	h.clients[conn] = &Client{Conn: conn, RelationshipID: relationshipID, UserID: userID}
 }
 
 func (h *Hub) Unregister(conn *websocket.Conn) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	delete(h.clients, conn)
+}
+
+// DistinctUserCount returns how many distinct users currently have a live
+// connection for the given relationship (a single user may hold more than one
+// socket, e.g. across reconnects).
+func (h *Hub) DistinctUserCount(relationshipID string) int {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	seen := make(map[string]bool)
+	for _, client := range h.clients {
+		if client.RelationshipID == relationshipID && client.UserID != "" {
+			seen[client.UserID] = true
+		}
+	}
+	return len(seen)
 }
 
 func (h *Hub) BroadcastToRelationship(relationshipID, action string, payload any, exclude *websocket.Conn) {

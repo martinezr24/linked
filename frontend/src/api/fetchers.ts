@@ -52,6 +52,30 @@ export async function sendNudge(deviceId: string, type: string) {
   return res.json() as Promise<{ ok: boolean }>;
 }
 
+export async function sendPulse(deviceId: string) {
+  const res = await apiFetch("/api/pulse", deviceId, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  if (!res.ok) throw new Error("Failed to send pulse");
+  return res.json() as Promise<{ ok: boolean }>;
+}
+
+export async function reactToPhoto(
+  deviceId: string,
+  photoId: string,
+  reaction: string,
+) {
+  const res = await apiFetch("/api/photos/reaction", deviceId, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ photoId, reaction }),
+  });
+  if (!res.ok) throw new Error("Failed to react to photo");
+  return res.json() as Promise<{ ok: boolean }>;
+}
+
 export async function fetchGoals(deviceId: string) {
   const res = await apiFetch("/api/goals/current", deviceId);
   if (!res.ok) throw new Error("Failed to load goals");

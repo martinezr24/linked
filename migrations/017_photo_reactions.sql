@@ -1,0 +1,1 @@
+ALTER TABLE daily_photos ADD COLUMN IF NOT EXISTS reaction TEXT;
