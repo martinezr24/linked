@@ -21,9 +21,19 @@ export function useTabReload(onReload: () => Promise<unknown> | void) {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
+    const start = Date.now();
     try {
       await onReload();
     } finally {
+      // Keep the orbit spinner visible for a beat even when the refetch is
+      // instant (cached data), so pull-to-refresh reads the same on every tab.
+      const elapsed = Date.now() - start;
+      const MIN_VISIBLE = 750;
+      if (elapsed < MIN_VISIBLE) {
+        await new Promise((resolve) =>
+          setTimeout(resolve, MIN_VISIBLE - elapsed),
+        );
+      }
       setRefreshing(false);
     }
   }, [onReload]);
