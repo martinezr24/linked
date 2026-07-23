@@ -92,7 +92,7 @@ export function ProfileSettingsCard() {
       />
 
       <AppText variant="caption" color="secondary" style={styles.fieldLabel}>
-        VENMO USERNAME
+        VENMO USERNAME (TO SEND TREATS)
       </AppText>
       <AppTextInput
         style={inputStyle}

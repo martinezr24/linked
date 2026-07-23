@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, View } from "react-native";
 
 import { AppMark } from "./AppMark";
 import { AppText } from "./AppText";
@@ -21,6 +21,8 @@ type Props = {
   minePhotoSent?: boolean;
   showStreak?: boolean;
   headerRight?: ReactNode;
+  /** Tap your own avatar to change your photo. */
+  onMinePress?: () => void;
 };
 
 function AvatarCircle({
@@ -28,15 +30,17 @@ function AvatarCircle({
   avatarUrl,
   bgColor,
   checkedIn,
+  onPress,
 }: {
   initial: string;
   avatarUrl?: string;
   bgColor: string;
   checkedIn?: boolean;
+  onPress?: () => void;
 }) {
   const theme = useTheme();
 
-  return (
+  const content = (
     <View style={styles.avatarWrap}>
       <AvatarImage
         url={avatarUrl}
@@ -59,6 +63,20 @@ function AvatarCircle({
       ) : null}
     </View>
   );
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        hitSlop={6}
+        accessibilityRole="button"
+        accessibilityLabel="Open account settings"
+      >
+        {content}
+      </Pressable>
+    );
+  }
+  return content;
 }
 
 export function ConnectedHeader({
@@ -73,6 +91,7 @@ export function ConnectedHeader({
   minePhotoSent,
   showStreak = true,
   headerRight,
+  onMinePress,
 }: Props) {
   const theme = useTheme();
 
@@ -87,6 +106,7 @@ export function ConnectedHeader({
               avatarUrl={mineAvatarUrl}
               bgColor={mineColor ?? theme.colors.avatar.mine}
               checkedIn={minePhotoSent}
+              onPress={onMinePress}
             />
           }
           right={

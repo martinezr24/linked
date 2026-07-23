@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { DailyPhotoCard } from "@/components/photos/DailyPhotoCard";
@@ -236,6 +237,7 @@ export default function HomeScreen() {
                 minePhotoSent={Boolean(photoToday?.mine)}
                 partnerPhotoSent={Boolean(photoToday?.partner)}
                 headerRight={<TreatButton onPress={() => setTreatsOpen(true)} />}
+                onMinePress={() => router.push("/account")}
               />
             </View>
             {showStreakBanner ? (

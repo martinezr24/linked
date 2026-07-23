@@ -15,6 +15,20 @@ const SW = 1.8;
  * Navigation & functional glyphs
  * ------------------------------------------------------------------------- */
 
+export function CameraIcon({ size = 24, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox={V} fill="none">
+      <Path
+        d="M4.5 8.5a2 2 0 0 1 2-2h1L8.6 5h6.8l1.1 1.5h1a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-8Z"
+        stroke={color}
+        strokeWidth={SW}
+        strokeLinejoin="round"
+      />
+      <Circle cx={12} cy={12.5} r={3} stroke={color} strokeWidth={SW} />
+    </Svg>
+  );
+}
+
 export function ChevronLeftIcon({ size = 24, color }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox={V} fill="none">

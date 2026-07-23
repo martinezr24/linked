@@ -4,11 +4,10 @@ import { router, type Href } from "expo-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
-import { fetchGridGame, fetchGridStats, fetchPhotoToday } from "@/api/fetchers";
+import { fetchGridGame, fetchGridStats } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { MountFade, PressableScale } from "@/components/ui/motion";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
-import { StreakPill } from "@/components/ui/StreakPill";
 import { GAMES, type GameMeta } from "@/games/catalog";
 import { useProfile } from "@/hooks/useProfile";
 import { useTabReload } from "@/hooks/useTabReload";
@@ -157,17 +156,10 @@ function TriviaGameCard({ meta }: { meta: GameMeta }) {
 }
 
 export default function GamesScreen() {
-  const { deviceId } = useRelationship();
   const queryClient = useQueryClient();
   const { scrollRef, refreshing, onRefresh } = useTabReload(() =>
     queryClient.invalidateQueries(),
   );
-  const { data: photoToday } = useQuery({
-    queryKey: queryKeys.photoToday,
-    queryFn: () => fetchPhotoToday(deviceId!),
-    enabled: Boolean(deviceId),
-  });
-  const streak = photoToday?.currentStreak ?? 0;
 
   return (
     <ScreenBackground>
@@ -191,7 +183,6 @@ export default function GamesScreen() {
                 Play together, wherever you are.
               </AppText>
             </View>
-            <StreakPill count={streak} />
           </View>
 
           {GAMES.map((meta, i) => (

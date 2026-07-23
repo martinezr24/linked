@@ -4,11 +4,13 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { queryKeys } from "@/api/queryKeys";
 import { AppText } from "@/components/ui/AppText";
 import { AvatarImage } from "@/components/ui/AvatarImage";
+import { CameraIcon } from "@/components/ui/icons";
 import { useRelationship } from "@/context/RelationshipContext";
 import { uploadProfileAvatar } from "@/utils/avatarUpload";
 import { pickPhotoFromSource } from "@/utils/pickPhoto";
 import { showMutationError } from "@/utils/errors";
 import { initialFromName } from "@/utils/coupleNames";
+import { colors } from "@/theme/tokens";
 
 type Props = {
   displayName?: string | null;
@@ -58,6 +60,9 @@ export function ProfileAvatarPicker({
             <ActivityIndicator color="#fff" />
           </View>
         ) : null}
+        <View style={styles.badge}>
+          <CameraIcon size={15} color="#fff" />
+        </View>
       </View>
       <AppText variant="bodySemibold" color="accent">
         Change photo
@@ -68,6 +73,19 @@ export function ProfileAvatarPicker({
 
 const styles = StyleSheet.create({
   wrap: { alignItems: "center", gap: 8, marginBottom: 12 },
+  badge: {
+    position: "absolute",
+    right: -2,
+    bottom: -2,
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.accent.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: colors.surface.card,
+  },
   loader: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.4)",
