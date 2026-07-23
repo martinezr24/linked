@@ -2,7 +2,7 @@ import { Pressable, StyleSheet } from "react-native";
 import { type Href, router } from "expo-router";
 
 import { AppText } from "./AppText";
-import { FlameIcon } from "./FlameIcon";
+import { LivingFlame } from "./LivingFlame";
 import { useTheme } from "@/theme/useTheme";
 
 type Props = {
@@ -24,8 +24,9 @@ export function StreakPill({ count }: Props) {
         pressed && styles.pressed,
       ]}
     >
-      <FlameIcon
-        size={14}
+      <LivingFlame
+        count={count}
+        baseSize={14}
         outer={theme.colors.accent.flame}
         inner={theme.colors.accent.flameInner}
       />

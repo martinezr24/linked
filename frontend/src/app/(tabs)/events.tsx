@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -18,6 +17,7 @@ import { OwnerFilterChips } from "@/components/calendar/OwnerFilterChips";
 import { PillMonthGrid } from "@/components/calendar/PillMonthGrid";
 import { AppText } from "@/components/ui/AppText";
 import { MountFade, PressableScale } from "@/components/ui/motion";
+import { OrbitSpinner } from "@/components/ui/OrbitSpinner";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { TabSettingsIcon } from "@/components/ui/TabIcons";
 import { queryKeys } from "@/api/queryKeys";
@@ -112,7 +112,7 @@ export default function EventsScreen() {
     return (
       <ScreenBackground>
         <SafeAreaView style={[styles.safe, styles.centered]}>
-          <ActivityIndicator size="large" color={theme.colors.accent.primary} />
+          <OrbitSpinner size={48} />
         </SafeAreaView>
       </ScreenBackground>
     );

@@ -8,6 +8,7 @@ import { AppText } from "@/components/ui/AppText";
 import { CoupleMilestones } from "@/components/CoupleMilestones";
 import { ConnectedHeader } from "@/components/ui/ConnectedHeader";
 import { MountFade } from "@/components/ui/motion";
+import { OrbitSpinner } from "@/components/ui/OrbitSpinner";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { TabSettingsIcon } from "@/components/ui/TabIcons";
 import { queryKeys } from "@/api/queryKeys";
@@ -85,38 +86,45 @@ export default function CoupleScreen() {
           }
         />
 
-        <ScrollView
-          ref={scrollRef}
-          contentContainerStyle={[
-            styles.scroll,
-            { paddingBottom: TAB_BAR_HEIGHT + 40 },
-          ]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={colors.text.secondary}
-            />
-          }
-        >
-          <MountFade index={0}>
-            <AnniversaryCard />
-          </MountFade>
+        <View style={styles.scrollWrap}>
+          {refreshing ? (
+            <View pointerEvents="none" style={styles.refreshSpinner}>
+              <OrbitSpinner size={30} />
+            </View>
+          ) : null}
+          <ScrollView
+            ref={scrollRef}
+            contentContainerStyle={[
+              styles.scroll,
+              { paddingBottom: TAB_BAR_HEIGHT + 40 },
+            ]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor="transparent"
+              />
+            }
+          >
+            <MountFade index={0}>
+              <AnniversaryCard />
+            </MountFade>
 
-          <MountFade index={1} style={styles.statsRow}>
-            <StatTile
-              value={daysTogether != null ? daysTogether.toLocaleString() : "–"}
-              label="Days together"
-            />
-            <StatTile value={String(streakCount)} label="Day streak" />
-            <StatTile value={String(longestStreak)} label="Best streak" />
-          </MountFade>
+            <MountFade index={1} style={styles.statsRow}>
+              <StatTile
+                value={daysTogether != null ? daysTogether.toLocaleString() : "–"}
+                label="Days together"
+              />
+              <StatTile value={String(streakCount)} label="Day streak" />
+              <StatTile value={String(longestStreak)} label="Best streak" />
+            </MountFade>
 
           <MountFade index={2}>
             <CoupleMilestones />
           </MountFade>
-        </ScrollView>
+          </ScrollView>
+        </View>
       </SafeAreaView>
     </ScreenBackground>
   );
@@ -124,6 +132,15 @@ export default function CoupleScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  scrollWrap: { flex: 1 },
+  refreshSpinner: {
+    position: "absolute",
+    top: 8,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 5,
+  },
   scroll: { paddingTop: 8, paddingHorizontal: 20 },
   statsRow: { flexDirection: "row", gap: 12, marginBottom: 16 },
   statTile: {

@@ -7,6 +7,7 @@ import { queryKeys } from "@/api/queryKeys";
 import { fetchGridGame, fetchGridStats } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { MountFade, PressableScale } from "@/components/ui/motion";
+import { OrbitSpinner } from "@/components/ui/OrbitSpinner";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { GAMES, type GameMeta } from "@/games/catalog";
 import { useProfile } from "@/hooks/useProfile";
@@ -167,6 +168,11 @@ export default function GamesScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
+        {refreshing ? (
+          <View pointerEvents="none" style={styles.refreshSpinner}>
+            <OrbitSpinner size={30} />
+          </View>
+        ) : null}
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.scroll}
@@ -175,7 +181,7 @@ export default function GamesScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.text.secondary}
+              tintColor="transparent"
             />
           }
         >
@@ -205,6 +211,14 @@ export default function GamesScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  refreshSpinner: {
+    position: "absolute",
+    top: 8,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 5,
+  },
   scroll: { padding: 20, paddingBottom: 100, gap: 12 },
   header: {
     flexDirection: "row",

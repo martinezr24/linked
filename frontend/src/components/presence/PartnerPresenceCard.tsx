@@ -1,4 +1,4 @@
-import { ActivityIndicator, StyleSheet, View } from "react-native";
+import { StyleSheet, View } from "react-native";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect } from "react";
 import Animated, {
@@ -13,6 +13,7 @@ import { fetchPartnerPresence } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { AvatarImage } from "@/components/ui/AvatarImage";
+import { OrbitSpinner } from "@/components/ui/OrbitSpinner";
 import {
   CloudIcon,
   PartlyCloudyIcon,
@@ -102,7 +103,7 @@ export function PartnerPresenceCard() {
   if (isLoading) {
     return (
       <View style={styles.loader}>
-        <ActivityIndicator color={colors.accent.primary} />
+        <OrbitSpinner size={40} />
       </View>
     );
   }

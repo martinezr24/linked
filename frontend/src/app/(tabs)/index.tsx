@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Platform,
   RefreshControl,
   ScrollView,
@@ -39,6 +38,7 @@ import { MountFade } from "@/components/ui/motion";
 import { TreatsModal } from "@/components/treats/TreatsModal";
 import { ConnectedHeader } from "@/components/ui/ConnectedHeader";
 import { TreatButton } from "@/components/ui/TreatButton";
+import { OrbitSpinner } from "@/components/ui/OrbitSpinner";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
 import { fetchRelationship, fetchPhotoToday } from "@/api/fetchers";
@@ -46,7 +46,6 @@ import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { dateToIso, getDeviceTimezoneLabel } from "@/utils/dates";
 import { showMutationError } from "@/utils/errors";
-import { useTheme } from "@/theme/useTheme";
 
 function formatCountdown(targetIso: string): string {
   const diff = new Date(targetIso).getTime() - Date.now();
@@ -69,7 +68,6 @@ function countdownDays(targetIso: string): string {
 const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 88 : 64;
 
 export default function HomeScreen() {
-  const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { deviceId } = useRelationship();
   const scrollBottomPad = TAB_BAR_HEIGHT + insets.bottom + 24;
@@ -191,7 +189,7 @@ export default function HomeScreen() {
     return (
       <ScreenBackground>
         <SafeAreaView style={[styles.centered, styles.safe]}>
-          <ActivityIndicator size="large" color={theme.colors.accent.primary} />
+          <OrbitSpinner size={48} />
         </SafeAreaView>
       </ScreenBackground>
     );
@@ -207,6 +205,12 @@ export default function HomeScreen() {
             partnerName={partnerName ?? undefined}
           />
 
+          {refreshing ? (
+            <View pointerEvents="none" style={styles.refreshSpinner}>
+              <OrbitSpinner size={30} />
+            </View>
+          ) : null}
+
           <ScrollView
             ref={scrollRef}
             style={styles.flex}
@@ -221,7 +225,7 @@ export default function HomeScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor={theme.colors.text.secondary}
+                tintColor="transparent"
               />
             }
           >
@@ -330,6 +334,14 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   headerScroll: { marginHorizontal: -20, marginTop: -8 },
   centered: { flex: 1, justifyContent: "center", alignItems: "center" },
+  refreshSpinner: {
+    position: "absolute",
+    top: 8,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 5,
+  },
   scroll: { paddingTop: 8, paddingHorizontal: 20, rowGap: 16 },
   bentoRow: { flexDirection: "row", gap: 12 },
   heroCol: { flex: 3 },

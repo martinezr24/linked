@@ -161,6 +161,23 @@ export function formatTimezoneShort(timeZone: string): string {
   }
 }
 
+/** Current hour (0–23) in the given IANA time zone, or null if unavailable. */
+export function getHourInTimeZone(timeZone?: string | null): number | null {
+  if (!timeZone) return null;
+  try {
+    const s = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour: "numeric",
+      hour12: false,
+    }).format(new Date());
+    const h = parseInt(s, 10);
+    if (Number.isNaN(h)) return null;
+    return h === 24 ? 0 : h;
+  } catch {
+    return null;
+  }
+}
+
 export function formatDateLabelInTimezone(
   day: string,
   timeZone: string,

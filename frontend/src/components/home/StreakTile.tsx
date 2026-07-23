@@ -10,7 +10,7 @@ import Animated, {
 
 import { AppText } from "@/components/ui/AppText";
 import { BentoTile } from "@/components/ui/BentoTile";
-import { FlameIcon } from "@/components/ui/FlameIcon";
+import { LivingFlame } from "@/components/ui/LivingFlame";
 import { useTheme } from "@/theme/useTheme";
 
 type Props = {
@@ -63,7 +63,7 @@ export function StreakTile({ streak }: Props) {
       <View style={styles.body}>
         <View>
           <Animated.View style={[styles.countRow, bumpStyle]}>
-            <FlameIcon size={30} />
+            <LivingFlame count={streak} baseSize={30} pop={false} />
             <AppText variant="h1" style={styles.count}>
               {streak}
             </AppText>

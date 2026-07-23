@@ -13,6 +13,7 @@ import Animated, {
 } from "react-native-reanimated";
 
 import { PRESS_SCALE, PRESS_SPRING } from "./motion";
+import { hapticLight } from "@/utils/haptics";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -21,6 +22,8 @@ type Props = Omit<PressableProps, "style"> & {
   style?: StyleProp<ViewStyle>;
   /** Scale the element shrinks to while pressed. Defaults to 0.96. */
   scaleTo?: number;
+  /** Fire a light haptic tick on press. Defaults to true. */
+  haptic?: boolean;
 };
 
 /**
@@ -32,6 +35,7 @@ export function PressableScale({
   children,
   style,
   scaleTo = PRESS_SCALE,
+  haptic = true,
   onPressIn,
   onPressOut,
   disabled,
@@ -49,8 +53,13 @@ export function PressableScale({
       {...rest}
       disabled={disabled}
       onPressIn={(e) => {
-        if (!reduced && !disabled) {
-          scale.value = withSpring(scaleTo, PRESS_SPRING);
+        if (!disabled) {
+          if (!reduced) {
+            scale.value = withSpring(scaleTo, PRESS_SPRING);
+          }
+          if (haptic) {
+            void hapticLight();
+          }
         }
         onPressIn?.(e);
       }}

@@ -12,10 +12,10 @@ import { WeeklyGoalsTile } from "@/components/goals/WeeklyGoalsTile";
 import { MyStatusCard } from "@/components/presence/MyStatusCard";
 import { AppText } from "@/components/ui/AppText";
 import { MountFade } from "@/components/ui/motion";
+import { OrbitSpinner } from "@/components/ui/OrbitSpinner";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { useRelationship } from "@/context/RelationshipContext";
 import { useTabReload } from "@/hooks/useTabReload";
-import { colors } from "@/theme/tokens";
 
 export default function PlayScreen() {
   const { deviceId } = useRelationship();
@@ -35,6 +35,11 @@ export default function PlayScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
+        {refreshing ? (
+          <View pointerEvents="none" style={styles.refreshSpinner}>
+            <OrbitSpinner size={30} />
+          </View>
+        ) : null}
         <DismissKeyboardView scroll={false}>
           <ScrollView
             ref={scrollRef}
@@ -47,7 +52,7 @@ export default function PlayScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                tintColor={colors.text.secondary}
+                tintColor="transparent"
               />
             }
           >
@@ -100,6 +105,14 @@ export default function PlayScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
+  refreshSpinner: {
+    position: "absolute",
+    top: 8,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    zIndex: 5,
+  },
   scroll: {
     paddingTop: 8,
     paddingHorizontal: 20,
