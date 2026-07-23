@@ -7,6 +7,7 @@ import { fetchWidgetSummary } from "@/api/fetchers";
 import { useRelationshipSync } from "@/hooks/useRelationshipSync";
 import { usePushRegistration } from "@/hooks/usePushRegistration";
 import { useRelationship } from "@/context/RelationshipContext";
+import { registerPresenceBackgroundTask } from "@/services/backgroundPresence";
 import { syncWidgetData } from "@/services/widgetSync";
 import { syncMyPresence } from "@/utils/presenceSync";
 
@@ -37,6 +38,8 @@ export function SyncBootstrap() {
     };
 
     void sync();
+
+    void registerPresenceBackgroundTask();
 
     const sub = AppState.addEventListener("change", (state) => {
       if (state === "active") {

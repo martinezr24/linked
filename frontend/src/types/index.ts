@@ -84,6 +84,7 @@ export type PartnerPresence = {
   batteryPercent?: number;
   statusMessage?: string;
   statusUpdatedAt?: string;
+  lastPresenceAt?: string;
 };
 
 export type CoupleLocation = {

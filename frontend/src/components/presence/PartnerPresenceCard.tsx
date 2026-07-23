@@ -39,7 +39,9 @@ function formatStatusAge(iso?: string): string | null {
   if (mins < 1) return "just now";
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
-  return `${hours}h ago`;
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 function BatteryBar({ percent }: { percent: number }) {
@@ -94,6 +96,7 @@ export function PartnerPresenceCard() {
     ? `${data.weatherSummary} · ${data.temperatureF}°F`
     : null;
   const statusAge = formatStatusAge(data.statusUpdatedAt);
+  const batteryAge = formatStatusAge(data.lastPresenceAt);
 
   return (
     <View style={styles.wrap}>
@@ -163,16 +166,9 @@ export function PartnerPresenceCard() {
               STATUS
             </AppText>
             {data.statusMessage ? (
-              <>
-                <AppText variant="bodySemibold" style={styles.statusText}>
-                  {data.statusMessage}
-                </AppText>
-                {statusAge ? (
-                  <AppText variant="caption" color="muted">
-                    Updated {statusAge}
-                  </AppText>
-                ) : null}
-              </>
+              <AppText variant="bodySemibold" style={styles.statusText}>
+                {data.statusMessage}
+              </AppText>
             ) : (
               <AppText variant="body" color="muted">
                 No status set
@@ -193,6 +189,21 @@ export function PartnerPresenceCard() {
             )}
           </View>
         </View>
+
+        {statusAge || batteryAge ? (
+          <View style={[styles.row, styles.updatedRow]}>
+            <AppText variant="caption" color="muted" style={styles.block}>
+              {statusAge ? `Updated ${statusAge}` : ""}
+            </AppText>
+            <AppText
+              variant="caption"
+              color="muted"
+              style={[styles.block, styles.updatedRight]}
+            >
+              {batteryAge ? `Updated ${batteryAge}` : ""}
+            </AppText>
+          </View>
+        ) : null}
       </ArtifactCard>
     </View>
   );
@@ -229,6 +240,8 @@ const styles = StyleSheet.create({
   weatherEmoji: { fontSize: 24, marginVertical: 2 },
   hint: { marginTop: 6, textAlign: "right", lineHeight: 20 },
   statusText: { marginTop: 4 },
+  updatedRow: { marginTop: 12 },
+  updatedRight: { textAlign: "right" },
   batteryWrap: { alignItems: "flex-end", marginTop: 4, gap: 4 },
   batteryTrack: {
     width: 100,

@@ -117,6 +117,9 @@ function GridGameCard({ meta }: { meta: GameMeta }) {
     }
   } else if (game && game.status === "waiting") {
     status = { label: "New game!", active: game.myPlayerNumber === 0 };
+  } else if (game && game.status === "finished" && meta.type === "wordguess") {
+    // The collaborative word guess is solved together — surface that.
+    status = { label: "Solved!", active: false };
   }
 
   let record: string | undefined;

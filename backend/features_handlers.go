@@ -44,6 +44,7 @@ type PartnerPresence struct {
 	BatteryPercent    *int    `json:"batteryPercent,omitempty"`
 	StatusMessage     *string `json:"statusMessage,omitempty"`
 	StatusUpdatedAt   *string `json:"statusUpdatedAt,omitempty"`
+	LastPresenceAt    *string `json:"lastPresenceAt,omitempty"`
 }
 
 type DailyPhotoDTO struct {
@@ -172,12 +173,13 @@ func handleGetPartnerPresence(w http.ResponseWriter, r *http.Request) {
 	var battery sql.NullInt64
 	var statusMsg sql.NullString
 	var statusUpdated sql.NullTime
+	var lastPresence sql.NullTime
 	err = db.QueryRow(
 		`SELECT id::text, timezone, weather_city, display_name, profile_picture_url,
-                battery_percent, status_message, status_updated_at
+                battery_percent, status_message, status_updated_at, last_presence_at
          FROM users WHERE relationship_id = $1 AND id != $2 LIMIT 1`,
 		*user.RelationshipID, user.ID,
-	).Scan(&partnerID, &tz, &city, &displayName, &pictureKey, &battery, &statusMsg, &statusUpdated)
+	).Scan(&partnerID, &tz, &city, &displayName, &pictureKey, &battery, &statusMsg, &statusUpdated, &lastPresence)
 	if err != nil {
 		http.Error(w, "partner not found", http.StatusNotFound)
 		return
@@ -210,6 +212,10 @@ func handleGetPartnerPresence(w http.ResponseWriter, r *http.Request) {
 	if statusUpdated.Valid {
 		t := statusUpdated.Time.UTC().Format(time.RFC3339)
 		resp.StatusUpdatedAt = &t
+	}
+	if lastPresence.Valid {
+		t := lastPresence.Time.UTC().Format(time.RFC3339)
+		resp.LastPresenceAt = &t
 	}
 	if summary, temp := fetchPartnerWeather(partnerID); summary != "" {
 		resp.WeatherSummary = &summary

@@ -67,9 +67,12 @@ export function GameScreen({ gameType }: Props) {
       setResultVisible(false);
       return;
     }
-    const timer = setTimeout(() => setResultVisible(true), 750);
+    // Give a longer beat on the collaborative word guess so you can actually
+    // read the solved word before the result overlay appears.
+    const delay = collaborative ? 2200 : 750;
+    const timer = setTimeout(() => setResultVisible(true), delay);
     return () => clearTimeout(timer);
-  }, [finished]);
+  }, [finished, collaborative]);
   const finishing = finished && !resultVisible;
   const showBoard =
     Boolean(game) && isPlayer && Boolean(Renderer) && (active || finishing);
