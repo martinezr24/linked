@@ -94,6 +94,7 @@ export default function CoupleScreen() {
           ) : null}
           <ScrollView
             ref={scrollRef}
+            style={styles.flex}
             contentContainerStyle={[
               styles.scroll,
               { paddingBottom: TAB_BAR_HEIGHT + 40 },
@@ -132,6 +133,7 @@ export default function CoupleScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   scrollWrap: { flex: 1 },
   refreshSpinner: {
     position: "absolute",

@@ -35,12 +35,12 @@ export default function PlayScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
-        {refreshing ? (
-          <View pointerEvents="none" style={styles.refreshSpinner}>
-            <OrbitSpinner size={30} />
-          </View>
-        ) : null}
         <DismissKeyboardView scroll={false}>
+          {refreshing ? (
+            <View pointerEvents="none" style={styles.refreshSpinner}>
+              <OrbitSpinner size={30} />
+            </View>
+          ) : null}
           <ScrollView
             ref={scrollRef}
             style={styles.flex}

@@ -168,6 +168,7 @@ export default function GamesScreen() {
   return (
     <ScreenBackground>
       <SafeAreaView style={styles.safe} edges={["top"]}>
+        <View style={styles.flex}>
         {refreshing ? (
           <View pointerEvents="none" style={styles.refreshSpinner}>
             <OrbitSpinner size={30} />
@@ -175,6 +176,7 @@ export default function GamesScreen() {
         ) : null}
         <ScrollView
           ref={scrollRef}
+          style={styles.flex}
           contentContainerStyle={styles.scroll}
           showsVerticalScrollIndicator={false}
           refreshControl={
@@ -204,6 +206,7 @@ export default function GamesScreen() {
             </MountFade>
           ))}
         </ScrollView>
+        </View>
       </SafeAreaView>
     </ScreenBackground>
   );
@@ -211,6 +214,7 @@ export default function GamesScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
+  flex: { flex: 1 },
   refreshSpinner: {
     position: "absolute",
     top: 8,
