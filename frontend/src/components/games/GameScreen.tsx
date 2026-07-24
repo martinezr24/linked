@@ -5,12 +5,11 @@ import { router } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
-import { fetchGridStats, fetchPhotoToday } from "@/api/fetchers";
+import { fetchGridStats } from "@/api/fetchers";
 import { AppText } from "@/components/ui/AppText";
 import { AppMark } from "@/components/ui/AppMark";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
-import { StreakPill } from "@/components/ui/StreakPill";
 import { ChevronLeftIcon } from "@/components/ui/icons";
 import { GameResultOverlay } from "@/components/games/GameResultOverlay";
 import { getGameMeta } from "@/games/catalog";
@@ -31,13 +30,6 @@ export function GameScreen({ gameType }: Props) {
   const meta = getGameMeta(gameType);
   const { game, isLoading, startGame, joinGame, endGame, makeMove } =
     useGridGame(gameType);
-
-  const { data: photoToday } = useQuery({
-    queryKey: queryKeys.photoToday,
-    queryFn: () => fetchPhotoToday(deviceId!),
-    enabled: Boolean(deviceId),
-  });
-  const streak = photoToday?.currentStreak ?? 0;
 
   const { data: stats } = useQuery({
     queryKey: queryKeys.gridStats(gameType),
@@ -98,9 +90,7 @@ export function GameScreen({ gameType }: Props) {
           <ChevronLeftIcon size={30} color={theme.colors.text.primary} />
         </Pressable>
         <AppMark size={28} />
-        <View style={styles.topRight}>
-          <StreakPill count={streak} />
-        </View>
+        <View style={styles.topRight} />
       </View>
       <AppText variant="h1" style={styles.title}>
         {meta?.title ?? "Game"}

@@ -46,7 +46,6 @@ import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { dateToIso, getDeviceTimezoneLabel } from "@/utils/dates";
 import { showMutationError } from "@/utils/errors";
-import { hapticLight } from "@/utils/haptics";
 
 function formatCountdown(targetIso: string): string {
   const diff = new Date(targetIso).getTime() - Date.now();
@@ -70,7 +69,7 @@ const TAB_BAR_HEIGHT = Platform.OS === "ios" ? 88 : 64;
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
-  const { deviceId, bothHere } = useRelationship();
+  const { deviceId, bothHere, emitLocal } = useRelationship();
   const scrollBottomPad = TAB_BAR_HEIGHT + insets.bottom + 24;
   const queryClient = useQueryClient();
   const [visitDraft, setVisitDraft] = useState<Date | null>(null);
@@ -245,7 +244,9 @@ export default function HomeScreen() {
                 energized={bothHere}
                 onPartnerLongPress={() => {
                   if (!deviceId) return;
-                  void hapticLight();
+                  // Play the ripple immediately (optimistic); don't wait on the
+                  // server echo, which can be slow or dropped.
+                  emitLocal({ action: "PULSE", payload: { local: true } });
                   void sendPulse(deviceId).catch(() => {});
                 }}
                 onMinePress={() => router.push("/account")}

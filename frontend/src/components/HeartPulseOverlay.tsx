@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, {
   Easing,
@@ -14,17 +14,23 @@ import { colors } from "@/theme/tokens";
 import { hapticSuccess } from "@/utils/haptics";
 
 /**
- * Full-screen heart ripple that plays when a "thinking of you" pulse arrives
- * over the websocket. Both partners see it at once — a shared, wordless moment.
+ * Full-screen heart ripple that plays when a "thinking of you" pulse arrives —
+ * either optimistically when you send one, or over the websocket when your
+ * partner does. A short dedupe window keeps the sender's optimistic play from
+ * doubling up with the server's echo of the same pulse.
  */
 export function HeartPulseOverlay() {
   const { subscribe } = useRelationship();
   const [playing, setPlaying] = useState(false);
   const progress = useSharedValue(0);
+  const lastPlayedRef = useRef(0);
 
   useEffect(() => {
     return subscribe((msg) => {
       if (msg.action !== "PULSE") return;
+      const now = Date.now();
+      if (now - lastPlayedRef.current < 2000) return;
+      lastPlayedRef.current = now;
       void hapticSuccess();
       setPlaying(true);
       progress.value = 0;

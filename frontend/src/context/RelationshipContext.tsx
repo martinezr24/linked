@@ -29,6 +29,8 @@ type RelationshipContextValue = {
   clearPaired: () => Promise<void>;
   subscribe: (handler: (msg: WsMessage) => void) => () => void;
   sendWs: (action: string, payload: Record<string, unknown>) => void;
+  /** Deliver a synthetic message to local subscribers (optimistic events). */
+  emitLocal: (msg: WsMessage) => void;
 };
 
 const RelationshipContext = createContext<RelationshipContextValue | null>(null);
@@ -165,6 +167,7 @@ export function RelationshipProvider({ children }: { children: ReactNode }) {
     clearPaired,
     subscribe,
     sendWs,
+    emitLocal: notify,
   };
 
   return (

@@ -12,14 +12,12 @@ import { router } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
-import { fetchPhotoToday } from "@/api/fetchers";
 import { AppTextInput } from "@/components/AppTextInput";
 import { AppText } from "@/components/ui/AppText";
 import { AppMark } from "@/components/ui/AppMark";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
-import { StreakPill } from "@/components/ui/StreakPill";
 import { CheckIcon, ChevronLeftIcon, CloseIcon } from "@/components/ui/icons";
 import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
@@ -56,13 +54,6 @@ export default function TriviaScreen() {
     correct: boolean;
     correctIndex: number;
   } | null>(null);
-
-  const { data: photoToday } = useQuery({
-    queryKey: queryKeys.photoToday,
-    queryFn: () => fetchPhotoToday(deviceId!),
-    enabled: Boolean(deviceId),
-  });
-  const streak = photoToday?.currentStreak ?? 0;
 
   const { data: game, isLoading } = useQuery({
     queryKey: queryKeys.triviaGame,
@@ -177,9 +168,7 @@ export default function TriviaScreen() {
               <ChevronLeftIcon size={30} color={theme.colors.text.primary} />
             </Pressable>
             <AppMark size={28} />
-            <View style={styles.topRight}>
-              <StreakPill count={streak} />
-            </View>
+            <View style={styles.topRight} />
           </View>
           <AppText variant="h1" style={styles.title}>
             Trivia
