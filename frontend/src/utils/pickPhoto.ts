@@ -2,11 +2,12 @@ import * as ImagePicker from "expo-image-picker";
 
 export type PhotoSource = "camera" | "library";
 
+// No `allowsEditing`/`aspect`: on iOS the built-in editor forces a square crop
+// (cutting off the rest of the photo) and, with the front camera, returns a
+// mirrored/rotated ("inverted") image. Capturing the full frame avoids both.
 const pickerOptions: ImagePicker.ImagePickerOptions = {
   mediaTypes: ["images"],
   quality: 0.7,
-  allowsEditing: true,
-  aspect: [1, 1],
 };
 
 export async function pickPhotoFromSource(
