@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Platform,
   RefreshControl,
@@ -38,6 +38,7 @@ import { MountFade } from "@/components/ui/motion";
 import { TreatsModal } from "@/components/treats/TreatsModal";
 import { ConnectedHeader } from "@/components/ui/ConnectedHeader";
 import { TreatButton } from "@/components/ui/TreatButton";
+import { HeartHint } from "@/components/ui/HeartHint";
 import { OrbitSpinner } from "@/components/ui/OrbitSpinner";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { queryKeys } from "@/api/queryKeys";
@@ -46,6 +47,10 @@ import { useRelationship } from "@/context/RelationshipContext";
 import { apiFetch } from "@/utils/api";
 import { dateToIso, getDeviceTimezoneLabel } from "@/utils/dates";
 import { showMutationError } from "@/utils/errors";
+import {
+  markHeartHintSeen,
+  wasHeartHintSeen,
+} from "@/utils/heartHintStorage";
 
 function formatCountdown(targetIso: string): string {
   const diff = new Date(targetIso).getTime() - Date.now();
@@ -75,6 +80,14 @@ export default function HomeScreen() {
   const [visitDraft, setVisitDraft] = useState<Date | null>(null);
   const [visitSheetOpen, setVisitSheetOpen] = useState(false);
   const [treatsOpen, setTreatsOpen] = useState(false);
+  const [heartHintVisible, setHeartHintVisible] = useState(false);
+  const heartHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstHintShown = useRef(false);
+  const revealHeartHint = useCallback(() => {
+    if (heartHintTimer.current) clearTimeout(heartHintTimer.current);
+    setHeartHintVisible(true);
+    heartHintTimer.current = setTimeout(() => setHeartHintVisible(false), 2800);
+  }, []);
   const tzLabel = getDeviceTimezoneLabel();
   const { scrollRef, refreshing, onRefresh } = useTabReload(() =>
     queryClient.invalidateQueries(),
@@ -149,6 +162,17 @@ export default function HomeScreen() {
 
   const showStreakBanner = bothSentPhotoToday && !streakBannerDismissed;
 
+  // Reveal the "hold to send a heart" hint once, after the home content loads.
+  useEffect(() => {
+    if (loading || firstHintShown.current) return;
+    firstHintShown.current = true;
+    void (async () => {
+      if (await wasHeartHintSeen()) return;
+      revealHeartHint();
+      void markHeartHintSeen();
+    })();
+  }, [loading, revealHeartHint]);
+
   const invalidateRelationship = () =>
     queryClient.invalidateQueries({ queryKey: queryKeys.relationship });
 
@@ -211,6 +235,8 @@ export default function HomeScreen() {
             </View>
           ) : null}
 
+          <HeartHint visible={heartHintVisible} />
+
           <ScrollView
             ref={scrollRef}
             style={styles.flex}
@@ -242,6 +268,7 @@ export default function HomeScreen() {
                 partnerPhotoSent={Boolean(photoToday?.partner)}
                 headerRight={<TreatButton onPress={() => setTreatsOpen(true)} />}
                 energized={bothHere}
+                onPartnerPress={revealHeartHint}
                 onPartnerLongPress={() => {
                   if (!deviceId) return;
                   // Play the ripple immediately (optimistic); don't wait on the

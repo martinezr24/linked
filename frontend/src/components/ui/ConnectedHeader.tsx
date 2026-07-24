@@ -25,6 +25,8 @@ type Props = {
   onMinePress?: () => void;
   /** Long-press your partner's avatar to send a "thinking of you" pulse. */
   onPartnerLongPress?: () => void;
+  /** Short tap on your partner's avatar (used to reveal the hold-to-send hint). */
+  onPartnerPress?: () => void;
   /** Energize the shared orbit (e.g. when you're both online right now). */
   energized?: boolean;
 };
@@ -103,6 +105,7 @@ export function ConnectedHeader({
   headerRight,
   onMinePress,
   onPartnerLongPress,
+  onPartnerPress,
   energized = false,
 }: Props) {
   const theme = useTheme();
@@ -128,8 +131,9 @@ export function ConnectedHeader({
               avatarUrl={partnerAvatarUrl}
               bgColor={partnerColor ?? theme.colors.avatar.partner}
               checkedIn={partnerPhotoSent}
+              onPress={onPartnerPress}
               onLongPress={onPartnerLongPress}
-              accessibilityLabel="Send your partner a thinking-of-you pulse"
+              accessibilityLabel="Hold to send your partner a heart"
             />
           }
         />
