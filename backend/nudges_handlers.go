@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -241,7 +243,17 @@ func sendExpoPush(tokens []string, title, body string, data map[string]any) {
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		log.Printf("expo push: request failed: %v", err)
 		return
 	}
-	_ = resp.Body.Close()
+	defer resp.Body.Close()
+	respBody, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("expo push: HTTP %d sending to %d token(s): %s",
+			resp.StatusCode, len(tokens), string(respBody))
+		return
+	}
+	// Expo replies with a ticket per message; errors (DeviceNotRegistered,
+	// credential problems, etc.) show up here rather than as an HTTP error.
+	log.Printf("expo push: sent %d token(s), response: %s", len(tokens), string(respBody))
 }
