@@ -78,7 +78,7 @@ export function DailyPhotoCard() {
 
   return (
     <View style={styles.wrap}>
-      <ArtifactCard category="Daily photo" title="Send today's moment" featured style={styles.card}>
+      <ArtifactCard category="Daily photo" title="Send today's moment" featured ornament="shootingStar" style={styles.card}>
         <AppText variant="body" color="secondary" style={styles.hint}>
           {streakCount > 0
             ? `Send today's photo together to keep your ${streakCount}-day streak going.`

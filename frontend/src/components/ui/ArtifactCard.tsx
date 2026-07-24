@@ -3,6 +3,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from "react-native";
 import { AppText } from "./AppText";
 import { PressableScale } from "./motion";
 import { SketchFrame } from "./SketchFrame";
+import { SketchOrnament, type OrnamentVariant } from "./SketchOrnament";
 import { useTheme } from "@/theme/useTheme";
 
 type Props = {
@@ -13,6 +14,8 @@ type Props = {
   featured?: boolean;
   /** Stretch the card to fill its parent's height. */
   fill?: boolean;
+  /** Hand-drawn celestial ornament tucked at the top-right corner. */
+  ornament?: OrnamentVariant;
   style?: StyleProp<ViewStyle>;
   /** When provided, the whole card becomes a spring-pressable button. */
   onPress?: () => void;
@@ -26,6 +29,7 @@ export function ArtifactCard({
   stacked = false,
   featured = false,
   fill = false,
+  ornament,
   style,
   onPress,
   accessibilityLabel,
@@ -100,6 +104,11 @@ export function ArtifactCard({
         </>
       ) : null}
       {featured ? <SketchFrame>{cardEl}</SketchFrame> : cardEl}
+      {ornament ? (
+        <View pointerEvents="none" style={styles.ornament}>
+          <SketchOrnament variant={ornament} size={46} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -108,6 +117,12 @@ const styles = StyleSheet.create({
   wrap: {
     position: "relative",
     marginBottom: 16,
+  },
+  ornament: {
+    position: "absolute",
+    top: -14,
+    right: -10,
+    zIndex: 5,
   },
   stackLayer: {
     position: "absolute",

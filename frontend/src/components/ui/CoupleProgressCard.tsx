@@ -66,7 +66,12 @@ export function CoupleProgressCard({
 
   return (
     <Animated.View style={[styles.outer, { transform: [{ scale }] }]}>
-      <ArtifactCard category="Daily check-in" featured style={styles.card}>
+      <ArtifactCard
+        category="Daily check-in"
+        featured
+        ornament="sparkles"
+        style={styles.card}
+      >
         {bothDone ? (
           <View style={styles.doneBlock}>
             <AppText variant="h2" style={styles.doneTitle}>
