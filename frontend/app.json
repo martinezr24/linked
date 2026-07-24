@@ -10,7 +10,7 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.martinez.orbit",
-      "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID",
+      "appleTeamId": "4S6A78PA3C",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
