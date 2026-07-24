@@ -10,9 +10,13 @@
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.martinez.orbit",
+      "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.martinez.orbit"]
       }
     },
     "android": {
@@ -73,7 +77,8 @@
           "iosDisplayInForeground": true
         }
       ],
-      "expo-background-task"
+      "expo-background-task",
+      "@bacons/apple-targets"
     ],
     "experiments": {
       "typedRoutes": true
@@ -81,7 +86,24 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "bc666e2b-a60d-47bb-8e74-8087daef6895"
+        "projectId": "bc666e2b-a60d-47bb-8e74-8087daef6895",
+        "build": {
+          "experimental": {
+            "ios": {
+              "appExtensions": [
+                {
+                  "bundleIdentifier": "com.martinez.orbit.widget",
+                  "targetName": "widget",
+                  "entitlements": {
+                    "com.apple.security.application-groups": [
+                      "group.com.martinez.orbit"
+                    ]
+                  }
+                }
+              ]
+            }
+          }
+        }
       }
     },
     "owner": "giojetski"

@@ -1,16 +1,24 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 
+import { setWidgetValue } from "../../modules/orbit-widgets";
 import type { WidgetSummary } from "@/types";
 
 const WIDGET_DATA_KEY = "linked_widget_summary";
+// Must match the App Group in app.json ios.entitlements and the widget target.
+const APP_GROUP = "group.com.martinez.orbit";
 
 async function writeWidgetData(json: string) {
   if (Platform.OS === "web") {
     localStorage.setItem(WIDGET_DATA_KEY, json);
     return;
   }
+  // SecureStore copy powers the in-app WidgetPreviewCard.
   await SecureStore.setItemAsync(WIDGET_DATA_KEY, json);
+  // App Group copy is what the native iOS widget reads (also reloads timelines).
+  if (Platform.OS === "ios") {
+    setWidgetValue(WIDGET_DATA_KEY, json, APP_GROUP);
+  }
 }
 
 export async function syncWidgetData(summary: WidgetSummary) {

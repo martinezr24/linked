@@ -1,0 +1,6 @@
+{
+  "name": "orbit-widgets",
+  "version": "1.0.0",
+  "description": "Share data with the Orbit iOS widget via an App Group.",
+  "main": "index.ts"
+}
