@@ -102,17 +102,14 @@ export default function PhotoCaptureScreen() {
           ref={cameraRef}
           style={StyleSheet.absoluteFill}
           facing={facing}
-          mirror={false}
+          mirror={facing === "front"}
         />
       )}
-
-      <View style={styles.vignetteTop} pointerEvents="none" />
-      <View style={styles.vignetteBottom} pointerEvents="none" />
 
       <View
         style={[
           styles.overlay,
-          { paddingTop: topInset + 8, paddingBottom: bottomInset + 16 },
+          { paddingTop: topInset + 12, paddingBottom: bottomInset + 16 },
         ]}
         pointerEvents="box-none"
       >
@@ -276,14 +273,4 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent.primary,
   },
   retakeBtn: { marginTop: 8 },
-  vignetteTop: {
-    ...StyleSheet.absoluteFillObject,
-    bottom: "60%",
-    backgroundColor: "rgba(21, 19, 24, 0.35)",
-  },
-  vignetteBottom: {
-    ...StyleSheet.absoluteFillObject,
-    top: "55%",
-    backgroundColor: "rgba(21, 19, 24, 0.5)",
-  },
 });
