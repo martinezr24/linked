@@ -66,6 +66,12 @@
         }
       ],
       [
+        "expo-camera",
+        {
+          "cameraPermission": "Orbit needs camera access so you can take photos for your partner."
+        }
+      ],
+      [
         "expo-location",
         {
           "locationWhenInUsePermission": "Orbit uses your location to show your partner the weather in your area."

@@ -7,7 +7,7 @@ import { AvatarImage } from "@/components/ui/AvatarImage";
 import { CameraIcon } from "@/components/ui/icons";
 import { useRelationship } from "@/context/RelationshipContext";
 import { uploadProfileAvatar } from "@/utils/avatarUpload";
-import { pickPhotoFromSource } from "@/utils/pickPhoto";
+import { pickPhotoFromLibrary } from "@/utils/pickPhoto";
 import { showMutationError } from "@/utils/errors";
 import { initialFromName } from "@/utils/coupleNames";
 import { colors } from "@/theme/tokens";
@@ -39,7 +39,7 @@ export function ProfileAvatarPicker({
 
   const pickAvatar = async () => {
     try {
-      const uri = await pickPhotoFromSource("library");
+      const uri = await pickPhotoFromLibrary();
       if (uri) upload.mutate(uri);
     } catch {
       showMutationError("Could not open photo library.");

@@ -100,8 +100,10 @@ Connect:
 
 ```bash
 cd backend
-go run .
+ENABLE_DEV_TOOLS=true go run .
 ```
+
+Setting `ENABLE_DEV_TOOLS=true` enables a **Pair with fake partner** button on the pair screen (dev builds only) so you can explore the app without a second device.
 
 The API listens on `:8080` and applies any pending migrations on startup.
 

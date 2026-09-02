@@ -2055,6 +2055,7 @@ func main() {
 	http.HandleFunc("/api/pairing/link", handlePairingLink)
 	http.HandleFunc("/api/pairing/status", handlePairingStatus)
 	http.HandleFunc("/api/pairing/unlink", handlePairingUnlink)
+	http.HandleFunc("/api/dev/pair-solo", handleDevPairSolo)
 	http.HandleFunc("/api/account/delete", handleAccountDelete)
 	http.HandleFunc("/api/profile/push-token", handlePushToken)
 	http.HandleFunc("/api/nudges", handleNudge)

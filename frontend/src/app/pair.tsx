@@ -25,6 +25,7 @@ export default function PairScreen() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [enteredCode, setEnteredCode] = useState("");
   const [linking, setLinking] = useState(false);
+  const [devPairing, setDevPairing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // A pairing deep link (orbit://pair?code=NNNNNN, or the https invite link)
@@ -157,6 +158,40 @@ export default function PairScreen() {
     router.replace("/");
   }
 
+  async function handleDevPair() {
+    if (!deviceId) return;
+    setError(null);
+    setDevPairing(true);
+
+    try {
+      const res = await fetch(`${getApiBase()}/api/dev/pair-solo`, {
+        method: "POST",
+        headers: { "X-Device-Id": deviceId },
+      });
+
+      if (res.status === 404) {
+        setError(
+          "Dev tools are disabled on the backend. Restart with ENABLE_DEV_TOOLS=true.",
+        );
+        return;
+      }
+
+      if (!res.ok) {
+        const text = await res.text();
+        setError(text || "Dev pairing failed.");
+        return;
+      }
+
+      const data = await res.json();
+      await setPaired(data.relationshipId);
+      router.replace("/");
+    } catch {
+      setError("Could not reach the backend.");
+    } finally {
+      setDevPairing(false);
+    }
+  }
+
   const minutes = Math.floor(secondsLeft / 60);
   const secs = String(secondsLeft % 60).padStart(2, "0");
 
@@ -261,6 +296,30 @@ export default function PairScreen() {
               loading={linking}
             />
           </ArtifactCard>
+
+          {__DEV__ ? (
+            <>
+              <AppText variant="body" color="muted" style={styles.divider}>
+                — developer —
+              </AppText>
+              <ArtifactCard category="Dev" title="Developer tools">
+                <AppText variant="body" color="secondary" style={styles.hint}>
+                  Pair with a fake partner to explore the app without a second
+                  device. Requires{" "}
+                  <AppText variant="bodySemibold" color="secondary">
+                    ENABLE_DEV_TOOLS=true
+                  </AppText>{" "}
+                  on the backend.
+                </AppText>
+                <PrimaryButton
+                  label={devPairing ? "Pairing…" : "Pair with fake partner"}
+                  onPress={() => void handleDevPair()}
+                  loading={devPairing}
+                  variant="ghost"
+                />
+              </ArtifactCard>
+            </>
+          ) : null}
         </DismissKeyboardView>
       </SafeAreaView>
     </ScreenBackground>

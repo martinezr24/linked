@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, StyleSheet, View } from "react-native";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 
 import { queryKeys } from "@/api/queryKeys";
@@ -13,15 +13,13 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { CouplePhotoImage } from "@/components/photos/CouplePhotoImage";
 import { pickRandomCaption } from "@/constants/photoCaptions";
 import { useRelationship } from "@/context/RelationshipContext";
-import { uploadDailyPhoto } from "@/utils/photoUpload";
-import { pickPhotoFromSource, type PhotoSource } from "@/utils/pickPhoto";
+import { pickPhotoFromLibrary } from "@/utils/pickPhoto";
 import { showMutationError } from "@/utils/errors";
 import { useTheme } from "@/theme/useTheme";
 
 export function DailyPhotoCard() {
   const theme = useTheme();
   const { deviceId } = useRelationship();
-  const queryClient = useQueryClient();
   const [caption, setCaption] = useState(() => pickRandomCaption());
 
   const { data, isLoading } = useQuery({
@@ -30,36 +28,31 @@ export function DailyPhotoCard() {
     enabled: Boolean(deviceId),
   });
 
-  const sendPhoto = useMutation({
-    mutationFn: async (uri: string) => uploadDailyPhoto(deviceId!, uri, caption),
-    onSuccess: (result) => {
-      setCaption(pickRandomCaption());
-      void queryClient.invalidateQueries({ queryKey: queryKeys.photoToday });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.widgetSummary });
-      void queryClient.invalidateQueries({ queryKey: queryKeys.photoHistory() });
-      router.push({
-        pathname: "/streak",
-        params: {
-          celebrate: result.bothSentToday ? "1" : "0",
-          streak: String(result.currentStreak),
-        },
-      });
-    },
-    onError: () => showMutationError("Could not send your photo."),
-  });
+  useEffect(() => {
+    if (data?.mine) setCaption(pickRandomCaption());
+  }, [data?.mine]);
 
-  const captureAndSend = async (source: PhotoSource) => {
+  const openCamera = () => {
+    router.push({
+      pathname: "/photos/capture",
+      params: { caption },
+    });
+  };
+
+  const openLibrary = async () => {
     try {
-      const uri = await pickPhotoFromSource(source);
-      if (uri) sendPhoto.mutate(uri);
+      const uri = await pickPhotoFromLibrary();
+      if (!uri) return;
+      router.push({
+        pathname: "/photos/capture",
+        params: { caption, previewUri: uri },
+      });
     } catch (e) {
       const code = e instanceof Error ? e.message : "";
-      if (code === "camera_denied") {
-        showMutationError("Camera permission is required to take a photo.");
-      } else if (code === "library_denied") {
+      if (code === "library_denied") {
         showMutationError("Photo library permission is required.");
       } else {
-        showMutationError("Could not open the camera or library.");
+        showMutationError("Could not open photo library.");
       }
     }
   };
@@ -123,16 +116,11 @@ export function DailyPhotoCard() {
               placeholder="Add a playful caption…"
               placeholderTextColor={theme.colors.text.muted}
             />
-            <PrimaryButton
-              label={sendPhoto.isPending ? "Sending…" : "Take photo"}
-              onPress={() => void captureAndSend("camera")}
-              loading={sendPhoto.isPending}
-            />
+            <PrimaryButton label="Take photo" onPress={openCamera} />
             <PrimaryButton
               label="Choose from library"
-              onPress={() => void captureAndSend("library")}
+              onPress={() => void openLibrary()}
               variant="ghost"
-              disabled={sendPhoto.isPending}
               style={styles.libraryBtn}
             />
           </>

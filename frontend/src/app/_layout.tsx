@@ -33,6 +33,10 @@ export default function RootLayout() {
                 name="photos/memories"
                 options={{ presentation: "modal", headerShown: false }}
               />
+              <Stack.Screen
+                name="photos/capture"
+                options={{ presentation: "fullScreenModal", headerShown: false }}
+              />
               <Stack.Screen name="draw" options={{ headerShown: false }} />
               <Stack.Screen
                 name="drawings/index"
