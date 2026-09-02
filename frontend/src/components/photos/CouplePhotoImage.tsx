@@ -19,6 +19,7 @@ export function CouplePhotoImage({ url, style }: Props) {
         headers: deviceId ? { "X-Device-Id": deviceId } : undefined,
       }}
       style={style}
+      resizeMode="cover"
     />
   );
 }

@@ -13,6 +13,10 @@ import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { CouplePhotoImage } from "@/components/photos/CouplePhotoImage";
 import { pickRandomCaption } from "@/constants/photoCaptions";
 import { useRelationship } from "@/context/RelationshipContext";
+import {
+  DAILY_PHOTO_ASPECT_RATIO,
+  DAILY_PHOTO_THUMB_WIDTH,
+} from "@/constants/dailyPhoto";
 import { pickPhotoFromLibrary } from "@/utils/pickPhoto";
 import { showMutationError } from "@/utils/errors";
 import { useTheme } from "@/theme/useTheme";
@@ -161,15 +165,18 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   thumbBox: {
-    width: 72,
-    height: 72,
+    width: DAILY_PHOTO_THUMB_WIDTH,
+    aspectRatio: DAILY_PHOTO_ASPECT_RATIO,
     borderRadius: 12,
     backgroundColor: "rgba(255,255,255,0.06)",
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
   },
-  thumb: { width: 72, height: 72 },
+  thumb: {
+    width: DAILY_PHOTO_THUMB_WIDTH,
+    aspectRatio: DAILY_PHOTO_ASPECT_RATIO,
+  },
   captionInput: {
     borderWidth: 1,
     borderRadius: 8,

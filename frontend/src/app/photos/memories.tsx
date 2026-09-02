@@ -23,6 +23,7 @@ import { AppText } from "@/components/ui/AppText";
 import { ArrowLeftIcon } from "@/components/ui/icons";
 import { ScreenBackground } from "@/components/ui/ScreenBackground";
 import { useRelationship } from "@/context/RelationshipContext";
+import { DAILY_PHOTO_ASPECT_RATIO } from "@/constants/dailyPhoto";
 import { formatMMDDYYYY } from "@/utils/dates";
 import { useTheme } from "@/theme/useTheme";
 import type { DailyPhoto, PhotoDayGroup } from "@/types";
@@ -277,7 +278,7 @@ const styles = StyleSheet.create({
   },
   fullImg: {
     width: "100%",
-    height: 320,
+    aspectRatio: DAILY_PHOTO_ASPECT_RATIO,
     borderRadius: 12,
     marginBottom: 12,
   },

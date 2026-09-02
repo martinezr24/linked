@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -6,6 +6,7 @@ import {
   Pressable,
   StyleSheet,
   View,
+  useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { CameraView, useCameraPermissions } from "expo-camera";
@@ -14,12 +15,31 @@ import { router, useLocalSearchParams } from "expo-router";
 import { AppText } from "@/components/ui/AppText";
 import { CameraIcon, CloseIcon, SwapIcon } from "@/components/ui/icons";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
+import { DAILY_PHOTO_ASPECT_RATIO } from "@/constants/dailyPhoto";
 import { useSendDailyPhoto } from "@/hooks/useSendDailyPhoto";
 import { captureFromCamera } from "@/utils/capturePhoto";
+import { cropToFrame } from "@/utils/cropToFrame";
 import { hapticLight } from "@/utils/haptics";
 import { colors } from "@/theme/tokens";
 
 type Facing = "front" | "back";
+
+function useFrameSize(topInset: number, bottomInset: number) {
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const chromeHeight = topInset + bottomInset + 220;
+  const maxWidth = screenWidth * 0.88;
+  const maxHeight = (screenHeight - chromeHeight) * 0.92;
+
+  let frameWidth = maxWidth;
+  let frameHeight = frameWidth / DAILY_PHOTO_ASPECT_RATIO;
+
+  if (frameHeight > maxHeight) {
+    frameHeight = maxHeight;
+    frameWidth = frameHeight * DAILY_PHOTO_ASPECT_RATIO;
+  }
+
+  return { frameWidth, frameHeight };
+}
 
 export default function PhotoCaptureScreen() {
   const { caption = "", previewUri: initialPreviewUri } = useLocalSearchParams<{
@@ -29,20 +49,41 @@ export default function PhotoCaptureScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [facing, setFacing] = useState<Facing>("front");
-  const [previewUri, setPreviewUri] = useState<string | null>(
-    initialPreviewUri ?? null,
-  );
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [croppingLibrary, setCroppingLibrary] = useState(Boolean(initialPreviewUri));
+  const [cameraReady, setCameraReady] = useState(false);
   const [capturing, setCapturing] = useState(false);
 
   const insets = useSafeAreaInsets();
   const topInset = insets.top > 0 ? insets.top : Platform.OS === "ios" ? 59 : 0;
   const bottomInset = insets.bottom > 0 ? insets.bottom : Platform.OS === "ios" ? 34 : 0;
+  const { frameWidth, frameHeight } = useFrameSize(topInset, bottomInset);
   const sendPhoto = useSendDailyPhoto(caption);
 
   const isPreview = previewUri != null;
 
+  useEffect(() => {
+    if (!initialPreviewUri) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const cropped = await cropToFrame(initialPreviewUri);
+        if (!cancelled) setPreviewUri(cropped);
+      } catch {
+        if (!cancelled) setPreviewUri(initialPreviewUri);
+      } finally {
+        if (!cancelled) setCroppingLibrary(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialPreviewUri]);
+
   const handleCapture = useCallback(async () => {
-    if (capturing) return;
+    if (capturing || !cameraReady) return;
     setCapturing(true);
     try {
       await hapticLight();
@@ -51,7 +92,7 @@ export default function PhotoCaptureScreen() {
     } finally {
       setCapturing(false);
     }
-  }, [capturing]);
+  }, [capturing, cameraReady]);
 
   const handleRetake = () => {
     if (initialPreviewUri) {
@@ -73,7 +114,7 @@ export default function PhotoCaptureScreen() {
     );
   }
 
-  if (!permission.granted && !isPreview) {
+  if (!permission.granted && !isPreview && !croppingLibrary) {
     return (
       <SafeAreaView style={styles.permission} edges={["top", "bottom"]}>
         <AppText variant="h2" style={styles.permissionTitle}>
@@ -93,25 +134,21 @@ export default function PhotoCaptureScreen() {
     );
   }
 
+  if (croppingLibrary) {
+    return (
+      <View style={styles.centered}>
+        <ActivityIndicator color={colors.accent.primary} />
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
-      {isPreview ? (
-        <Image source={{ uri: previewUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-      ) : (
-        <CameraView
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          facing={facing}
-          mirror={facing === "front"}
-        />
-      )}
-
       <View
         style={[
           styles.overlay,
           { paddingTop: topInset + 12, paddingBottom: bottomInset + 16 },
         ]}
-        pointerEvents="box-none"
       >
         <View style={styles.topBar}>
           <Pressable
@@ -133,6 +170,34 @@ export default function PhotoCaptureScreen() {
             ) : null}
           </View>
           <View style={styles.iconSpacer} />
+        </View>
+
+        <View style={styles.frameArea}>
+          <View
+            style={[
+              styles.frame,
+              { width: frameWidth, height: frameHeight },
+            ]}
+          >
+            {isPreview ? (
+              <Image
+                source={{ uri: previewUri }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+              />
+            ) : (
+              <CameraView
+                ref={cameraRef}
+                style={StyleSheet.absoluteFill}
+                facing={facing}
+                mirror={facing === "front"}
+                onCameraReady={() => setCameraReady(true)}
+              />
+            )}
+          </View>
+          <AppText variant="caption" color="muted" style={styles.frameHint}>
+            This is how your photo will appear
+          </AppText>
         </View>
 
         <View style={styles.bottom}>
@@ -161,7 +226,10 @@ export default function PhotoCaptureScreen() {
               </AppText>
               <View style={styles.controls}>
                 <Pressable
-                  onPress={() => setFacing((f) => (f === "front" ? "back" : "front"))}
+                  onPress={() => {
+                    setCameraReady(false);
+                    setFacing((f) => (f === "front" ? "back" : "front"));
+                  }}
                   style={styles.flipBtn}
                   accessibilityLabel="Flip camera"
                 >
@@ -169,8 +237,11 @@ export default function PhotoCaptureScreen() {
                 </Pressable>
                 <Pressable
                   onPress={() => void handleCapture()}
-                  disabled={capturing}
-                  style={styles.shutterOuter}
+                  disabled={capturing || !cameraReady}
+                  style={[
+                    styles.shutterOuter,
+                    (!cameraReady || capturing) && styles.shutterDisabled,
+                  ]}
                   accessibilityLabel="Take photo"
                 >
                   <View style={styles.shutterInner} />
@@ -209,7 +280,6 @@ const styles = StyleSheet.create({
   cancelBtn: { marginTop: 8 },
   overlay: {
     flex: 1,
-    justifyContent: "space-between",
   },
   topBar: {
     flexDirection: "row",
@@ -233,6 +303,23 @@ const styles = StyleSheet.create({
   caption: {
     textAlign: "center",
     marginTop: 4,
+  },
+  frameArea: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  frame: {
+    borderRadius: 16,
+    overflow: "hidden",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.85)",
+    backgroundColor: "#000",
+  },
+  frameHint: {
+    marginTop: 12,
+    textAlign: "center",
   },
   bottom: {
     paddingHorizontal: 24,
@@ -265,6 +352,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: "rgba(230, 57, 70, 0.15)",
+  },
+  shutterDisabled: {
+    opacity: 0.45,
   },
   shutterInner: {
     width: 58,
