@@ -2023,6 +2023,8 @@ func main() {
 	registerGridGameRoutes()
 
 	http.HandleFunc("/health", handlers.Health(db))
+	http.HandleFunc("/privacy", handlePrivacy)
+	http.HandleFunc("/support", handleSupport)
 	http.HandleFunc("/i/", handlePairInvite)
 	http.HandleFunc("/ws", handleConnections)
 	http.HandleFunc("/api/lists", handleGetList)

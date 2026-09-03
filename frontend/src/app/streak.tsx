@@ -55,11 +55,18 @@ export default function StreakScreen() {
 
   const nudge = useMutation({
     mutationFn: () => sendNudge(deviceId!, "send_photo"),
-    onSuccess: () => {
-      Alert.alert(
-        `${partner} has been notified!`,
-        "They'll get a reminder to send today's photo.",
-      );
+    onSuccess: (data) => {
+      if (data.notified) {
+        Alert.alert(
+          `${partner} has been notified!`,
+          "They'll get a reminder to send today's photo.",
+        );
+      } else {
+        Alert.alert(
+          "Reminder sent",
+          "If they have Orbit open they'll see it. For lock-screen alerts, they need notifications enabled.",
+        );
+      }
     },
     onError: () => showMutationError("Could not send that nudge."),
   });

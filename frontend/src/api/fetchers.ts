@@ -49,7 +49,7 @@ export async function sendNudge(deviceId: string, type: string) {
     body: JSON.stringify({ type }),
   });
   if (!res.ok) throw new Error("Failed to send nudge");
-  return res.json() as Promise<{ ok: boolean }>;
+  return res.json() as Promise<{ ok: boolean; notified?: boolean }>;
 }
 
 export async function sendPulse(deviceId: string) {

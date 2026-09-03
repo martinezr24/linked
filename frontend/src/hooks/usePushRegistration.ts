@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 import Constants from "expo-constants";
 import * as Device from "expo-device";
 import * as Notifications from "expo-notifications";
@@ -10,8 +10,8 @@ import { useRelationship } from "@/context/RelationshipContext";
 /**
  * Requests notification permission and registers this device's Expo push token
  * with the backend so a partner's nudges can arrive while the app is closed.
- * Every native call is guarded so that a build without the notifications
- * native module (e.g. an older dev client) simply no-ops instead of crashing.
+ * Re-runs when the app comes to the foreground so a new TestFlight/APNs token
+ * is uploaded. Native calls are guarded so older dev clients no-op instead of crashing.
  */
 export function usePushRegistration() {
   const { deviceId } = useRelationship();
@@ -20,7 +20,7 @@ export function usePushRegistration() {
     if (!deviceId || !Device.isDevice) return;
     let cancelled = false;
 
-    (async () => {
+    const register = async () => {
       try {
         Notifications.setNotificationHandler({
           handleNotification: async () => ({
@@ -34,27 +34,46 @@ export function usePushRegistration() {
         const existing = await Notifications.getPermissionsAsync();
         let granted = existing.granted;
         if (!granted && existing.canAskAgain) {
-          const requested = await Notifications.requestPermissionsAsync();
+          const requested = await Notifications.requestPermissionsAsync({
+            ios: {
+              allowAlert: true,
+              allowBadge: true,
+              allowSound: true,
+            },
+          });
           granted = requested.granted;
         }
-        if (!granted) return;
+        if (!granted) {
+          console.warn("push: notification permission not granted");
+          return;
+        }
 
         const projectId =
           Constants.expoConfig?.extra?.eas?.projectId ??
           Constants.easConfig?.projectId;
+        if (!projectId) {
+          console.warn("push: missing EAS projectId");
+        }
         const tokenResp = await Notifications.getExpoPushTokenAsync(
           projectId ? { projectId } : undefined,
         );
         if (cancelled || !tokenResp.data) return;
 
         await registerPushToken(deviceId, tokenResp.data, Platform.OS);
-      } catch {
-        // Best-effort: push simply won't be available for this device.
+      } catch (err) {
+        console.warn("push: registration failed", err);
       }
-    })();
+    };
+
+    void register();
+
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") void register();
+    });
 
     return () => {
       cancelled = true;
+      sub.remove();
     };
   }, [deviceId]);
 }

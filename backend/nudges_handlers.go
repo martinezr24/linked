@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 )
@@ -127,15 +128,12 @@ func handleNudge(w http.ResponseWriter, r *http.Request) {
 		"fromName": name,
 	})
 
-	// Push notification (delivered when the app is backgrounded or closed).
-	if tokens := partnerPushTokens(partnerID); len(tokens) > 0 {
-		go sendExpoPush(tokens, title, message, map[string]any{
-			"type": body.Type,
-			"kind": "nudge",
-		})
-	}
+	notified := notifyPartnerPush(partnerID, title, message, map[string]any{
+		"type": body.Type,
+		"kind": "nudge",
+	})
 
-	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	json.NewEncoder(w).Encode(map[string]any{"ok": true, "notified": notified})
 }
 
 // handlePulse delivers a live "thinking of you" heartbeat: a heart ripples
@@ -180,18 +178,17 @@ func handlePulse(w http.ResponseWriter, r *http.Request) {
 		"fromName": name,
 	})
 
-	if tokens := partnerPushTokens(partnerID); len(tokens) > 0 {
-		go sendExpoPush(tokens, "💗 "+name, name+" is thinking of you.", map[string]any{
-			"kind": "pulse",
-		})
-	}
+	notified := notifyPartnerPush(partnerID, "💗 "+name, name+" is thinking of you.", map[string]any{
+		"kind": "pulse",
+	})
 
-	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+	json.NewEncoder(w).Encode(map[string]any{"ok": true, "notified": notified})
 }
 
 func partnerPushTokens(userID string) []string {
-	rows, err := db.Query(`SELECT token FROM push_tokens WHERE user_id::text = $1`, userID)
+	rows, err := db.Query(`SELECT token FROM push_tokens WHERE user_id = $1::uuid`, userID)
 	if err != nil {
+		log.Printf("expo push: token query failed for %s: %v", userID, err)
 		return nil
 	}
 	defer rows.Close()
@@ -205,12 +202,25 @@ func partnerPushTokens(userID string) []string {
 	return tokens
 }
 
+// notifyPartnerPush looks up Expo tokens and queues a send. Returns whether
+// at least one token was found (delivery itself is async / best-effort).
+func notifyPartnerPush(userID, title, body string, data map[string]any) bool {
+	tokens := partnerPushTokens(userID)
+	if len(tokens) == 0 {
+		log.Printf("expo push: no tokens for user %s", userID)
+		return false
+	}
+	go sendExpoPush(tokens, title, body, data)
+	return true
+}
+
 type expoPushMessage struct {
-	To    string         `json:"to"`
-	Title string         `json:"title"`
-	Body  string         `json:"body"`
-	Sound string         `json:"sound"`
-	Data  map[string]any `json:"data,omitempty"`
+	To       string         `json:"to"`
+	Title    string         `json:"title"`
+	Body     string         `json:"body"`
+	Sound    string         `json:"sound"`
+	Priority string         `json:"priority"`
+	Data     map[string]any `json:"data,omitempty"`
 }
 
 // sendExpoPush delivers notifications through Expo's push service. Best-effort:
@@ -219,11 +229,12 @@ func sendExpoPush(tokens []string, title, body string, data map[string]any) {
 	msgs := make([]expoPushMessage, 0, len(tokens))
 	for _, t := range tokens {
 		msgs = append(msgs, expoPushMessage{
-			To:    t,
-			Title: title,
-			Body:  body,
-			Sound: "default",
-			Data:  data,
+			To:       t,
+			Title:    title,
+			Body:     body,
+			Sound:    "default",
+			Priority: "high",
+			Data:     data,
 		})
 	}
 	payload, err := json.Marshal(msgs)
@@ -240,6 +251,9 @@ func sendExpoPush(tokens []string, title, body string, data map[string]any) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Accept", "application/json")
+	if token := strings.TrimSpace(os.Getenv("EXPO_ACCESS_TOKEN")); token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {

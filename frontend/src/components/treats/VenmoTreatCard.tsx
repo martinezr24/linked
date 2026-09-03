@@ -11,19 +11,24 @@ type Props = {
   /** The partner's Venmo username (set by them in Profile). */
   username?: string;
   partnerName: string;
+  /** "pay" opens a payment to the partner; "request" asks them to pay you. */
+  mode?: "pay" | "request";
 };
 
-/** Opens Venmo to pay the partner. Falls back to the web profile if the app
- *  isn't installed. Disabled until the partner has added their handle. */
-export function VenmoTreatCard({ username, partnerName }: Props) {
+/** Opens Venmo to pay or request money from the partner. Falls back to the web
+ *  profile if the app isn't installed. Disabled until the partner has added
+ *  their handle. */
+export function VenmoTreatCard({ username, partnerName, mode = "pay" }: Props) {
   const theme = useTheme();
   const handle = username?.trim().replace(/^@/, "");
 
   const openVenmo = async () => {
     if (!handle) return;
     void hapticLight();
-    const note = encodeURIComponent("A little treat 🧡");
-    const appUrl = `venmo://paycharge?txn=pay&recipients=${handle}&note=${note}`;
+    const note = encodeURIComponent(
+      mode === "request" ? "Can you Venmo me? 🧡" : "A little treat 🧡",
+    );
+    const appUrl = `venmo://paycharge?txn=${mode}&recipients=${handle}&note=${note}`;
     const webUrl = `https://venmo.com/u/${handle}`;
     try {
       await Linking.openURL(appUrl);
@@ -31,6 +36,9 @@ export function VenmoTreatCard({ username, partnerName }: Props) {
       await Linking.openURL(webUrl).catch(() => {});
     }
   };
+
+  const title = mode === "request" ? "Request Venmo" : "Send Venmo";
+  const buttonLabel = mode === "request" ? "Request" : "Send";
 
   return (
     <View
@@ -46,7 +54,7 @@ export function VenmoTreatCard({ username, partnerName }: Props) {
         <Text style={styles.dollar}>$</Text>
       </View>
       <View style={styles.copy}>
-        <AppText variant="bodySemibold">Send Venmo</AppText>
+        <AppText variant="bodySemibold">{title}</AppText>
         <AppText variant="caption" color="secondary" style={styles.subtitle}>
           {handle
             ? `@${handle}`
@@ -54,7 +62,7 @@ export function VenmoTreatCard({ username, partnerName }: Props) {
         </AppText>
       </View>
       <PrimaryButton
-        label="Send"
+        label={buttonLabel}
         onPress={() => void openVenmo()}
         disabled={!handle}
         style={styles.btn}

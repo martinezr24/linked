@@ -133,6 +133,8 @@ npx eas-cli build  --platform ios --profile preview      # internal build
 npx eas-cli submit --platform ios --profile production   # TestFlight / App Store
 ```
 
+**App Store launch:** [`docs/APP_STORE_RELEASE.md`](docs/APP_STORE_RELEASE.md) · [`docs/TESTFLIGHT_NEXT_STEPS.md`](docs/TESTFLIGHT_NEXT_STEPS.md)
+
 ---
 
 ## 🎨 Design

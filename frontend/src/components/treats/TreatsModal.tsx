@@ -49,7 +49,8 @@ export function TreatsModal({ visible, onClose, partnerName }: Props) {
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
           >
-            <VenmoTreatCard username={partnerVenmo} partnerName={label} />
+            <VenmoTreatCard username={partnerVenmo} partnerName={label} mode="pay" />
+            <VenmoTreatCard username={partnerVenmo} partnerName={label} mode="request" />
             {TREAT_LINKS.map((treat) => (
               <TreatCard key={treat.id} treat={treat} />
             ))}

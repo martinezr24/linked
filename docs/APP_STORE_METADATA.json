@@ -1,0 +1,41 @@
+{
+  "name": "Orbit",
+  "subtitle": "Stay close, any distance",
+  "bundleId": "com.martinez.orbit",
+  "primaryCategory": "Lifestyle",
+  "secondaryCategory": "Social Networking",
+  "copyright": "© 2026 Giovanni Martinez",
+  "supportUrl": "https://linked.fly.dev/support",
+  "privacyPolicyUrl": "https://linked.fly.dev/privacy",
+  "promotionalText": "A celestial home for long-distance love — daily photos, real-time games, distance map, and a widget that keeps you both in orbit.",
+  "keywords": "couples,long distance,relationship,daily photo,LDR,partner,widget,games,check-in,calendar",
+  "whatsNew": "Welcome to Orbit — your shared space across any distance. Daily photos, games, distance map, check-ins, and more.",
+  "description": "Orbit is a shared home for long-distance couples — a little space just for the two of you, no matter how many miles are between you.\n\nSTAY CLOSE\n• Their World — see your partner's local time, weather, battery, and status at a glance\n• Distance Apart — a live map showing the miles between you, with a pulsing heart at your midpoint\n• Thinking of You — long-press your partner's avatar to send a heart that ripples across their screen\n\nSHARE YOUR DAYS\n• Daily Photo — swap a photo each day, build a streak together, and react with stickers\n• Daily Check-in — answer shared prompts and leave notes for each other\n• Doodles — draw something and send it over\n• Shared Calendar — plan visits and events together\n\nPLAY & TREAT\n• Mini-games — Connect 4, Tic-Tac-Toe, Word Guess, Dots & Boxes, Battleship, and Trivia in real time\n• Treats — send your partner a little something via Venmo\n\nALWAYS IN SYNC\nReal-time updates, push notifications, and an iOS home-screen widget with your streak and next-visit countdown.\n\nOrbit is built for two. Pair with your partner using a simple invite code and start your orbit together.",
+  "screenshots": {
+    "device": "6.7 inch (iPhone 15 Pro Max)",
+    "sizePx": "1290x2796",
+    "folder": "docs/screenshots/",
+    "files": [
+      "01-home.png",
+      "02-daily-photo.png",
+      "03-distance.png",
+      "04-games.png",
+      "05-memories.png",
+      "06-widget.png"
+    ]
+  },
+  "privacyLabels": {
+    "dataLinkedToUser": [
+      "User ID (device identifier)",
+      "Photos or Videos",
+      "Location (optional, for weather)",
+      "Other User Content"
+    ],
+    "tracking": false,
+    "thirdPartyAdvertising": false
+  },
+  "exportCompliance": {
+    "usesEncryption": false,
+    "appJsonKey": "ITSAppUsesNonExemptEncryption"
+  }
+}

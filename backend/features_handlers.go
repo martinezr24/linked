@@ -759,6 +759,22 @@ func handlePhotosPost(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(resp)
 	broadcastServerEvent(*user.RelationshipID, "SYNC_PHOTOS", map[string]any{})
+
+	var partnerID string
+	if err := db.QueryRow(
+		`SELECT id::text FROM users WHERE relationship_id = $1 AND id != $2 LIMIT 1`,
+		*user.RelationshipID, user.ID,
+	).Scan(&partnerID); err == nil {
+		var senderName sql.NullString
+		_ = db.QueryRow(`SELECT display_name FROM users WHERE id = $1`, user.ID).Scan(&senderName)
+		name := strings.TrimSpace(senderName.String)
+		if name == "" {
+			name = "Your partner"
+		}
+		notifyPartnerPush(partnerID, "New daily photo", name+" sent today's photo.", map[string]any{
+			"kind": "photo",
+		})
+	}
 }
 
 func handlePhotosHistory(w http.ResponseWriter, r *http.Request) {
@@ -902,11 +918,9 @@ func handlePhotoReaction(w http.ResponseWriter, r *http.Request) {
 		if name == "" {
 			name = "Your partner"
 		}
-		if tokens := partnerPushTokens(ownerID); len(tokens) > 0 {
-			go sendExpoPush(tokens, "New reaction", name+" reacted to your photo.", map[string]any{
-				"kind": "reaction",
-			})
-		}
+		notifyPartnerPush(ownerID, "New reaction", name+" reacted to your photo.", map[string]any{
+			"kind": "reaction",
+		})
 	}
 
 	json.NewEncoder(w).Encode(map[string]bool{"ok": true})
