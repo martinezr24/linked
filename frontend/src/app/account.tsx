@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -10,6 +11,7 @@ import {
 import { useQueryClient } from "@tanstack/react-query";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import Constants from "expo-constants";
 
 import { AppText } from "@/components/ui/AppText";
 import { ArtifactCard } from "@/components/ui/ArtifactCard";
@@ -25,6 +27,7 @@ import { getWeatherCity, setWeatherCity } from "@/utils/weatherCity";
 import { apiFetch } from "@/utils/api";
 import { AppTextInput } from "@/components/AppTextInput";
 import { getDeviceTimezoneLabel } from "@/utils/dates";
+import { getPrivacyUrl, getSupportUrl } from "@/constants/legal";
 import { showMutationError } from "@/utils/errors";
 import { useTheme } from "@/theme/useTheme";
 
@@ -77,6 +80,16 @@ export default function SettingsDetailScreen() {
   const [myCity, setMyCity] = useState("");
   const [savingPresence, setSavingPresence] = useState(false);
   const tzLabel = getDeviceTimezoneLabel();
+  const appVersion = Constants.expoConfig?.version ?? "1.0.0";
+  const buildNumber =
+    Constants.expoConfig?.ios?.buildNumber ??
+    Constants.nativeBuildVersion ??
+    "1";
+
+  const openUrl = async (url: string) => {
+    const can = await Linking.canOpenURL(url);
+    if (can) await Linking.openURL(url);
+  };
 
   useEffect(() => {
     getWeatherCity().then((city) => setMyCity(city ?? ""));
@@ -234,6 +247,31 @@ export default function SettingsDetailScreen() {
               onPress={handleDeleteAccount}
             />
           </ArtifactCard>
+
+          <ArtifactCard category="Legal" title="Policies & support">
+            <Pressable
+              onPress={() => void openUrl(getPrivacyUrl())}
+              style={[styles.linkRow, styles.linkRowFirst]}
+            >
+              <AppText variant="bodySemibold">Privacy Policy</AppText>
+              <AppText variant="caption" color="muted">
+                How we handle your data
+              </AppText>
+            </Pressable>
+            <Pressable
+              onPress={() => void openUrl(getSupportUrl())}
+              style={[styles.linkRow, styles.linkRowLast]}
+            >
+              <AppText variant="bodySemibold">Support</AppText>
+              <AppText variant="caption" color="muted">
+                Help, contact, and FAQs
+              </AppText>
+            </Pressable>
+          </ArtifactCard>
+
+          <AppText variant="caption" color="muted" style={styles.version}>
+            Orbit v{appVersion} ({buildNumber})
+          </AppText>
         </ScrollView>
       </SafeAreaView>
     </ScreenBackground>
@@ -262,5 +300,18 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
     fontSize: 16,
+  },
+  linkRow: {
+    paddingVertical: 12,
+  },
+  linkRowFirst: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: "rgba(255,255,255,0.08)",
+    marginBottom: 4,
+  },
+  version: {
+    textAlign: "center",
+    marginTop: 8,
+    marginBottom: 24,
   },
 });

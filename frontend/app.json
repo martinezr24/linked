@@ -8,7 +8,6 @@
     "scheme": "orbit",
     "userInterfaceStyle": "dark",
     "ios": {
-      "icon": "./assets/expo.icon",
       "bundleIdentifier": "com.martinez.orbit",
       "appleTeamId": "4S6A78PA3C",
       "buildNumber": "1",
@@ -49,10 +48,9 @@
         "expo-splash-screen",
         {
           "backgroundColor": "#3D1528",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
-          }
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 76,
+          "resizeMode": "contain"
         }
       ],
       "expo-secure-store",

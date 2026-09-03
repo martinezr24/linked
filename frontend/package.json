@@ -55,7 +55,10 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "icons": "node scripts/render-brand-assets.mjs",
+    "release:ios": "bash scripts/release-ios.sh",
+    "submit:ios": "eas submit --platform ios --profile production --latest"
   },
   "private": true
 }
