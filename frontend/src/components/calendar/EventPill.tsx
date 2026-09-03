@@ -59,16 +59,18 @@ export function EventPill({
           borderRadius,
         ]}
       />
-      {isSegmentStart && isGoogleEvent && (
-        <Text style={styles.googleBadge}>G</Text>
-      )}
-      <AppText
-        variant="caption"
-        numberOfLines={1}
-        style={[styles.label, { color: colors.text }]}
-      >
-        {isSegmentStart ? event.title : " "}
-      </AppText>
+      <View style={styles.content}>
+        {isSegmentStart && isGoogleEvent && (
+          <Text style={styles.googleBadge}>G</Text>
+        )}
+        <AppText
+          variant="caption"
+          numberOfLines={1}
+          style={[styles.label, { color: colors.text }]}
+        >
+          {isSegmentStart ? event.title : " "}
+        </AppText>
+      </View>
     </Pressable>
   );
 }
@@ -81,7 +83,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     overflow: "hidden",
   },
+  content: {
+    flexDirection: "row",
+    alignItems: "center",
+    height: 18,
+    overflow: "hidden",
+  },
   label: {
+    flexShrink: 1,
     fontSize: 10,
     lineHeight: 14,
     letterSpacing: 0,
@@ -89,6 +98,7 @@ const styles = StyleSheet.create({
   },
   googleBadge: {
     fontSize: 8,
+    lineHeight: 10,
     fontWeight: "800",
     color: "#fff",
     backgroundColor: "#4285F4",
@@ -96,6 +106,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     marginRight: 3,
     overflow: "hidden",
-    alignSelf: "center",
+    flexShrink: 0,
   },
 });

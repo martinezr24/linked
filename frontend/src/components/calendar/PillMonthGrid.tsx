@@ -33,6 +33,8 @@ type Props = {
   ownerFilter: EventOwnerType | "all";
   timeZone: string;
   selectedDay?: string | null;
+  /** Extra scroll padding so last weeks clear FAB / tab bar. */
+  contentBottomInset?: number;
   onMonthChange: (month: Date) => void;
   onDayPress: (day: string) => void;
   onEventPress: (event: SharedEvent) => void;
@@ -44,6 +46,7 @@ export function PillMonthGrid({
   ownerFilter,
   timeZone,
   selectedDay,
+  contentBottomInset = 0,
   onMonthChange,
   onDayPress,
   onEventPress,
@@ -123,12 +126,17 @@ export function PillMonthGrid({
 
       <ScrollView
         style={styles.gridScroll}
+        contentContainerStyle={{ paddingBottom: contentBottomInset }}
         showsVerticalScrollIndicator={false}
         bounces={false}
       >
         <View onLayout={onGridLayout}>
           {weeks.map((week) => {
-            const rowHeight = weekRowHeight(week.laneCount);
+            const hasOverflow = Object.values(week.overflowByDay).some(
+              (n) => n > 0,
+            );
+            const rowHeight = weekRowHeight(week.laneCount, hasOverflow);
+            const overflowLane = week.laneCount;
 
             return (
               <View
@@ -215,6 +223,47 @@ export function PillMonthGrid({
                       />
                     );
                   })}
+
+                {cellWidth > 0 &&
+                  hasOverflow &&
+                  week.days.map((day, col) => {
+                    const hidden = week.overflowByDay[day.date] ?? 0;
+                    if (hidden <= 0) return null;
+
+                    const left = col * cellWidth + 2;
+                    const top =
+                      DAY_NUMBER_HEIGHT +
+                      overflowLane * (PILL_HEIGHT + PILL_GAP) +
+                      2;
+
+                    return (
+                      <Pressable
+                        key={`overflow-${day.date}`}
+                        onPress={() => onDayPress(day.date)}
+                        style={[
+                          styles.overflowChip,
+                          {
+                            width: cellWidth - 4,
+                            left,
+                            top,
+                            backgroundColor: theme.colors.surface.cardElevated,
+                          },
+                        ]}
+                        accessibilityLabel={`${hidden} more events`}
+                        accessibilityRole="button"
+                      >
+                        <AppText
+                          variant="caption"
+                          style={[
+                            styles.overflowLabel,
+                            { color: theme.colors.text.secondary },
+                          ]}
+                        >
+                          +{hidden}
+                        </AppText>
+                      </Pressable>
+                    );
+                  })}
               </View>
             );
           })}
@@ -241,10 +290,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  monthNavIcon: {
-    fontSize: 36,
-    lineHeight: 40,
-  },
   monthTitle: {
     flex: 1,
     textAlign: "center",
@@ -264,14 +309,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     position: "relative",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    overflow: "visible",
+    overflow: "hidden",
   },
   dayCell: {
     flex: 1,
     borderRightWidth: StyleSheet.hairlineWidth,
     paddingTop: 4,
     paddingHorizontal: 2,
-    overflow: "visible",
+    overflow: "hidden",
   },
   dayNumberWrap: {
     alignSelf: "flex-start",
@@ -280,5 +325,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 4,
+  },
+  overflowChip: {
+    position: "absolute",
+    height: PILL_HEIGHT,
+    borderRadius: 9,
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    zIndex: 2,
+  },
+  overflowLabel: {
+    fontSize: 10,
+    lineHeight: 14,
+    fontWeight: "700",
   },
 });

@@ -2,6 +2,7 @@ import type { SharedEvent } from "@/types";
 import {
   eventCalendarEndDay,
   eventCalendarStartDay,
+  eventStartIso,
   localDateString,
 } from "@/utils/dates";
 
@@ -24,13 +25,22 @@ export type PillSegment = {
 export type WeekLayout = {
   days: CalendarDay[];
   segments: PillSegment[];
+  /** Visible pill lanes (capped at MAX_VISIBLE_LANES). */
   laneCount: number;
+  /** Hidden event count per day date string; omit or 0 when none. */
+  overflowByDay: Record<string, number>;
 };
+
+export const MAX_VISIBLE_LANES = 2;
 
 const WEEKDAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
 
 export function weekdayLabels(): string[] {
   return WEEKDAY_LABELS;
+}
+
+export function isGoogleEvent(ev: SharedEvent): boolean {
+  return ev.ownerLabel === "google" || ev.id.startsWith("gcal_");
 }
 
 export function buildMonthGrid(visibleMonth: Date): CalendarDay[] {
@@ -84,6 +94,16 @@ function clampDayToGrid(
   return date;
 }
 
+function eventTouchesDay(
+  event: SharedEvent,
+  day: string,
+  timeZone?: string,
+): boolean {
+  const startDay = eventCalendarStartDay(event, timeZone);
+  const endDay = eventCalendarEndDay(event, timeZone);
+  return day >= startDay && day <= endDay;
+}
+
 function segmentsForWeek(
   weekDays: CalendarDay[],
   weekIndex: number,
@@ -116,11 +136,16 @@ function segmentsForWeek(
     });
   }
 
+  // Orbit first so shared dates keep low lanes; then column, longer span, start time.
   return raw.sort((a, b) => {
+    const aGoogle = isGoogleEvent(a.event);
+    const bGoogle = isGoogleEvent(b.event);
+    if (aGoogle !== bGoogle) return aGoogle ? 1 : -1;
     if (a.startCol !== b.startCol) return a.startCol - b.startCol;
     const aSpan = a.endCol - a.startCol;
     const bSpan = b.endCol - b.startCol;
-    return bSpan - aSpan;
+    if (aSpan !== bSpan) return bSpan - aSpan;
+    return eventStartIso(a.event).localeCompare(eventStartIso(b.event));
   });
 }
 
@@ -142,6 +167,31 @@ function assignLanes(segments: Omit<PillSegment, "lane">[]): PillSegment[] {
   return lanes;
 }
 
+function computeOverflowByDay(
+  weekDays: CalendarDay[],
+  events: SharedEvent[],
+  visible: PillSegment[],
+  timeZone?: string,
+): Record<string, number> {
+  const overflowByDay: Record<string, number> = {};
+
+  for (let col = 0; col < weekDays.length; col++) {
+    const day = weekDays[col];
+    const total = events.filter((ev) =>
+      eventTouchesDay(ev, day.date, timeZone),
+    ).length;
+    if (total === 0) continue;
+
+    const shown = visible.filter(
+      (seg) => col >= seg.startCol && col <= seg.endCol,
+    ).length;
+    const hidden = total - shown;
+    if (hidden > 0) overflowByDay[day.date] = hidden;
+  }
+
+  return overflowByDay;
+}
+
 export function layoutMonthPills(
   visibleMonth: Date,
   events: SharedEvent[],
@@ -153,13 +203,28 @@ export function layoutMonthPills(
   for (let w = 0; w < days.length; w += 7) {
     const weekDays = days.slice(w, w + 7);
     const weekIndex = w / 7;
-    const raw = segmentsForWeek(weekDays, weekIndex, events, timeZone);
-    const segments = assignLanes(raw);
+    const weekStart = weekDays[0].date;
+    const weekEnd = weekDays[6].date;
+    const weekEvents = events.filter((ev) => {
+      const startDay = eventCalendarStartDay(ev, timeZone);
+      const endDay = eventCalendarEndDay(ev, timeZone);
+      return !(endDay < weekStart || startDay > weekEnd);
+    });
+
+    const raw = segmentsForWeek(weekDays, weekIndex, weekEvents, timeZone);
+    const allLanes = assignLanes(raw);
+    const segments = allLanes.filter((s) => s.lane < MAX_VISIBLE_LANES);
     const laneCount = segments.reduce(
       (max, s) => Math.max(max, s.lane + 1),
       0,
     );
-    weeks.push({ days: weekDays, segments, laneCount });
+    const overflowByDay = computeOverflowByDay(
+      weekDays,
+      weekEvents,
+      segments,
+      timeZone,
+    );
+    weeks.push({ days: weekDays, segments, laneCount, overflowByDay });
   }
 
   return { days, weeks };
@@ -181,12 +246,14 @@ export const PILL_GAP = 3;
 export const DAY_NUMBER_HEIGHT = 22;
 export const WEEK_BASE_HEIGHT = 28;
 
-export function weekRowHeight(laneCount: number): number {
-  if (laneCount === 0) return WEEK_BASE_HEIGHT + DAY_NUMBER_HEIGHT;
+/** Row height for visible pill lanes, plus one slot when any day has a +N chip. */
+export function weekRowHeight(laneCount: number, hasOverflow = false): number {
+  const lanes = laneCount + (hasOverflow ? 1 : 0);
+  if (lanes === 0) return WEEK_BASE_HEIGHT + DAY_NUMBER_HEIGHT;
   return (
     DAY_NUMBER_HEIGHT +
-    laneCount * PILL_HEIGHT +
-    Math.max(0, laneCount - 1) * PILL_GAP +
+    lanes * PILL_HEIGHT +
+    Math.max(0, lanes - 1) * PILL_GAP +
     6
   );
 }

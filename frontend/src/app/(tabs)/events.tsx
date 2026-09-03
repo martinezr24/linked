@@ -159,6 +159,7 @@ export default function EventsScreen() {
             ownerFilter={ownerFilter}
             timeZone={activeTimezone}
             selectedDay={agendaDay}
+            contentBottomInset={tabBarHeight + 72}
             onMonthChange={setVisibleMonth}
             onDayPress={setAgendaDay}
             onEventPress={openEdit}
