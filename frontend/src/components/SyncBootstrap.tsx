@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { AppState } from "react-native";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
 import { fetchWidgetSummary } from "@/api/fetchers";
@@ -17,6 +17,19 @@ export function SyncBootstrap() {
   const { deviceId, relationshipId } = useRelationship();
   const queryClient = useQueryClient();
 
+  // Keep App Group in sync whenever widgetSummary is fetched (launch, focus,
+  // photo/check-in invalidations, websocket SYNC_*).
+  const { data: widgetSummary } = useQuery({
+    queryKey: queryKeys.widgetSummary,
+    queryFn: () => fetchWidgetSummary(deviceId!),
+    enabled: Boolean(deviceId && relationshipId),
+  });
+
+  useEffect(() => {
+    if (!widgetSummary) return;
+    void syncWidgetData(widgetSummary);
+  }, [widgetSummary]);
+
   useEffect(() => {
     if (!deviceId || !relationshipId) return;
 
@@ -29,12 +42,7 @@ export function SyncBootstrap() {
       } catch {
         // presence sync is best-effort
       }
-      try {
-        const summary = await fetchWidgetSummary(deviceId);
-        await syncWidgetData(summary);
-      } catch {
-        // widget sync is best-effort
-      }
+      void queryClient.invalidateQueries({ queryKey: queryKeys.widgetSummary });
     };
 
     void sync();

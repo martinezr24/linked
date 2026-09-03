@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 
 import { setWidgetValue } from "../../modules/orbit-widgets";
+import { fetchWidgetSummary } from "@/api/fetchers";
 import type { WidgetSummary } from "@/types";
 
 const WIDGET_DATA_KEY = "linked_widget_summary";
@@ -23,6 +24,13 @@ async function writeWidgetData(json: string) {
 
 export async function syncWidgetData(summary: WidgetSummary) {
   await writeWidgetData(JSON.stringify(summary));
+}
+
+/** Fetch latest summary from the API and push it into App Group / SecureStore. */
+export async function fetchAndSyncWidgetData(deviceId: string) {
+  const summary = await fetchWidgetSummary(deviceId);
+  await syncWidgetData(summary);
+  return summary;
 }
 
 export async function readWidgetData(): Promise<WidgetSummary | null> {

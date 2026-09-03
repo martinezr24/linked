@@ -7,7 +7,7 @@ import type { WsMessage } from "@/types";
 
 const SYNC_ACTIONS: Record<string, (readonly unknown[])[]> = {
   SYNC_RELATIONSHIP: [queryKeys.relationship, queryKeys.widgetSummary],
-  SYNC_GOALS: [queryKeys.goals],
+  SYNC_GOALS: [queryKeys.goals, queryKeys.widgetSummary],
   SYNC_EVENTS: [queryKeys.events, queryKeys.widgetSummary],
   SYNC_CHECKINS: [queryKeys.checkIns, queryKeys.widgetSummary],
   SYNC_LISTS: [queryKeys.list("reunion")],
@@ -17,9 +17,9 @@ const SYNC_ACTIONS: Record<string, (readonly unknown[])[]> = {
     queryKeys.photoHistory(),
     queryKeys.widgetSummary,
   ],
-  SYNC_PRESENCE: [queryKeys.partnerPresence],
-  SYNC_PROFILE: [queryKeys.profile, queryKeys.partnerPresence],
-  SYNC_DRAWINGS: [queryKeys.drawings],
+  SYNC_PRESENCE: [queryKeys.partnerPresence, queryKeys.widgetSummary],
+  SYNC_PROFILE: [queryKeys.profile, queryKeys.partnerPresence, queryKeys.widgetSummary],
+  SYNC_DRAWINGS: [queryKeys.drawings, queryKeys.widgetSummary],
   // Prefix keys so every grid game (connect4, tictactoe, wordguess, dotsboxes,
   // battleship) plus trivia and stats refresh when a partner acts — not just
   // connect4.

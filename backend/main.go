@@ -1918,14 +1918,14 @@ func handleWidgetSummary(w http.ResponseWriter, r *http.Request) {
 				if uid == user.ID {
 					summary.MineCheckedIn = true
 					if mediaStore != nil {
-						if u, err := mediaStore.SignGet(context.Background(), objectKey, 60*time.Minute); err == nil {
+						if u, err := mediaStore.SignGet(context.Background(), objectKey, 24*time.Hour); err == nil {
 							summary.DailyPhotoUrl = &u
 						}
 					}
 				} else {
 					summary.PartnerCheckedIn = true
 					if mediaStore != nil {
-						if u, err := mediaStore.SignGet(context.Background(), objectKey, 60*time.Minute); err == nil {
+						if u, err := mediaStore.SignGet(context.Background(), objectKey, 24*time.Hour); err == nil {
 							summary.PartnerPhotoUrl = &u
 						}
 					}
@@ -1972,7 +1972,7 @@ func handleWidgetSummary(w http.ResponseWriter, r *http.Request) {
 		name := strings.TrimSpace(displayName.String)
 		var avatar *string
 		if pictureKey.Valid && pictureKey.String != "" && mediaStore != nil {
-			if u, err := mediaStore.SignGet(context.Background(), pictureKey.String, 60*time.Minute); err == nil {
+			if u, err := mediaStore.SignGet(context.Background(), pictureKey.String, 24*time.Hour); err == nil {
 				avatar = &u
 			}
 		}

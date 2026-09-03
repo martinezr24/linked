@@ -1,6 +1,6 @@
 import WidgetKit
 import SwiftUI
-import MapKit
+import CoreLocation
 
 // MARK: - Shared data (written by the app via the OrbitWidgets Expo module)
 
@@ -58,10 +58,34 @@ struct OrbitSummary: Decodable {
         partnerCheckedIn: false, mineCheckedIn: false, currentStreak: 0
     )
 
+    /// Believable gallery / first-paint sample so widgets don’t look broken.
+    static let sample = OrbitSummary(
+        partnerCheckedIn: true,
+        mineCheckedIn: true,
+        currentStreak: 3,
+        partnerName: "Partner",
+        myName: "You",
+        myCity: "New Haven",
+        partnerCity: "Sacramento",
+        myLat: 41.31,
+        myLon: -72.92,
+        partnerLat: 38.58,
+        partnerLon: -121.49,
+        distanceMiles: 2540
+    )
+
     var photoStatus: String {
         if mineCheckedIn && partnerCheckedIn { return "Both in — streak secured" }
         if mineCheckedIn { return "Waiting for partner" }
         if partnerCheckedIn { return "Partner sent — your turn" }
+        return "Send today’s photo"
+    }
+
+    /// Shorter copy for tight small widgets.
+    var photoStatusCompact: String {
+        if mineCheckedIn && partnerCheckedIn { return "Both in" }
+        if mineCheckedIn { return "Waiting on them" }
+        if partnerCheckedIn { return "Your turn" }
         return "Send today’s photo"
     }
 }
@@ -119,7 +143,7 @@ struct OrbitEntry: TimelineEntry {
 
 struct Provider: TimelineProvider {
     func placeholder(in context: Context) -> OrbitEntry {
-        OrbitEntry(date: Date(), summary: .empty)
+        OrbitEntry(date: Date(), summary: .sample)
     }
 
     func getSnapshot(in context: Context, completion: @escaping (OrbitEntry) -> Void) {
@@ -160,19 +184,47 @@ private struct DownloadedImages {
     var partnerAvatar: UIImage?
 }
 
-private func fetchImage(_ urlString: String?) -> UIImage? {
-    guard let urlString, let url = URL(string: urlString) else { return nil }
+private func imageCacheDirectory() -> URL? {
+    guard let root = FileManager.default.containerURL(
+        forSecurityApplicationGroupIdentifier: appGroup
+    ) else { return nil }
+    let dir = root.appendingPathComponent("widget-images", isDirectory: true)
+    try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    return dir
+}
+
+private func cachedImage(slot: String) -> UIImage? {
+    guard let dir = imageCacheDirectory() else { return nil }
+    let url = dir.appendingPathComponent("\(slot).jpg")
     guard let data = try? Data(contentsOf: url) else { return nil }
     return UIImage(data: data)
+}
+
+private func storeCachedImage(_ image: UIImage, slot: String) {
+    guard let dir = imageCacheDirectory(),
+          let data = image.jpegData(compressionQuality: 0.85) else { return }
+    let url = dir.appendingPathComponent("\(slot).jpg")
+    try? data.write(to: url, options: .atomic)
+}
+
+/// Fetch from network; on success cache by stable slot. On failure, fall back to cache.
+private func fetchImage(_ urlString: String?, slot: String) -> UIImage? {
+    if let urlString, let url = URL(string: urlString),
+       let data = try? Data(contentsOf: url),
+       let image = UIImage(data: data) {
+        storeCachedImage(image, slot: slot)
+        return image
+    }
+    return cachedImage(slot: slot)
 }
 
 private func downloadImages(summary: OrbitSummary, completion: @escaping (DownloadedImages) -> Void) {
     DispatchQueue.global(qos: .userInitiated).async {
         var images = DownloadedImages()
-        images.daily = fetchImage(summary.dailyPhotoUrl)
-        images.partner = fetchImage(summary.partnerPhotoUrl)
-        images.myAvatar = fetchImage(summary.myAvatarUrl)
-        images.partnerAvatar = fetchImage(summary.partnerAvatarUrl)
+        images.daily = fetchImage(summary.dailyPhotoUrl, slot: "daily")
+        images.partner = fetchImage(summary.partnerPhotoUrl, slot: "partner_photo")
+        images.myAvatar = fetchImage(summary.myAvatarUrl, slot: "my_avatar")
+        images.partnerAvatar = fetchImage(summary.partnerAvatarUrl, slot: "partner_avatar")
         DispatchQueue.main.async { completion(images) }
     }
 }
@@ -261,7 +313,13 @@ private struct AvatarCircle: View {
     let image: UIImage?
     let name: String?
     var size: CGFloat = 36
+    var strokeColor: Color = accent
     var body: some View {
+        let initial: String = {
+            let trimmed = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+            if let first = trimmed.first { return String(first).uppercased() }
+            return "O"
+        }()
         ZStack {
             Circle().fill(cardFill)
             if let image {
@@ -269,14 +327,14 @@ private struct AvatarCircle: View {
                     .resizable()
                     .scaledToFill()
             } else {
-                Text(String((name ?? "?").prefix(1)).uppercased())
+                Text(initial)
                     .font(.system(size: size * 0.4, weight: .semibold))
                     .foregroundColor(textPrimary)
             }
         }
         .frame(width: size, height: size)
         .clipShape(Circle())
-        .overlay(Circle().stroke(canvas, lineWidth: 1.5))
+        .overlay(Circle().stroke(strokeColor, lineWidth: max(1.5, size * 0.06)))
     }
 }
 
@@ -296,10 +354,11 @@ private struct StreakSmallView: View {
             Text("day photo streak")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(textSecondary)
-            Text(summary.photoStatus)
+            Text(summary.photoStatusCompact)
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(summary.mineCheckedIn && summary.partnerCheckedIn ? success : textSecondary)
-                .lineLimit(1)
+                .lineLimit(2)
+                .minimumScaleFactor(0.8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
     }
@@ -333,6 +392,8 @@ private struct StreakMediumView: View {
                 Text(summary.photoStatus)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(summary.mineCheckedIn && summary.partnerCheckedIn ? success : textSecondary)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
             }
             Spacer(minLength: 0)
             VStack(alignment: .trailing, spacing: 4) {
@@ -394,7 +455,8 @@ private struct DailyPhotoView: View {
                         entry.summary.mineCheckedIn && entry.summary.partnerCheckedIn
                             ? accent : textPrimary
                     )
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
             }
             HStack(spacing: 8) {
                 PhotoSlot(image: entry.dailyPhoto, label: "You")
@@ -405,13 +467,14 @@ private struct DailyPhotoView: View {
             }
             .frame(maxWidth: .infinity)
             if family != .systemMedium {
-                Text(entry.summary.photoStatus)
+                Text(entry.summary.photoStatusCompact)
                     .font(.system(size: 10, weight: .medium))
                     .foregroundColor(
                         entry.summary.mineCheckedIn && entry.summary.partnerCheckedIn
                             ? accent : textSecondary
                     )
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -529,7 +592,7 @@ private struct GoalsView: View {
                     Text("Set goals")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(textPrimary)
-                    Text("None yet this week")
+                    Text("Add goals in Orbit")
                         .font(.system(size: 11))
                         .foregroundColor(textSecondary)
                 } else {
@@ -553,7 +616,7 @@ private struct GoalsView: View {
                     .foregroundColor(textPrimary)
                     .padding(.bottom, 4)
                 if goals.isEmpty {
-                    Text("None yet this week")
+                    Text("Add goals in Orbit")
                         .font(.system(size: 13))
                         .foregroundColor(textSecondary)
                     Spacer(minLength: 0)
@@ -771,25 +834,97 @@ private struct TheirWorldRoot: View {
 
 // MARK: - Distance
 
-private struct DistanceSmallView: View {
-    let summary: OrbitSummary
+/// Project lon/lat into a padded rect so coast-to-coast still reads as an arc.
+private func projectCoordinate(
+    lat: Double,
+    lon: Double,
+    in size: CGSize,
+    padding: CGFloat = 28
+) -> CGPoint {
+    // Rough US-ish bounds with room for elsewhere; clamp so points stay inset.
+    let minLon = -125.0, maxLon = -65.0
+    let minLat = 24.0, maxLat = 50.0
+    let nx = (lon - minLon) / (maxLon - minLon)
+    let ny = 1 - (lat - minLat) / (maxLat - minLat)
+    let x = padding + CGFloat(max(0, min(1, nx))) * (size.width - padding * 2)
+    let y = padding + CGFloat(max(0, min(1, ny))) * (size.height - padding * 2)
+    return CGPoint(x: x, y: y)
+}
+
+private struct DistanceArcCanvas: View {
+    let me: CLLocationCoordinate2D
+    let partner: CLLocationCoordinate2D
+    let myAvatar: UIImage?
+    let partnerAvatar: UIImage?
+    let myName: String?
+    let partnerName: String?
+    var avatarSize: CGFloat = 36
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
+        GeometryReader { geo in
+            let a = projectCoordinate(lat: me.latitude, lon: me.longitude, in: geo.size)
+            let b = projectCoordinate(lat: partner.latitude, lon: partner.longitude, in: geo.size)
+            let mid = CGPoint(x: (a.x + b.x) / 2, y: (a.y + b.y) / 2)
+            let dx = b.x - a.x
+            let dy = b.y - a.y
+            let len = max(hypot(dx, dy), 1)
+            // Control point bowed “up” relative to the chord.
+            let nx = -dy / len
+            let ny = dx / len
+            let bow = min(geo.size.height * 0.28, len * 0.35)
+            let control = CGPoint(x: mid.x + nx * bow, y: mid.y + ny * bow)
+
+            ZStack {
+                // Soft map-like vignette
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(red: 0.10, green: 0.10, blue: 0.12),
+                                Color(red: 0.06, green: 0.055, blue: 0.07),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                Path { path in
+                    path.move(to: a)
+                    path.addQuadCurve(to: b, control: control)
+                }
+                .stroke(accent, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+
+                // Midpoint knot
+                Circle()
+                    .fill(accent)
+                    .frame(width: 8, height: 8)
+                    .position(control)
+
+                AvatarCircle(image: myAvatar, name: myName, size: avatarSize)
+                    .position(a)
+                AvatarCircle(image: partnerAvatar, name: partnerName, size: avatarSize)
+                    .position(b)
+            }
+        }
+    }
+}
+
+private struct DistanceSmallView: View {
+    let entry: OrbitEntry
+    var body: some View {
+        let s = entry.summary
+        VStack(alignment: .leading, spacing: 4) {
             CapsLabel(text: "DISTANCE APART")
             Spacer(minLength: 0)
-            if let miles = summary.distanceMiles {
+            if let miles = s.distanceMiles {
                 Text(miles.formatted(.number.precision(.fractionLength(0))))
                     .font(.system(size: 34, weight: .bold, design: .serif))
                     .foregroundColor(textPrimary)
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.left.arrow.right")
-                        .font(.system(size: 10))
-                    Text("mi apart")
-                }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(textSecondary)
+                Text("mi apart")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(textSecondary)
             } else {
                 Text("Distance")
                     .font(.system(size: 16, weight: .semibold))
@@ -799,44 +934,23 @@ private struct DistanceSmallView: View {
                     .foregroundColor(textSecondary)
             }
             Spacer(minLength: 0)
-            HStack {
-                Text(summary.myCity ?? "—")
+            HStack(spacing: 6) {
+                AvatarCircle(image: entry.myAvatar, name: s.myName, size: 22)
+                Text(s.myCity ?? "—")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(textPrimary)
                     .lineLimit(1)
-                Spacer()
-                Text(summary.partnerCity ?? "—")
+                    .minimumScaleFactor(0.7)
+                Spacer(minLength: 2)
+                AvatarCircle(image: entry.partnerAvatar, name: s.partnerName, size: 22)
+                Text(s.partnerCity ?? "—")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(textPrimary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundColor(textPrimary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-    }
-}
-
-private struct DistanceMapLite: View {
-    let me: CLLocationCoordinate2D
-    let partner: CLLocationCoordinate2D
-
-    var region: MKCoordinateRegion {
-        let mid = CLLocationCoordinate2D(
-            latitude: (me.latitude + partner.latitude) / 2,
-            longitude: (me.longitude + partner.longitude) / 2
-        )
-        let latDelta = max(abs(me.latitude - partner.latitude) * 1.8, 8)
-        let lonDelta = max(abs(me.longitude - partner.longitude) * 1.8, 8)
-        return MKCoordinateRegion(center: mid, span: MKCoordinateSpan(latitudeDelta: latDelta, longitudeDelta: lonDelta))
-    }
-
-    var body: some View {
-        Map(initialPosition: .region(region)) {
-            Marker("", coordinate: me)
-            Marker("", coordinate: partner)
-            MapPolyline(coordinates: [me, partner])
-                .stroke(accent, style: StrokeStyle(lineWidth: 2, dash: [5, 5]))
-        }
-        .mapStyle(.standard(pointsOfInterest: .excludingAll))
-        .disabled(true)
-        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -844,55 +958,56 @@ private struct DistanceMediumView: View {
     let entry: OrbitEntry
     var body: some View {
         let s = entry.summary
-        HStack(alignment: .top, spacing: 12) {
+        ZStack(alignment: .bottom) {
             if let la = s.myLat, let lo = s.myLon, let pla = s.partnerLat, let plo = s.partnerLon {
-                DistanceMapLite(
+                DistanceArcCanvas(
                     me: CLLocationCoordinate2D(latitude: la, longitude: lo),
-                    partner: CLLocationCoordinate2D(latitude: pla, longitude: plo)
+                    partner: CLLocationCoordinate2D(latitude: pla, longitude: plo),
+                    myAvatar: entry.myAvatar,
+                    partnerAvatar: entry.partnerAvatar,
+                    myName: s.myName,
+                    partnerName: s.partnerName,
+                    avatarSize: 34
                 )
-                .frame(width: 120)
+                .padding(.bottom, 36)
+            } else {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(cardFill)
+                    .overlay(
+                        Text("Share locations in Orbit")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(textSecondary)
+                    )
+                    .padding(.bottom, 36)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                CapsLabel(text: "DISTANCE APART")
+
+            VStack(spacing: 2) {
                 if let miles = s.distanceMiles {
-                    Text(miles.formatted(.number.precision(.fractionLength(0))))
-                        .font(.system(size: 32, weight: .bold, design: .serif))
+                    Text("\(miles.formatted(.number.precision(.fractionLength(0)))) mi")
+                        .font(.system(size: 28, weight: .bold, design: .serif))
                         .foregroundColor(textPrimary)
-                    HStack(spacing: 4) {
-                        Image(systemName: "arrow.left.arrow.right")
-                            .font(.system(size: 10))
-                        Text("mi apart")
-                    }
-                    .font(.system(size: 12))
-                    .foregroundColor(textSecondary)
                 } else {
                     Text("Not shared")
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(textPrimary)
                 }
-                Spacer(minLength: 4)
-                VStack(alignment: .leading, spacing: 6) {
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(s.myName ?? "You")
-                            .font(.system(size: 10))
-                            .foregroundColor(textSecondary)
-                        Text(s.myCity ?? "—")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(textPrimary)
-                    }
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(s.partnerName ?? "Partner")
-                            .font(.system(size: 10))
-                            .foregroundColor(textSecondary)
-                        Text(s.partnerCity ?? "—")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(textPrimary)
-                    }
+                HStack(spacing: 8) {
+                    Text([s.myName, s.myCity].compactMap { $0 }.joined(separator: " · "))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                    Text("·")
+                        .foregroundColor(textSecondary)
+                    Text([s.partnerName, s.partnerCity].compactMap { $0 }.joined(separator: " · "))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
                 }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(textSecondary)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity)
+            .padding(.bottom, 2)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -904,7 +1019,7 @@ private struct DistanceRoot: View {
         case .systemMedium:
             DistanceMediumView(entry: entry)
         default:
-            DistanceSmallView(summary: entry.summary)
+            DistanceSmallView(entry: entry)
         }
     }
 }
@@ -925,6 +1040,5 @@ struct DistanceWidget: Widget {
 #Preview(as: .systemSmall) {
     widget()
 } timeline: {
-    OrbitEntry(date: .now, summary: OrbitSummary(
-        partnerCheckedIn: true, mineCheckedIn: true, currentStreak: 7))
+    OrbitEntry(date: .now, summary: OrbitSummary.sample)
 }
