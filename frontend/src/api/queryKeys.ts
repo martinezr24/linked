@@ -18,4 +18,5 @@ export const queryKeys = {
   gridStats: (gameType: string) => ["gridStats", gameType] as const,
   list: (listType: string, eventId?: string) =>
     ["list", listType, eventId ?? ""] as const,
+  googleStatus: ["googleStatus"] as const,
 };

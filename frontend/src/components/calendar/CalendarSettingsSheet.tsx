@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -10,6 +10,7 @@ import { ColorSwatchPicker } from "@/components/profile/ColorSwatchPicker";
 import { queryKeys } from "@/api/queryKeys";
 import { updateProfile } from "@/api/fetchers";
 import { useProfile } from "@/hooks/useProfile";
+import { useGoogleCalendar } from "@/hooks/useGoogleCalendar";
 import { useRelationship } from "@/context/RelationshipContext";
 import { blendHexColors } from "@/utils/eventColors";
 import { showMutationError } from "@/utils/errors";
@@ -22,6 +23,7 @@ export function CalendarSettingsSheet({ visible, onClose }: Props) {
   const { deviceId } = useRelationship();
   const queryClient = useQueryClient();
   const { mineColor, partnerColor, sharedColor } = useProfile();
+  const { isConnected, email, isLoading: gcalLoading, connect, disconnect, isDisconnecting } = useGoogleCalendar();
 
   const [myColor, setMyColor] = useState(mineColor);
   const [bothColor, setBothColor] = useState(
@@ -86,6 +88,43 @@ export function CalendarSettingsSheet({ visible, onClose }: Props) {
                 onPress={() => save.mutate()}
                 style={styles.save}
               />
+
+              {/* ── Google Calendar ── */}
+              <View style={styles.divider} />
+              <AppText variant="caption" color="secondary" style={styles.label}>
+                GOOGLE CALENDAR
+              </AppText>
+              {gcalLoading ? (
+                <ActivityIndicator style={styles.gcalSpinner} />
+              ) : isConnected ? (
+                <View style={styles.gcalConnected}>
+                  <View style={styles.gcalInfo}>
+                    <View style={[styles.gcalDot, { backgroundColor: "#4285F4" }]} />
+                    <AppText variant="bodySemibold" style={styles.gcalEmail}>
+                      {email ?? "Connected"}
+                    </AppText>
+                  </View>
+                  <Pressable
+                    onPress={disconnect}
+                    disabled={isDisconnecting}
+                    style={styles.disconnectBtn}
+                  >
+                    <AppText variant="caption" color="secondary">
+                      {isDisconnecting ? "Disconnecting…" : "Disconnect"}
+                    </AppText>
+                  </Pressable>
+                </View>
+              ) : (
+                <PrimaryButton
+                  label="Connect Google Calendar"
+                  onPress={() => void connect()}
+                  style={styles.gcalBtn}
+                />
+              )}
+              <AppText variant="caption" color="muted" style={styles.gcalNote}>
+                Your Google events appear as a read-only overlay. New Orbit
+                events are also added to an "Orbit" calendar in Google.
+              </AppText>
             </ScrollView>
           </SafeAreaView>
         </Pressable>
@@ -117,4 +156,18 @@ const styles = StyleSheet.create({
   label: { marginTop: 16, marginBottom: 8 },
   note: { marginTop: 12, lineHeight: 18 },
   save: { marginTop: 24 },
+  divider: { height: 1, backgroundColor: "rgba(128,128,128,0.15)", marginTop: 28 },
+  gcalSpinner: { marginVertical: 8 },
+  gcalConnected: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 4,
+  },
+  gcalInfo: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
+  gcalDot: { width: 10, height: 10, borderRadius: 5 },
+  gcalEmail: { flex: 1 },
+  disconnectBtn: { paddingHorizontal: 8, paddingVertical: 4 },
+  gcalBtn: { marginTop: 4 },
+  gcalNote: { marginTop: 10, lineHeight: 18 },
 });

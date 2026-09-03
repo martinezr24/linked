@@ -96,6 +96,8 @@ export default function EventsScreen() {
   };
 
   const openEdit = (event: SharedEvent) => {
+    // Google-sourced events are read-only; don't open the edit sheet.
+    if (event.ownerLabel === "google" || event.id.startsWith("gcal_")) return;
     setAgendaDay(null);
     setEditing(event);
     setCreateDate(undefined);

@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View } from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { AppText } from "@/components/ui/AppText";
 import { useProfile } from "@/hooks/useProfile";
@@ -29,6 +29,7 @@ export function EventPill({
   const { mineColor, partnerColor, sharedColor } = useProfile();
   const profileColors = { mineColor, partnerColor, sharedColor };
   const ownerType = event.ownerType ?? "shared";
+  const isGoogleEvent = event.ownerLabel === "google" || event.id.startsWith("gcal_");
   const colors = eventColorFor(ownerType, theme, profileColors);
 
   const borderRadius = {
@@ -58,6 +59,9 @@ export function EventPill({
           borderRadius,
         ]}
       />
+      {isSegmentStart && isGoogleEvent && (
+        <Text style={styles.googleBadge}>G</Text>
+      )}
       <AppText
         variant="caption"
         numberOfLines={1}
@@ -82,5 +86,16 @@ const styles = StyleSheet.create({
     lineHeight: 14,
     letterSpacing: 0,
     fontWeight: "600",
+  },
+  googleBadge: {
+    fontSize: 8,
+    fontWeight: "800",
+    color: "#fff",
+    backgroundColor: "#4285F4",
+    borderRadius: 3,
+    paddingHorizontal: 2,
+    marginRight: 3,
+    overflow: "hidden",
+    alignSelf: "center",
   },
 });

@@ -323,3 +323,24 @@ export async function deleteListItem(
   );
   if (!res.ok) throw new Error("Failed to delete item");
 }
+
+// ── Google Calendar ───────────────────────────────────────────────────────────
+
+export async function fetchGoogleStatus(
+  deviceId: string,
+): Promise<{ connected: boolean; email?: string }> {
+  const res = await apiFetch("/api/google/status", deviceId);
+  if (!res.ok) return { connected: false };
+  return res.json();
+}
+
+export async function fetchGoogleAuthUrl(deviceId: string): Promise<string> {
+  const res = await apiFetch("/api/google/auth-url", deviceId);
+  if (!res.ok) throw new Error("Failed to fetch Google auth URL");
+  const data = (await res.json()) as { url: string };
+  return data.url;
+}
+
+export async function disconnectGoogle(deviceId: string): Promise<void> {
+  await apiFetch("/api/google/connect", deviceId, { method: "DELETE" });
+}

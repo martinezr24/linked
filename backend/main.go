@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strings"
@@ -98,6 +99,11 @@ type AsyncNote struct {
 	CreatedAt    string  `json:"createdAt"`
 }
 
+type WidgetGoal struct {
+	Text string `json:"text"`
+	Done bool   `json:"done"`
+}
+
 type WidgetSummary struct {
 	NextVisitAt      *string `json:"nextVisitAt"`
 	NextEventTitle   *string `json:"nextEventTitle"`
@@ -105,6 +111,14 @@ type WidgetSummary struct {
 	PartnerCheckedIn bool    `json:"partnerCheckedIn"`
 	MineCheckedIn    bool    `json:"mineCheckedIn"`
 	CurrentStreak    int     `json:"currentStreak"`
+	// New widget fields
+	DailyPhotoUrl     *string      `json:"dailyPhotoUrl"`
+	PartnerPhotoUrl   *string      `json:"partnerPhotoUrl"`
+	LatestDrawingDate *string      `json:"latestDrawingDate"`
+	WeeklyGoals       []WidgetGoal `json:"weeklyGoals"`
+	PartnerCity       *string      `json:"partnerCity"`
+	DistanceMiles     *float64     `json:"distanceMiles"`
+	MyCity            *string      `json:"myCity"`
 }
 
 type User struct {
@@ -1077,6 +1091,16 @@ func handleGetEvents(w http.ResponseWriter, r *http.Request) {
 			events = append(events, ev)
 		}
 	}
+
+	// Merge in Google Calendar events for the requesting user (best-effort).
+	if hasRange {
+		user, uErr := getOrCreateUser(deviceID)
+		if uErr == nil {
+			gEvents := fetchGoogleEvents(user.ID, rangeStart, rangeEnd)
+			events = append(events, gEvents...)
+		}
+	}
+
 	json.NewEncoder(w).Encode(events)
 }
 
@@ -1143,8 +1167,8 @@ func handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "db error", http.StatusInternalServerError)
 		return
 	}
-	created, err := querySharedEvent(relationshipID, ev.ID)
-	if err != nil {
+	created, queryErr := querySharedEvent(relationshipID, ev.ID)
+	if queryErr != nil {
 		w.WriteHeader(http.StatusCreated)
 		ev.StartAt = start.UTC().Format(time.RFC3339)
 		ev.EndAt = end.UTC().Format(time.RFC3339)
@@ -1153,11 +1177,15 @@ func handlePostEvent(w http.ResponseWriter, r *http.Request) {
 		ev.CreatedBy = &user.ID
 		ev.OwnerType = ownerType
 		json.NewEncoder(w).Encode(ev)
+		created = ev
 	} else {
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(created)
 	}
 	broadcastServerEvent(relationshipID, "SYNC_EVENTS", map[string]any{"relationshipId": relationshipID})
+
+	// Push the new event to the creator's Google Calendar (best-effort, async).
+	go pushEventToGoogle(user.ID, ev.ID, created)
 }
 
 func handleDeleteEvent(w http.ResponseWriter, r *http.Request) {
@@ -1187,6 +1215,13 @@ func handleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing event id", http.StatusBadRequest)
 		return
 	}
+	// Capture google_event_id and creator before deleting so we can clean up.
+	var googleEventID, creatorID string
+	_ = db.QueryRow(
+		`SELECT COALESCE(google_event_id, ''), COALESCE(created_by::text, '') FROM shared_events WHERE id = $1 AND relationship_id = $2`,
+		eventID, relationshipID,
+	).Scan(&googleEventID, &creatorID)
+
 	_, _ = db.Exec(
 		`DELETE FROM itinerary_items WHERE event_id = $1 AND relationship_id = $2`,
 		eventID, relationshipID,
@@ -1201,6 +1236,11 @@ func handleDeleteEvent(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 	broadcastServerEvent(relationshipID, "SYNC_EVENTS", map[string]any{"relationshipId": relationshipID})
+
+	// Remove the event from Google Calendar if it was pushed there.
+	if googleEventID != "" && creatorID != "" {
+		go deleteEventFromGoogle(creatorID, googleEventID)
+	}
 }
 
 func handleEventByID(w http.ResponseWriter, r *http.Request) {
@@ -1835,28 +1875,102 @@ func handleWidgetSummary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, _, bothPhotos := computePhotoStreak(relationshipID, today)
-	rows, _ := db.Query(
-		`SELECT user_id::text FROM daily_photos WHERE relationship_id = $1 AND photo_date = $2::date`,
+	_ = bothPhotos
+
+	// Daily photos: check-in status + presigned URLs for the widget.
+	photoRows, _ := db.Query(
+		`SELECT user_id::text, object_key FROM daily_photos WHERE relationship_id = $1 AND photo_date = $2::date`,
 		relationshipID, today,
 	)
-	if rows != nil {
-		defer rows.Close()
-		for rows.Next() {
-			var uid string
-			if rows.Scan(&uid) == nil {
+	if photoRows != nil {
+		defer photoRows.Close()
+		for photoRows.Next() {
+			var uid, objectKey string
+			if photoRows.Scan(&uid, &objectKey) == nil {
 				if uid == user.ID {
 					summary.MineCheckedIn = true
+					if mediaStore != nil {
+						if u, err := mediaStore.SignGet(context.Background(), objectKey, 60*time.Minute); err == nil {
+							summary.DailyPhotoUrl = &u
+						}
+					}
 				} else {
 					summary.PartnerCheckedIn = true
+					if mediaStore != nil {
+						if u, err := mediaStore.SignGet(context.Background(), objectKey, 60*time.Minute); err == nil {
+							summary.PartnerPhotoUrl = &u
+						}
+					}
 				}
 			}
 		}
 	}
-	_ = bothPhotos
+
 	current, _, _ := computePhotoStreak(relationshipID, today)
 	summary.CurrentStreak = current
 
+	// Latest drawing date.
+	var drawingCreated sql.NullTime
+	_ = db.QueryRow(
+		`SELECT created_at FROM drawings WHERE relationship_id = $1 ORDER BY created_at DESC LIMIT 1`,
+		relationshipID,
+	).Scan(&drawingCreated)
+	if drawingCreated.Valid {
+		s := drawingCreated.Time.UTC().Format(time.RFC3339)
+		summary.LatestDrawingDate = &s
+	}
+
+	// Weekly goals.
+	goals, _ := listCurrentWeeklyGoals(relationshipID)
+	wg := make([]WidgetGoal, 0, len(goals))
+	for _, g := range goals {
+		wg = append(wg, WidgetGoal{Text: g.GoalText, Done: g.Done})
+	}
+	summary.WeeklyGoals = wg
+
+	// Partner city + distance.
+	var myLat, myLon, partnerLat, partnerLon sql.NullFloat64
+	var myCity, partnerCity sql.NullString
+	_ = db.QueryRow(
+		`SELECT weather_lat, weather_lon, weather_city FROM users WHERE id = $1`, user.ID,
+	).Scan(&myLat, &myLon, &myCity)
+	// Find partner
+	var partnerID string
+	err = db.QueryRow(
+		`SELECT id::text FROM users WHERE relationship_id = $1 AND id != $2 LIMIT 1`,
+		relationshipID, user.ID,
+	).Scan(&partnerID)
+	if err == nil {
+		_ = db.QueryRow(
+			`SELECT weather_lat, weather_lon, weather_city FROM users WHERE id = $1`, partnerID,
+		).Scan(&partnerLat, &partnerLon, &partnerCity)
+	}
+	if myCity.Valid && myCity.String != "" {
+		summary.MyCity = &myCity.String
+	}
+	if partnerCity.Valid && partnerCity.String != "" {
+		summary.PartnerCity = &partnerCity.String
+	}
+	if myLat.Valid && myLon.Valid && partnerLat.Valid && partnerLon.Valid {
+		d := haversineDistance(myLat.Float64, myLon.Float64, partnerLat.Float64, partnerLon.Float64)
+		summary.DistanceMiles = &d
+	}
+
 	json.NewEncoder(w).Encode(summary)
+}
+
+// haversineDistance returns the great-circle distance in miles between two
+// latitude/longitude pairs.
+func haversineDistance(lat1, lon1, lat2, lon2 float64) float64 {
+	const earthRadiusMi = 3958.8
+	toRad := math.Pi / 180
+	dLat := (lat2 - lat1) * toRad
+	dLon := (lon2 - lon1) * toRad
+	lat1r := lat1 * toRad
+	lat2r := lat2 * toRad
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) + math.Cos(lat1r)*math.Cos(lat2r)*math.Sin(dLon/2)*math.Sin(dLon/2)
+	c := 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+	return earthRadiusMi * c
 }
 
 func deleteRelationshipData(tx *sql.Tx, relationshipID string) error {
@@ -2062,6 +2176,12 @@ func main() {
 	http.HandleFunc("/api/profile/push-token", handlePushToken)
 	http.HandleFunc("/api/nudges", handleNudge)
 	http.HandleFunc("/api/pulse", handlePulse)
+
+	// Google Calendar OAuth + sync
+	http.HandleFunc("/api/google/auth-url", handleGoogleAuthURL)
+	http.HandleFunc("/api/google/callback", handleGoogleCallback)
+	http.HandleFunc("/api/google/status", handleGoogleStatus)
+	http.HandleFunc("/api/google/connect", handleGoogleDisconnect) // DELETE
 
 	fmt.Println("Linked engine running with persistence on :8080...")
 	log.Fatal(http.ListenAndServe(":8080", nil))

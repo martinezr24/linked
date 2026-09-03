@@ -202,6 +202,13 @@ export type WidgetSummary = {
   partnerCheckedIn: boolean;
   mineCheckedIn: boolean;
   currentStreak: number;
+  dailyPhotoUrl?: string | null;
+  partnerPhotoUrl?: string | null;
+  latestDrawingDate?: string | null;
+  weeklyGoals?: { text: string; done: boolean }[];
+  partnerCity?: string | null;
+  distanceMiles?: number | null;
+  myCity?: string | null;
 };
 
 export type WsMessage = {
