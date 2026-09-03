@@ -15,7 +15,9 @@
         "ITSAppUsesNonExemptEncryption": false
       },
       "entitlements": {
-        "com.apple.security.application-groups": ["group.com.martinez.orbit"]
+        "com.apple.security.application-groups": [
+          "group.com.martinez.orbit"
+        ]
       }
     },
     "android": {
@@ -82,7 +84,8 @@
         }
       ],
       "expo-background-task",
-      "@bacons/apple-targets"
+      "@bacons/apple-targets",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

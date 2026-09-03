@@ -336,8 +336,17 @@ export async function fetchGoogleStatus(
 
 export async function fetchGoogleAuthUrl(deviceId: string): Promise<string> {
   const res = await apiFetch("/api/google/auth-url", deviceId);
-  if (!res.ok) throw new Error("Failed to fetch Google auth URL");
+  if (!res.ok) {
+    const body = await res.text();
+    if (res.status === 501) {
+      throw new Error(
+        "Google Calendar is not set up on the server yet. Add GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URI.",
+      );
+    }
+    throw new Error(body.trim() || "Failed to fetch Google auth URL");
+  }
   const data = (await res.json()) as { url: string };
+  if (!data.url) throw new Error("Failed to fetch Google auth URL");
   return data.url;
 }
 

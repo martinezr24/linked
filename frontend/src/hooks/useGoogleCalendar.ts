@@ -1,4 +1,5 @@
-import { Linking } from "react-native";
+import { useCallback } from "react";
+import * as WebBrowser from "expo-web-browser";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { queryKeys } from "@/api/queryKeys";
@@ -8,16 +9,12 @@ import {
   fetchGoogleStatus,
 } from "@/api/fetchers";
 import { useRelationship } from "@/context/RelationshipContext";
+import { showMutationError } from "@/utils/errors";
 
-/**
- * Hook for managing a user's Google Calendar connection.
- *
- * - `isConnected`  whether the current user has a linked Google account
- * - `email`        the connected Google account email (if connected)
- * - `connect()`    opens the Google OAuth consent page in the system browser
- * - `disconnect()` removes the stored Google token
- * - `isLoading`    true while the status is being fetched
- */
+const GOOGLE_REDIRECT = "orbit://google-calendar/connected";
+
+WebBrowser.maybeCompleteAuthSession();
+
 export function useGoogleCalendar() {
   const { deviceId } = useRelationship();
   const queryClient = useQueryClient();
@@ -28,25 +25,48 @@ export function useGoogleCalendar() {
     enabled: Boolean(deviceId),
   });
 
+  const invalidateGoogle = useCallback(() => {
+    void queryClient.invalidateQueries({ queryKey: queryKeys.googleStatus });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.events });
+  }, [queryClient]);
+
   const disconnectMutation = useMutation({
     mutationFn: () => disconnectGoogle(deviceId!),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: queryKeys.googleStatus });
-    },
+    onSuccess: invalidateGoogle,
+    onError: () => showMutationError("Could not disconnect Google Calendar."),
   });
 
-  const connect = async () => {
-    if (!deviceId) return;
-    const url = await fetchGoogleAuthUrl(deviceId);
-    await Linking.openURL(url);
-  };
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      if (!deviceId) throw new Error("Not signed in yet.");
+      const url = await fetchGoogleAuthUrl(deviceId);
+      const result = await WebBrowser.openAuthSessionAsync(url, GOOGLE_REDIRECT);
+      if (result.type === "cancel" || result.type === "dismiss") {
+        return "cancelled" as const;
+      }
+      if (result.type !== "success") {
+        throw new Error("Could not open Google sign-in.");
+      }
+      return "connected" as const;
+    },
+    onSuccess: (outcome) => {
+      if (outcome === "connected") invalidateGoogle();
+    },
+    onError: (err) => {
+      const message =
+        err instanceof Error ? err.message : "Could not connect Google Calendar.";
+      showMutationError(message);
+    },
+  });
 
   return {
     isConnected: data?.connected ?? false,
     email: data?.email,
     isLoading,
-    connect,
+    connect: () => connectMutation.mutate(),
     disconnect: () => disconnectMutation.mutate(),
+    isConnecting: connectMutation.isPending,
     isDisconnecting: disconnectMutation.isPending,
+    invalidateGoogle,
   };
 }

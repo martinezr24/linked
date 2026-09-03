@@ -104,6 +104,19 @@ type WidgetGoal struct {
 	Done bool   `json:"done"`
 }
 
+type WidgetStroke struct {
+	Color string  `json:"color"`
+	Width float64 `json:"width"`
+	Path  string  `json:"path"`
+}
+
+type WidgetDrawing struct {
+	Width      float64        `json:"width"`
+	Height     float64        `json:"height"`
+	Background string         `json:"background"`
+	Strokes    []WidgetStroke `json:"strokes"`
+}
+
 type WidgetSummary struct {
 	NextVisitAt      *string `json:"nextVisitAt"`
 	NextEventTitle   *string `json:"nextEventTitle"`
@@ -111,14 +124,29 @@ type WidgetSummary struct {
 	PartnerCheckedIn bool    `json:"partnerCheckedIn"`
 	MineCheckedIn    bool    `json:"mineCheckedIn"`
 	CurrentStreak    int     `json:"currentStreak"`
-	// New widget fields
-	DailyPhotoUrl     *string      `json:"dailyPhotoUrl"`
-	PartnerPhotoUrl   *string      `json:"partnerPhotoUrl"`
-	LatestDrawingDate *string      `json:"latestDrawingDate"`
-	WeeklyGoals       []WidgetGoal `json:"weeklyGoals"`
-	PartnerCity       *string      `json:"partnerCity"`
-	DistanceMiles     *float64     `json:"distanceMiles"`
-	MyCity            *string      `json:"myCity"`
+	DailyPhotoUrl    *string `json:"dailyPhotoUrl"`
+	PartnerPhotoUrl  *string `json:"partnerPhotoUrl"`
+	WeeklyGoals      []WidgetGoal `json:"weeklyGoals"`
+	LatestDrawing    *WidgetDrawing `json:"latestDrawing"`
+	// Presence / Their World
+	PartnerName     *string `json:"partnerName"`
+	PartnerAvatarUrl *string `json:"partnerAvatarUrl"`
+	LocalTime       *string `json:"localTime"`
+	Timezone        *string `json:"timezone"`
+	WeatherSummary  *string `json:"weatherSummary"`
+	TemperatureF    *int    `json:"temperatureF"`
+	StatusMessage   *string `json:"statusMessage"`
+	BatteryPercent  *int    `json:"batteryPercent"`
+	// Distance
+	MyName        *string  `json:"myName"`
+	MyCity        *string  `json:"myCity"`
+	PartnerCity   *string  `json:"partnerCity"`
+	MyLat         *float64 `json:"myLat"`
+	MyLon         *float64 `json:"myLon"`
+	PartnerLat    *float64 `json:"partnerLat"`
+	PartnerLon    *float64 `json:"partnerLon"`
+	DistanceMiles *float64 `json:"distanceMiles"`
+	MyAvatarUrl   *string  `json:"myAvatarUrl"`
 }
 
 type User struct {
@@ -1909,15 +1937,17 @@ func handleWidgetSummary(w http.ResponseWriter, r *http.Request) {
 	current, _, _ := computePhotoStreak(relationshipID, today)
 	summary.CurrentStreak = current
 
-	// Latest drawing date.
-	var drawingCreated sql.NullTime
+	// Latest drawing (vector strokes for the widget).
+	var drawingRaw []byte
 	_ = db.QueryRow(
-		`SELECT created_at FROM drawings WHERE relationship_id = $1 ORDER BY created_at DESC LIMIT 1`,
+		`SELECT data FROM drawings WHERE relationship_id = $1 ORDER BY created_at DESC LIMIT 1`,
 		relationshipID,
-	).Scan(&drawingCreated)
-	if drawingCreated.Valid {
-		s := drawingCreated.Time.UTC().Format(time.RFC3339)
-		summary.LatestDrawingDate = &s
+	).Scan(&drawingRaw)
+	if len(drawingRaw) > 0 {
+		var d WidgetDrawing
+		if json.Unmarshal(drawingRaw, &d) == nil && d.Width > 0 && d.Height > 0 {
+			summary.LatestDrawing = &d
+		}
 	}
 
 	// Weekly goals.
@@ -1928,31 +1958,80 @@ func handleWidgetSummary(w http.ResponseWriter, r *http.Request) {
 	}
 	summary.WeeklyGoals = wg
 
-	// Partner city + distance.
-	var myLat, myLon, partnerLat, partnerLon sql.NullFloat64
-	var myCity, partnerCity sql.NullString
-	_ = db.QueryRow(
-		`SELECT weather_lat, weather_lon, weather_city FROM users WHERE id = $1`, user.ID,
-	).Scan(&myLat, &myLon, &myCity)
-	// Find partner
+	// Me + partner: names, avatars, cities, coords, presence.
+	fillUserWidgetFields := func(userID string, isMe bool) {
+		var lat, lon sql.NullFloat64
+		var city, displayName, pictureKey, tz, status sql.NullString
+		var battery sql.NullInt64
+		_ = db.QueryRow(
+			`SELECT weather_lat, weather_lon, weather_city, display_name, profile_picture_url,
+			        timezone, battery_percent, status_message
+			 FROM users WHERE id = $1`,
+			userID,
+		).Scan(&lat, &lon, &city, &displayName, &pictureKey, &tz, &battery, &status)
+		name := strings.TrimSpace(displayName.String)
+		var avatar *string
+		if pictureKey.Valid && pictureKey.String != "" && mediaStore != nil {
+			if u, err := mediaStore.SignGet(context.Background(), pictureKey.String, 60*time.Minute); err == nil {
+				avatar = &u
+			}
+		}
+		var cityPtr *string
+		if city.Valid && strings.TrimSpace(city.String) != "" {
+			c := strings.TrimSpace(city.String)
+			cityPtr = &c
+		}
+		if isMe {
+			if name != "" {
+				summary.MyName = &name
+			}
+			summary.MyCity = cityPtr
+			summary.MyAvatarUrl = avatar
+			if lat.Valid && lon.Valid {
+				la, lo := lat.Float64, lon.Float64
+				summary.MyLat, summary.MyLon = &la, &lo
+			}
+			return
+		}
+		if name != "" {
+			summary.PartnerName = &name
+		}
+		summary.PartnerCity = cityPtr
+		summary.PartnerAvatarUrl = avatar
+		if lat.Valid && lon.Valid {
+			la, lo := lat.Float64, lon.Float64
+			summary.PartnerLat, summary.PartnerLon = &la, &lo
+		}
+		if tz.Valid && tz.String != "" {
+			t := tz.String
+			summary.Timezone = &t
+			lt := formatPartnerLocalTime(t)
+			summary.LocalTime = &lt
+		}
+		if battery.Valid {
+			b := int(battery.Int64)
+			summary.BatteryPercent = &b
+		}
+		if status.Valid && strings.TrimSpace(status.String) != "" {
+			s := strings.TrimSpace(status.String)
+			summary.StatusMessage = &s
+		}
+		if ws, temp := fetchPartnerWeather(userID); ws != "" {
+			summary.WeatherSummary = &ws
+			summary.TemperatureF = temp
+		}
+	}
+
+	fillUserWidgetFields(user.ID, true)
 	var partnerID string
-	err = db.QueryRow(
+	if err := db.QueryRow(
 		`SELECT id::text FROM users WHERE relationship_id = $1 AND id != $2 LIMIT 1`,
 		relationshipID, user.ID,
-	).Scan(&partnerID)
-	if err == nil {
-		_ = db.QueryRow(
-			`SELECT weather_lat, weather_lon, weather_city FROM users WHERE id = $1`, partnerID,
-		).Scan(&partnerLat, &partnerLon, &partnerCity)
+	).Scan(&partnerID); err == nil {
+		fillUserWidgetFields(partnerID, false)
 	}
-	if myCity.Valid && myCity.String != "" {
-		summary.MyCity = &myCity.String
-	}
-	if partnerCity.Valid && partnerCity.String != "" {
-		summary.PartnerCity = &partnerCity.String
-	}
-	if myLat.Valid && myLon.Valid && partnerLat.Valid && partnerLon.Valid {
-		d := haversineDistance(myLat.Float64, myLon.Float64, partnerLat.Float64, partnerLon.Float64)
+	if summary.MyLat != nil && summary.MyLon != nil && summary.PartnerLat != nil && summary.PartnerLon != nil {
+		d := haversineDistance(*summary.MyLat, *summary.MyLon, *summary.PartnerLat, *summary.PartnerLon)
 		summary.DistanceMiles = &d
 	}
 

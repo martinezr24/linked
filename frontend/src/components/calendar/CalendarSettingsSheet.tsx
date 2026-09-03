@@ -23,7 +23,7 @@ export function CalendarSettingsSheet({ visible, onClose }: Props) {
   const { deviceId } = useRelationship();
   const queryClient = useQueryClient();
   const { mineColor, partnerColor, sharedColor } = useProfile();
-  const { isConnected, email, isLoading: gcalLoading, connect, disconnect, isDisconnecting } = useGoogleCalendar();
+  const { isConnected, email, isLoading: gcalLoading, connect, disconnect, isDisconnecting, isConnecting } = useGoogleCalendar();
 
   const [myColor, setMyColor] = useState(mineColor);
   const [bothColor, setBothColor] = useState(
@@ -117,7 +117,8 @@ export function CalendarSettingsSheet({ visible, onClose }: Props) {
               ) : (
                 <PrimaryButton
                   label="Connect Google Calendar"
-                  onPress={() => void connect()}
+                  onPress={() => connect()}
+                  loading={isConnecting}
                   style={styles.gcalBtn}
                 />
               )}

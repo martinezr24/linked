@@ -195,6 +195,8 @@ export type AsyncNote = {
   createdAt: string;
 };
 
+export type WidgetGoal = { text: string; done: boolean };
+
 export type WidgetSummary = {
   nextVisitAt?: string | null;
   nextEventTitle?: string | null;
@@ -204,11 +206,25 @@ export type WidgetSummary = {
   currentStreak: number;
   dailyPhotoUrl?: string | null;
   partnerPhotoUrl?: string | null;
-  latestDrawingDate?: string | null;
-  weeklyGoals?: { text: string; done: boolean }[];
-  partnerCity?: string | null;
-  distanceMiles?: number | null;
+  weeklyGoals?: WidgetGoal[];
+  latestDrawing?: DrawingData | null;
+  partnerName?: string | null;
+  partnerAvatarUrl?: string | null;
+  localTime?: string | null;
+  timezone?: string | null;
+  weatherSummary?: string | null;
+  temperatureF?: number | null;
+  statusMessage?: string | null;
+  batteryPercent?: number | null;
+  myName?: string | null;
   myCity?: string | null;
+  partnerCity?: string | null;
+  myLat?: number | null;
+  myLon?: number | null;
+  partnerLat?: number | null;
+  partnerLon?: number | null;
+  distanceMiles?: number | null;
+  myAvatarUrl?: string | null;
 };
 
 export type WsMessage = {

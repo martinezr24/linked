@@ -43,6 +43,10 @@ export default function RootLayout() {
                 options={{ headerShown: false }}
               />
               <Stack.Screen name="distance" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="google-calendar/connected"
+                options={{ headerShown: false, animation: "fade" }}
+              />
             </Stack>
             <HeartPulseOverlay />
             <AnimatedSplash />
