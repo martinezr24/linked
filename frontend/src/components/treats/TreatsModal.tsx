@@ -5,6 +5,7 @@ import {
   StyleSheet,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText } from "@/components/ui/AppText";
 import { TreatCard } from "@/components/treats/TreatCard";
@@ -21,36 +22,54 @@ type Props = {
 
 export function TreatsModal({ visible, onClose, partnerName }: Props) {
   const theme = useTheme();
+  const insets = useSafeAreaInsets();
   const { partnerVenmo } = useProfile();
   const label = partnerName?.trim() || "your partner";
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <Pressable style={styles.backdrop} onPress={onClose}>
+      <View style={styles.backdrop}>
         <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Dismiss"
+        />
+        <View
           style={[
             styles.sheet,
             {
               backgroundColor: theme.colors.surface.card,
               borderColor: theme.colors.border.subtle,
+              paddingBottom: Math.max(insets.bottom, 16) + 16,
             },
           ]}
-          onPress={(e) => e.stopPropagation()}
         >
-          <View style={styles.handle} />
-          <AppText variant="h2" style={styles.title}>
-            Treat {label}
-          </AppText>
-          <AppText variant="body" color="secondary" style={styles.hint}>
-            Pick a small gift — you'll finish checkout in their app or browser.
-          </AppText>
+          <View style={styles.header}>
+            <View style={styles.handle} />
+            <AppText variant="h2" style={styles.title}>
+              Treat {label}
+            </AppText>
+            <AppText variant="body" color="secondary" style={styles.hint}>
+              Pick a small gift — you'll finish checkout in their app or browser.
+            </AppText>
+          </View>
           <ScrollView
             style={styles.list}
-            showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.listContent}
+            showsVerticalScrollIndicator
+            keyboardShouldPersistTaps="handled"
+            bounces
           >
-            <VenmoTreatCard username={partnerVenmo} partnerName={label} mode="pay" />
-            <VenmoTreatCard username={partnerVenmo} partnerName={label} mode="request" />
+            <VenmoTreatCard
+              username={partnerVenmo}
+              partnerName={label}
+              mode="pay"
+            />
+            <VenmoTreatCard
+              username={partnerVenmo}
+              partnerName={label}
+              mode="request"
+            />
             {TREAT_LINKS.map((treat) => (
               <TreatCard key={treat.id} treat={treat} />
             ))}
@@ -60,8 +79,8 @@ export function TreatsModal({ visible, onClose, partnerName }: Props) {
               Not now
             </AppText>
           </Pressable>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -77,8 +96,10 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 20,
     borderWidth: 1,
     paddingHorizontal: 20,
-    paddingBottom: 32,
     maxHeight: "85%",
+  },
+  header: {
+    flexShrink: 0,
   },
   handle: {
     width: 36,
@@ -91,7 +112,16 @@ const styles = StyleSheet.create({
   },
   title: { marginBottom: 8 },
   hint: { marginBottom: 16 },
-  list: { maxHeight: 360 },
+  list: {
+    flexGrow: 1,
+    flexShrink: 1,
+    minHeight: 0,
+  },
   listContent: { gap: 10, paddingBottom: 8 },
-  dismiss: { alignItems: "center", marginTop: 16, paddingVertical: 8 },
+  dismiss: {
+    flexShrink: 0,
+    alignItems: "center",
+    marginTop: 16,
+    paddingVertical: 8,
+  },
 });

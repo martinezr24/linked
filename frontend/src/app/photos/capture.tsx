@@ -9,11 +9,11 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
-import { CameraView, useCameraPermissions } from "expo-camera";
+import { CameraView, useCameraPermissions, type FlashMode } from "expo-camera";
 import { router, useLocalSearchParams } from "expo-router";
 
 import { AppText } from "@/components/ui/AppText";
-import { CameraIcon, CloseIcon, SwapIcon } from "@/components/ui/icons";
+import { CloseIcon, FlashIcon, SwapIcon } from "@/components/ui/icons";
 import { PrimaryButton } from "@/components/ui/PrimaryButton";
 import { DAILY_PHOTO_ASPECT_RATIO } from "@/constants/dailyPhoto";
 import { useSendDailyPhoto } from "@/hooks/useSendDailyPhoto";
@@ -23,6 +23,19 @@ import { hapticLight } from "@/utils/haptics";
 import { colors } from "@/theme/tokens";
 
 type Facing = "front" | "back";
+
+const FLASH_CYCLE: FlashMode[] = ["off", "on", "auto"];
+
+function nextFlashMode(current: FlashMode): FlashMode {
+  const i = FLASH_CYCLE.indexOf(current);
+  return FLASH_CYCLE[(i + 1) % FLASH_CYCLE.length]!;
+}
+
+function flashLabel(mode: FlashMode): string {
+  if (mode === "on") return "On";
+  if (mode === "auto") return "Auto";
+  return "Off";
+}
 
 function useFrameSize(topInset: number, bottomInset: number) {
   const { width: screenWidth, height: screenHeight } = useWindowDimensions();
@@ -49,6 +62,7 @@ export default function PhotoCaptureScreen() {
   const [permission, requestPermission] = useCameraPermissions();
   const cameraRef = useRef<CameraView>(null);
   const [facing, setFacing] = useState<Facing>("front");
+  const [flashMode, setFlashMode] = useState<FlashMode>("off");
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [croppingLibrary, setCroppingLibrary] = useState(Boolean(initialPreviewUri));
   const [cameraReady, setCameraReady] = useState(false);
@@ -190,6 +204,8 @@ export default function PhotoCaptureScreen() {
                 ref={cameraRef}
                 style={StyleSheet.absoluteFill}
                 facing={facing}
+                flash={flashMode}
+                enableTorch={flashMode === "on" && facing === "back"}
                 mirror={facing === "front"}
                 onCameraReady={() => setCameraReady(true)}
               />
@@ -246,9 +262,40 @@ export default function PhotoCaptureScreen() {
                 >
                   <View style={styles.shutterInner} />
                 </Pressable>
-                <View style={styles.flipSpacer}>
-                  <CameraIcon size={22} color="transparent" />
-                </View>
+                <Pressable
+                  onPress={() => {
+                    void hapticLight();
+                    setFlashMode((m) => nextFlashMode(m));
+                  }}
+                  style={[
+                    styles.flashBtn,
+                    flashMode !== "off" && styles.flashBtnActive,
+                  ]}
+                  accessibilityLabel={`Flash ${flashLabel(flashMode)}`}
+                >
+                  <FlashIcon
+                    size={20}
+                    color={
+                      flashMode !== "off"
+                        ? colors.accent.primary
+                        : colors.text.primary
+                    }
+                  />
+                  <AppText
+                    variant="caption"
+                    style={[
+                      styles.flashCaption,
+                      {
+                        color:
+                          flashMode !== "off"
+                            ? colors.accent.primary
+                            : colors.text.secondary,
+                      },
+                    ]}
+                  >
+                    {flashLabel(flashMode)}
+                  </AppText>
+                </Pressable>
               </View>
             </>
           )}
@@ -342,7 +389,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  flipSpacer: { width: 48 },
+  flashBtn: {
+    width: 48,
+    height: 52,
+    borderRadius: 24,
+    backgroundColor: colors.overlay.glass,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 2,
+  },
+  flashBtnActive: {
+    borderWidth: 1,
+    borderColor: colors.accent.primary,
+  },
+  flashCaption: {
+    fontSize: 9,
+    lineHeight: 11,
+    marginTop: 1,
+    fontWeight: "600",
+  },
   shutterOuter: {
     width: 76,
     height: 76,

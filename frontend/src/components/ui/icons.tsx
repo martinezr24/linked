@@ -29,6 +29,20 @@ export function CameraIcon({ size = 24, color }: IconProps) {
   );
 }
 
+export function FlashIcon({ size = 24, color }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox={V} fill="none">
+      <Path
+        d="M13 2 4 14h7l-1 8 9-12h-7l1-8Z"
+        stroke={color}
+        strokeWidth={SW}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
 export function ChevronLeftIcon({ size = 24, color }: IconProps) {
   return (
     <Svg width={size} height={size} viewBox={V} fill="none">
