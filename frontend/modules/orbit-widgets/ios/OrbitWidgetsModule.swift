@@ -6,14 +6,11 @@ public class OrbitWidgetsModule: Module {
   public func definition() -> ModuleDefinition {
     Name("OrbitWidgets")
 
-    // Write a string value into the shared App Group container and refresh
-    // the widget timelines so the home-screen widget updates immediately.
+    // Write a string into the shared App Group. Does not reload timelines —
+    // callers should finish caching images first, then call reload().
     Function("set") { (key: String, value: String, group: String) in
       let defaults = UserDefaults(suiteName: group)
       defaults?.set(value, forKey: key)
-      if #available(iOS 14.0, *) {
-        WidgetCenter.shared.reloadAllTimelines()
-      }
     }
 
     Function("reload") {
@@ -22,36 +19,29 @@ public class OrbitWidgetsModule: Module {
       }
     }
 
-    /// Download (or clear) widget image slots into the App Group from the main
-    /// app process, which has reliable network access. Keys are slot names
-    /// (`daily`, `partner_photo`, `my_avatar`, `partner_avatar`); values are
-    /// remote URLs. Pass an empty string to delete a stale slot file.
-    AsyncFunction("cacheImages") { (slots: [String: String], group: String) in
+    /// Write (or clear) one image slot in the App Group `widget-images/` folder.
+    /// Pass an empty `base64Jpeg` to delete a stale file. Otherwise decode JPEG/PNG
+    /// base64, downscale, and store as JPEG.
+    AsyncFunction("writeImage") { (slot: String, base64Jpeg: String, group: String) in
       guard let root = FileManager.default.containerURL(
         forSecurityApplicationGroupIdentifier: group
       ) else { return }
 
       let dir = root.appendingPathComponent("widget-images", isDirectory: true)
       try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+      let fileURL = dir.appendingPathComponent("\(slot).jpg")
 
-      for (slot, urlString) in slots {
-        let fileURL = dir.appendingPathComponent("\(slot).jpg")
-        let trimmed = urlString.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
-          try? FileManager.default.removeItem(at: fileURL)
-          continue
-        }
-        guard let url = URL(string: trimmed),
-              let data = try? Data(contentsOf: url),
-              let image = UIImage(data: data) else { continue }
-        let scaled = Self.downscale(image, maxDimension: 400)
-        guard let jpeg = scaled.jpegData(compressionQuality: 0.82) else { continue }
-        try? jpeg.write(to: fileURL, options: .atomic)
+      let trimmed = base64Jpeg.trimmingCharacters(in: .whitespacesAndNewlines)
+      if trimmed.isEmpty {
+        try? FileManager.default.removeItem(at: fileURL)
+        return
       }
 
-      if #available(iOS 14.0, *) {
-        WidgetCenter.shared.reloadAllTimelines()
-      }
+      guard let data = Data(base64Encoded: trimmed, options: .ignoreUnknownCharacters),
+            let image = UIImage(data: data) else { return }
+      let scaled = Self.downscale(image, maxDimension: 400)
+      guard let jpeg = scaled.jpegData(compressionQuality: 0.82) else { return }
+      try? jpeg.write(to: fileURL, options: .atomic)
     }
   }
 

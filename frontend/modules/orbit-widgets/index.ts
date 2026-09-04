@@ -3,7 +3,7 @@ import { requireNativeModule } from "expo-modules-core";
 type OrbitWidgetsModule = {
   set: (key: string, value: string, group: string) => void;
   reload: () => void;
-  cacheImages: (slots: Record<string, string>, group: string) => Promise<void>;
+  writeImage: (slot: string, base64Jpeg: string, group: string) => Promise<void>;
 };
 
 // The native module only exists in iOS builds that include the local module.
@@ -15,7 +15,7 @@ try {
   native = null;
 }
 
-/** Write a string into the shared App Group and reload widget timelines. */
+/** Write a string into the shared App Group (does not reload timelines). */
 export function setWidgetValue(key: string, value: string, group: string): void {
   native?.set(key, value, group);
 }
@@ -26,13 +26,14 @@ export function reloadWidgets(): void {
 }
 
 /**
- * Download (or clear) image slots into the App Group `widget-images/` folder.
- * Empty-string values delete the slot file. No-ops when the native module is absent.
+ * Write (or clear) one image slot under App Group `widget-images/`.
+ * Empty base64 deletes the slot file.
  */
-export async function cacheWidgetImages(
-  slots: Record<string, string>,
+export async function writeWidgetImage(
+  slot: string,
+  base64Jpeg: string,
   group: string,
 ): Promise<void> {
-  if (!native?.cacheImages) return;
-  await native.cacheImages(slots, group);
+  if (!native?.writeImage) return;
+  await native.writeImage(slot, base64Jpeg, group);
 }

@@ -1,8 +1,13 @@
 import { Platform } from "react-native";
 import * as SecureStore from "expo-secure-store";
 
-import { cacheWidgetImages, setWidgetValue } from "../../modules/orbit-widgets";
+import {
+  reloadWidgets,
+  setWidgetValue,
+  writeWidgetImage,
+} from "../../modules/orbit-widgets";
 import { fetchWidgetSummary } from "@/api/fetchers";
+import { resolveMediaUrl } from "@/utils/mediaUrl";
 import type { WidgetSummary } from "@/types";
 
 const WIDGET_DATA_KEY = "linked_widget_summary";
@@ -16,6 +21,16 @@ const IMAGE_SLOTS = [
   ["partner_avatar", "partnerAvatarUrl"],
 ] as const;
 
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const chunk = 0x8000;
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 async function writeWidgetData(json: string) {
   if (Platform.OS === "web") {
     localStorage.setItem(WIDGET_DATA_KEY, json);
@@ -23,30 +38,54 @@ async function writeWidgetData(json: string) {
   }
   // SecureStore copy powers the in-app WidgetPreviewCard.
   await SecureStore.setItemAsync(WIDGET_DATA_KEY, json);
-  // App Group copy is what the native iOS widget reads (also reloads timelines).
+  // App Group copy is what the native iOS widget reads (reload happens after images).
   if (Platform.OS === "ios") {
     setWidgetValue(WIDGET_DATA_KEY, json, APP_GROUP);
   }
 }
 
-/** Push photo/avatar bytes into App Group so the widget extension need not network. */
+/** Download photos via the same network path as the app UI, then write App Group JPGs. */
 async function cacheSummaryImages(summary: WidgetSummary) {
   if (Platform.OS !== "ios") return;
-  const slots: Record<string, string> = {};
-  for (const [slot, key] of IMAGE_SLOTS) {
-    const url = summary[key];
-    slots[slot] = typeof url === "string" && url.length > 0 ? url : "";
-  }
-  try {
-    await cacheWidgetImages(slots, APP_GROUP);
-  } catch {
-    // Best-effort; widget can still try network fallback on timeline refresh.
-  }
+
+  await Promise.all(
+    IMAGE_SLOTS.map(async ([slot, key]) => {
+      const raw = summary[key];
+      if (typeof raw !== "string" || raw.length === 0) {
+        try {
+          await writeWidgetImage(slot, "", APP_GROUP);
+        } catch {
+          // best-effort clear
+        }
+        return;
+      }
+
+      try {
+        const absolute = resolveMediaUrl(raw);
+        const res = await fetch(absolute);
+        if (!res.ok) {
+          await writeWidgetImage(slot, "", APP_GROUP);
+          return;
+        }
+        const buffer = await res.arrayBuffer();
+        if (buffer.byteLength === 0) {
+          await writeWidgetImage(slot, "", APP_GROUP);
+          return;
+        }
+        await writeWidgetImage(slot, arrayBufferToBase64(buffer), APP_GROUP);
+      } catch {
+        // Keep any prior cached file; timeline can still try network fallback.
+      }
+    }),
+  );
 }
 
 export async function syncWidgetData(summary: WidgetSummary) {
   await writeWidgetData(JSON.stringify(summary));
   await cacheSummaryImages(summary);
+  if (Platform.OS === "ios") {
+    reloadWidgets();
+  }
 }
 
 /** Fetch latest summary from the API and push it into App Group / SecureStore. */
