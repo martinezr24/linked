@@ -59,20 +59,56 @@ struct OrbitSummary: Decodable {
     )
 
     /// Believable gallery / first-paint sample so widgets don’t look broken.
-    static let sample = OrbitSummary(
-        partnerCheckedIn: true,
-        mineCheckedIn: true,
-        currentStreak: 3,
-        partnerName: "Partner",
-        myName: "You",
-        myCity: "New Haven",
-        partnerCity: "Sacramento",
-        myLat: 41.31,
-        myLon: -72.92,
-        partnerLat: 38.58,
-        partnerLon: -121.49,
-        distanceMiles: 2540
-    )
+    static let sample: OrbitSummary = {
+        let visit = Calendar.current.date(byAdding: .day, value: 12, to: Date()) ?? Date()
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime]
+        return OrbitSummary(
+            nextVisitAt: iso.string(from: visit),
+            partnerCheckedIn: true,
+            mineCheckedIn: true,
+            currentStreak: 3,
+            weeklyGoals: [
+                WidgetGoalItem(text: "Send a voice note", done: true),
+                WidgetGoalItem(text: "Plan next visit", done: false),
+                WidgetGoalItem(text: "Share a photo", done: false),
+            ],
+            partnerName: "Partner",
+            localTime: "2:40 PM",
+            timezone: "PDT",
+            weatherSummary: "Clear",
+            temperatureF: 72,
+            statusMessage: "At the library",
+            batteryPercent: 64,
+            myName: "You",
+            myCity: "New Haven",
+            partnerCity: "Sacramento",
+            myLat: 41.31,
+            myLon: -72.92,
+            partnerLat: 38.58,
+            partnerLon: -121.49,
+            distanceMiles: 2540
+        )
+    }()
+
+    /// True when App Group has nothing useful to show (gallery would look empty).
+    var looksEmpty: Bool {
+        nextVisitAt == nil
+            && nextEventAt == nil
+            && currentStreak == 0
+            && dailyPhotoUrl == nil
+            && partnerPhotoUrl == nil
+            && (weeklyGoals == nil || weeklyGoals?.isEmpty == true)
+            && latestDrawing == nil
+            && localTime == nil
+            && weatherSummary == nil
+            && temperatureF == nil
+            && statusMessage == nil
+            && batteryPercent == nil
+            && distanceMiles == nil
+            && myLat == nil
+            && partnerLat == nil
+    }
 
     var photoStatus: String {
         if mineCheckedIn && partnerCheckedIn { return "Both in — streak secured" }
@@ -147,7 +183,14 @@ struct Provider: TimelineProvider {
     }
 
     func getSnapshot(in context: Context, completion: @escaping (OrbitEntry) -> Void) {
-        let summary = loadSummary()
+        let loaded = loadSummary()
+        let useSample = context.isPreview || loaded.looksEmpty
+        let summary = useSample ? OrbitSummary.sample : loaded
+        // Gallery / empty snapshots: skip network so iOS doesn't fall back to redacted placeholder.
+        if useSample {
+            completion(OrbitEntry(date: Date(), summary: summary))
+            return
+        }
         downloadImages(summary: summary) { images in
             completion(OrbitEntry(
                 date: Date(),
@@ -272,6 +315,16 @@ private func svgPath(_ d: String) -> Path {
 
 // MARK: - Shared chrome
 
+private let widgetContentPadding: CGFloat = 14
+
+private extension View {
+    func orbitWidgetChrome() -> some View {
+        self
+            .padding(widgetContentPadding)
+            .containerBackground(canvas, for: .widget)
+    }
+}
+
 private struct CapsLabel: View {
     let text: String
     var body: some View {
@@ -304,7 +357,7 @@ private struct PhotoSlot: View {
                 }
             }
         }
-        .aspectRatio(3 / 4, contentMode: .fit)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
@@ -432,11 +485,12 @@ struct widget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             OrbitWidgetView(entry: entry)
-                .containerBackground(canvas, for: .widget)
+                .orbitWidgetChrome()
         }
         .configurationDisplayName("Streak & visit")
         .description("Photo streak and countdown to your next visit.")
         .supportedFamilies([.systemSmall, .systemMedium])
+        .contentMarginsDisabled()
     }
 }
 
@@ -465,7 +519,7 @@ private struct DailyPhotoView: View {
                     .foregroundColor(textSecondary)
                 PhotoSlot(image: entry.partnerPhoto, label: "Partner")
             }
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             if family != .systemMedium {
                 Text(entry.summary.photoStatusCompact)
                     .font(.system(size: 10, weight: .medium))
@@ -486,11 +540,12 @@ struct DailyPhotoWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             DailyPhotoView(entry: entry)
-                .containerBackground(canvas, for: .widget)
+                .orbitWidgetChrome()
         }
         .configurationDisplayName("Daily Photo")
         .description("Today’s photos from you and your partner.")
         .supportedFamilies([.systemSmall, .systemMedium])
+        .contentMarginsDisabled()
     }
 }
 
@@ -549,11 +604,12 @@ struct DrawingWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             DrawingView(summary: entry.summary)
-                .containerBackground(canvas, for: .widget)
+                .orbitWidgetChrome()
         }
         .configurationDisplayName("Drawings")
         .description("Your latest shared drawing.")
         .supportedFamilies([.systemSmall])
+        .contentMarginsDisabled()
     }
 }
 
@@ -608,6 +664,7 @@ private struct GoalsView: View {
                 }
                 Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
         } else {
             VStack(alignment: .leading, spacing: 4) {
                 CapsLabel(text: "THIS WEEK")
@@ -631,7 +688,9 @@ private struct GoalsView: View {
                                 .strikethrough(goal.done)
                                 .foregroundColor(goal.done ? textSecondary : textPrimary)
                                 .lineLimit(1)
+                            Spacer(minLength: 0)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     Spacer(minLength: 0)
                     Text("\(done)/\(goals.count) done")
@@ -649,11 +708,12 @@ struct GoalsWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             GoalsView(goals: entry.summary.weeklyGoals ?? [])
-                .containerBackground(canvas, for: .widget)
+                .orbitWidgetChrome()
         }
         .configurationDisplayName("Weekly Goals")
         .description("This week’s connection goals.")
         .supportedFamilies([.systemSmall, .systemMedium])
+        .contentMarginsDisabled()
     }
 }
 
@@ -693,6 +753,7 @@ private struct TheirWorldSmallView: View {
     let entry: OrbitEntry
     var body: some View {
         let s = entry.summary
+        let hasWeatherOrTime = s.temperatureF != nil || s.weatherSummary != nil || s.localTime != nil
         VStack(alignment: .leading, spacing: 4) {
             HStack {
                 AvatarCircle(image: entry.partnerAvatar, name: s.partnerName, size: 28)
@@ -709,18 +770,25 @@ private struct TheirWorldSmallView: View {
                     .foregroundColor(textSecondary)
                     .lineLimit(1)
             }
-            HStack(spacing: 4) {
-                Image(systemName: weatherSymbol(s.weatherSummary))
-                    .font(.system(size: 11))
-                if let temp = s.temperatureF {
-                    Text("\(s.weatherSummary ?? "Weather") · \(temp)°F")
-                } else {
-                    Text(s.weatherSummary ?? s.localTime ?? "")
+            if hasWeatherOrTime {
+                HStack(spacing: 4) {
+                    Image(systemName: weatherSymbol(s.weatherSummary))
+                        .font(.system(size: 11))
+                    if let temp = s.temperatureF {
+                        Text("\(s.weatherSummary ?? "Weather") · \(temp)°F")
+                    } else {
+                        Text(s.weatherSummary ?? s.localTime ?? "")
+                    }
                 }
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(textSecondary)
+                .lineLimit(1)
+            } else {
+                Text("Open Orbit to sync")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(textSecondary)
+                    .lineLimit(1)
             }
-            .font(.system(size: 11, weight: .medium))
-            .foregroundColor(textSecondary)
-            .lineLimit(1)
             if let bat = s.batteryPercent {
                 Text("Battery \(bat)%")
                     .font(.system(size: 11, weight: .medium))
@@ -811,11 +879,12 @@ struct TheirWorldWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             TheirWorldRoot(entry: entry)
-                .containerBackground(canvas, for: .widget)
+                .orbitWidgetChrome()
         }
         .configurationDisplayName("Their World")
         .description("Partner time, weather, status, and battery.")
         .supportedFamilies([.systemSmall, .systemMedium])
+        .contentMarginsDisabled()
     }
 }
 
@@ -971,14 +1040,18 @@ private struct DistanceMediumView: View {
                 )
                 .padding(.bottom, 36)
             } else {
-                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                    .fill(cardFill)
-                    .overlay(
-                        Text("Share locations in Orbit")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(textSecondary)
-                    )
-                    .padding(.bottom, 36)
+                VStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    Image(systemName: "location.slash")
+                        .font(.system(size: 28, weight: .medium))
+                        .foregroundColor(textSecondary)
+                    Text("Share locations in Orbit")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(textSecondary)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.bottom, 28)
             }
 
             VStack(spacing: 2) {
@@ -991,18 +1064,28 @@ private struct DistanceMediumView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundColor(textPrimary)
                 }
-                HStack(spacing: 8) {
-                    Text([s.myName, s.myCity].compactMap { $0 }.joined(separator: " · "))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
-                    Text("·")
-                        .foregroundColor(textSecondary)
-                    Text([s.partnerName, s.partnerCity].compactMap { $0 }.joined(separator: " · "))
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.7)
+                let meLine = [s.myName, s.myCity].compactMap { $0 }.joined(separator: " · ")
+                let themLine = [s.partnerName, s.partnerCity].compactMap { $0 }.joined(separator: " · ")
+                if !meLine.isEmpty || !themLine.isEmpty {
+                    HStack(spacing: 8) {
+                        if !meLine.isEmpty {
+                            Text(meLine)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
+                        if !meLine.isEmpty && !themLine.isEmpty {
+                            Text("·")
+                                .foregroundColor(textSecondary)
+                        }
+                        if !themLine.isEmpty {
+                            Text(themLine)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                        }
+                    }
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(textSecondary)
                 }
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(textSecondary)
             }
             .frame(maxWidth: .infinity)
             .padding(.bottom, 2)
@@ -1029,11 +1112,12 @@ struct DistanceWidget: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: Provider()) { entry in
             DistanceRoot(entry: entry)
-                .containerBackground(canvas, for: .widget)
+                .orbitWidgetChrome()
         }
         .configurationDisplayName("Distance Apart")
         .description("How far apart you are right now.")
         .supportedFamilies([.systemSmall, .systemMedium])
+        .contentMarginsDisabled()
     }
 }
 
