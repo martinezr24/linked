@@ -184,23 +184,21 @@ struct Provider: TimelineProvider {
 
     func getSnapshot(in context: Context, completion: @escaping (OrbitEntry) -> Void) {
         let loaded = loadSummary()
-        let useSample = context.isPreview || loaded.looksEmpty
-        let summary = useSample ? OrbitSummary.sample : loaded
-        // Gallery / empty snapshots: skip network so iOS doesn't fall back to redacted placeholder.
-        if useSample {
-            completion(OrbitEntry(date: Date(), summary: summary))
+        // Gallery / empty: sample immediately. Otherwise cache-only — never block on network
+        // or iOS falls back to the auto-redacted placeholder on device.
+        if context.isPreview || loaded.looksEmpty {
+            completion(OrbitEntry(date: Date(), summary: .sample))
             return
         }
-        downloadImages(summary: summary) { images in
-            completion(OrbitEntry(
-                date: Date(),
-                summary: summary,
-                dailyPhoto: images.daily,
-                partnerPhoto: images.partner,
-                myAvatar: images.myAvatar,
-                partnerAvatar: images.partnerAvatar
-            ))
-        }
+        let images = loadCachedImages(summary: loaded)
+        completion(OrbitEntry(
+            date: Date(),
+            summary: loaded,
+            dailyPhoto: images.daily,
+            partnerPhoto: images.partner,
+            myAvatar: images.myAvatar,
+            partnerAvatar: images.partnerAvatar
+        ))
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<OrbitEntry>) -> Void) {
@@ -250,15 +248,36 @@ private func storeCachedImage(_ image: UIImage, slot: String) {
     try? data.write(to: url, options: .atomic)
 }
 
+/// Prefer App Group files written by the main app; network is a fallback only.
+private func loadCachedImages(summary: OrbitSummary) -> DownloadedImages {
+    var images = DownloadedImages()
+    if summary.dailyPhotoUrl != nil { images.daily = cachedImage(slot: "daily") }
+    if summary.partnerPhotoUrl != nil { images.partner = cachedImage(slot: "partner_photo") }
+    if summary.myAvatarUrl != nil { images.myAvatar = cachedImage(slot: "my_avatar") }
+    if summary.partnerAvatarUrl != nil { images.partnerAvatar = cachedImage(slot: "partner_avatar") }
+    return images
+}
+
 /// Fetch from network; on success cache by stable slot. On failure, fall back to cache.
 private func fetchImage(_ urlString: String?, slot: String) -> UIImage? {
+    if let cached = cachedImage(slot: slot) {
+        // Still try a refresh when a URL is present, but never leave the slot empty
+        // if network fails on device.
+        if let urlString, let url = URL(string: urlString),
+           let data = try? Data(contentsOf: url),
+           let image = UIImage(data: data) {
+            storeCachedImage(image, slot: slot)
+            return image
+        }
+        return cached
+    }
     if let urlString, let url = URL(string: urlString),
        let data = try? Data(contentsOf: url),
        let image = UIImage(data: data) {
         storeCachedImage(image, slot: slot)
         return image
     }
-    return cachedImage(slot: slot)
+    return nil
 }
 
 private func downloadImages(summary: OrbitSummary, completion: @escaping (DownloadedImages) -> Void) {
@@ -322,6 +341,9 @@ private extension View {
         self
             .padding(widgetContentPadding)
             .containerBackground(canvas, for: .widget)
+            // Device-only: without this, WidgetKit often leaves entry views redacted
+            // (grey bars) while Simulator looks fine.
+            .unredacted()
     }
 }
 
@@ -357,7 +379,8 @@ private struct PhotoSlot: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+        .aspectRatio(3 / 4, contentMode: .fit)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
@@ -512,14 +535,14 @@ private struct DailyPhotoView: View {
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
             }
-            HStack(spacing: 8) {
+            HStack(alignment: .center, spacing: 8) {
                 PhotoSlot(image: entry.dailyPhoto, label: "You")
                 Image(systemName: "arrow.left.arrow.right")
                     .font(.system(size: 11, weight: .semibold))
                     .foregroundColor(textSecondary)
                 PhotoSlot(image: entry.partnerPhoto, label: "Partner")
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity)
             if family != .systemMedium {
                 Text(entry.summary.photoStatusCompact)
                     .font(.system(size: 10, weight: .medium))
@@ -530,6 +553,7 @@ private struct DailyPhotoView: View {
                     .lineLimit(2)
                     .minimumScaleFactor(0.8)
             }
+            Spacer(minLength: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }

@@ -3,6 +3,7 @@ import { requireNativeModule } from "expo-modules-core";
 type OrbitWidgetsModule = {
   set: (key: string, value: string, group: string) => void;
   reload: () => void;
+  cacheImages: (slots: Record<string, string>, group: string) => Promise<void>;
 };
 
 // The native module only exists in iOS builds that include the local module.
@@ -22,4 +23,16 @@ export function setWidgetValue(key: string, value: string, group: string): void 
 /** Force the widgets to reload their timelines. */
 export function reloadWidgets(): void {
   native?.reload();
+}
+
+/**
+ * Download (or clear) image slots into the App Group `widget-images/` folder.
+ * Empty-string values delete the slot file. No-ops when the native module is absent.
+ */
+export async function cacheWidgetImages(
+  slots: Record<string, string>,
+  group: string,
+): Promise<void> {
+  if (!native?.cacheImages) return;
+  await native.cacheImages(slots, group);
 }
